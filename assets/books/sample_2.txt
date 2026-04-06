@@ -1,0 +1,25 @@
+Koofy Reader MVP Build Note
+
+1. Library
+- local asset book list
+- tap to open reader
+- show reading progress
+
+2. Reader
+- single scroll view text reader
+- persist progress ratio in local storage
+- restore to previous position
+
+3. Ads (placeholder stage)
+- footer ad area for future banner
+- offline message when no network
+- reward action stores ad-hide expiry
+
+4. Expansion plan
+- add epub/txt import
+- add theme and font controls
+- add real banner/rewarded ads
+- add iOS build stabilization
+
+이 파일도 샘플 본문입니다.
+영문/국문 혼합 텍스트 렌더링 테스트와 스크롤 위치 저장 테스트를 위해 포함했습니다.

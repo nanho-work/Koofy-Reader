@@ -1,0 +1,56 @@
+name: Android Release (AdMob Prod)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-release-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Validate required secrets
+        env:
+          ADMOB_APP_ID_ANDROID: ${{ secrets.ADMOB_APP_ID_ANDROID }}
+          ADMOB_BANNER_ANDROID: ${{ secrets.ADMOB_BANNER_ANDROID }}
+          ADMOB_REWARDED_ANDROID: ${{ secrets.ADMOB_REWARDED_ANDROID }}
+        run: |
+          set -euo pipefail
+          test -n "$ADMOB_APP_ID_ANDROID"
+          test -n "$ADMOB_BANNER_ANDROID"
+          test -n "$ADMOB_REWARDED_ANDROID"
+
+      - name: Create local AdMob env file
+        env:
+          ADMOB_APP_ID_ANDROID: ${{ secrets.ADMOB_APP_ID_ANDROID }}
+          ADMOB_BANNER_ANDROID: ${{ secrets.ADMOB_BANNER_ANDROID }}
+          ADMOB_REWARDED_ANDROID: ${{ secrets.ADMOB_REWARDED_ANDROID }}
+        run: |
+          cat > .env.admob <<EOF
+          ADMOB_APP_ID_ANDROID=$ADMOB_APP_ID_ANDROID
+          ADMOB_BANNER_ANDROID=$ADMOB_BANNER_ANDROID
+          ADMOB_REWARDED_ANDROID=$ADMOB_REWARDED_ANDROID
+          EOF
+
+      - name: Build Android release AAB
+        run: ./scripts/android_ads_build.sh release aab
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
