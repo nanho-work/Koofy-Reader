@@ -49,3 +49,5 @@ app.*.map.json
 .env.*
 !.env.admob.example
 ios/Flutter/AdMob.local.xcconfig
+android/key.properties
+android/upload-keystore.jks

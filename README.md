@@ -46,12 +46,32 @@ Required repository secrets:
 - `ADMOB_APP_ID_ANDROID`
 - `ADMOB_BANNER_ANDROID`
 - `ADMOB_REWARDED_ANDROID`
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
 Execution:
 
 1. GitHub repository -> `Actions`
 2. Run `Android Release (AdMob Prod)` workflow
 3. Download artifact `app-release-aab`
+
+## Why Play Console said "debug mode"
+
+If release signing is missing, Play Console may reject upload as debug-signed.
+This repository now requires `android/key.properties` for release builds.
+
+Local file format (`android/key.properties`):
+
+```properties
+storeFile=upload-keystore.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+In GitHub Actions, this file is generated from secrets automatically.
 
 ## Android manifest App ID injection
 

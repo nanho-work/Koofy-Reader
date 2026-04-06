@@ -28,11 +28,19 @@ jobs:
           ADMOB_APP_ID_ANDROID: ${{ secrets.ADMOB_APP_ID_ANDROID }}
           ADMOB_BANNER_ANDROID: ${{ secrets.ADMOB_BANNER_ANDROID }}
           ADMOB_REWARDED_ANDROID: ${{ secrets.ADMOB_REWARDED_ANDROID }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$ADMOB_APP_ID_ANDROID"
           test -n "$ADMOB_BANNER_ANDROID"
           test -n "$ADMOB_REWARDED_ANDROID"
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
 
       - name: Create local AdMob env file
         env:
@@ -44,6 +52,22 @@ jobs:
           ADMOB_APP_ID_ANDROID=$ADMOB_APP_ID_ANDROID
           ADMOB_BANNER_ANDROID=$ADMOB_BANNER_ANDROID
           ADMOB_REWARDED_ANDROID=$ADMOB_REWARDED_ANDROID
+          EOF
+
+      - name: Create Android signing files
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
       - name: Build Android release AAB
