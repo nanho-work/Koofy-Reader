@@ -6,17 +6,19 @@ class BookTile extends StatelessWidget {
     super.key,
     required this.book,
     required this.progressRatio,
+    required this.progressText,
+    required this.lastReadText,
     required this.onTap,
   });
 
   final Book book;
   final double progressRatio;
+  final String progressText;
+  final String? lastReadText;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final percent = (progressRatio * 100).round();
-
     return Card(
       margin: EdgeInsets.zero,
       child: ListTile(
@@ -28,9 +30,16 @@ class BookTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${book.author} · $percent% 읽음'),
+              Text('${book.author} · $progressText'),
               const SizedBox(height: 8),
               LinearProgressIndicator(value: progressRatio.clamp(0.0, 1.0)),
+              if (lastReadText != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '마지막 읽은 시간: $lastReadText',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 8),
               Text(book.description),
             ],
