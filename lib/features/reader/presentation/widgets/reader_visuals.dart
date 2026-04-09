@@ -3,7 +3,8 @@ import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
 
 const double readerDoublePageGap = 18;
 const double readerVerticalPadding = 16;
-const double readerFontSizeNormal = 19;
+const double readerContentBottomInset = 16;
+const double readerFontSizeNormal = 18;
 const double readerFontSizeLarge = 23;
 
 class ReaderPalette {

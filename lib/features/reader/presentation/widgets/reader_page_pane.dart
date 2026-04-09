@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_visuals.dart';
 
 class ReaderPagePane extends StatelessWidget {
   const ReaderPagePane({
@@ -16,13 +17,28 @@ class ReaderPagePane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: backgroundColor,
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      alignment: Alignment.topLeft,
-      child: text.trim().isEmpty
-          ? const SizedBox.shrink()
-          : SelectableText(text, style: style),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          0,
+          horizontalPadding,
+          readerContentBottomInset,
+        ),
+        child: SizedBox.expand(
+          child: ClipRect(
+            child: text.trim().isEmpty
+                ? const SizedBox.shrink()
+                : Text(
+                    text,
+                    style: style,
+                    softWrap: true,
+                    overflow: TextOverflow.clip,
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -50,6 +50,7 @@ class ReaderSessionController {
   final ReaderSettingsRepository _settingsRepository;
   final BookRepository _bookRepository;
   final TextPaginationEngine _paginationEngine;
+  static final Map<String, List<int>> _runtimePaginationOffsets = {};
 
   Future<ReaderBootstrapData> bootstrap(Book book) async {
     final results = await Future.wait<dynamic>([
@@ -84,31 +85,70 @@ class ReaderSessionController {
     required ReadingProgress? restoredProgress,
     required int previousTotalPages,
     required double previousRatio,
+    int previewPageCount = 30,
+    ValueChanged<PaginatedText>? onPreviewReady,
   }) async {
-    final cachedOffsets = await _readerRepository.loadPaginationOffsets(
-      bookId: bookId,
-      signature: signature,
-      contentLength: content.length,
-    );
+    final runtimeCacheKey = '$bookId|$signature|${content.length}';
+    final runtimeOffsets = _runtimePaginationOffsets[runtimeCacheKey];
+    final cachedOffsets =
+        runtimeOffsets ??
+        await _readerRepository.loadPaginationOffsets(
+          bookId: bookId,
+          signature: signature,
+          contentLength: content.length,
+        );
 
     PaginatedText paginated;
     if (cachedOffsets != null && cachedOffsets.isNotEmpty) {
+      _runtimePaginationOffsets[runtimeCacheKey] = cachedOffsets;
       paginated = PaginatedText.fromBreakOffsets(
         source: content,
         offsets: cachedOffsets,
       );
     } else {
-      paginated = await _paginationEngine.paginateAsync(
-        content: content,
-        maxWidth: textArea.width,
-        maxHeight: textArea.height,
-        style: textStyle,
-      );
+      final canUsePreview =
+          onPreviewReady != null &&
+          previewPageCount > 0 &&
+          restoredProgress == null &&
+          previousTotalPages <= 1;
+
+      PaginatedText? preview;
+      if (canUsePreview) {
+        preview = await _paginationEngine.paginateAsync(
+          content: content,
+          maxWidth: textArea.width,
+          maxHeight: textArea.height,
+          style: textStyle,
+          yieldEvery: 1,
+          maxPages: previewPageCount,
+        );
+        if (preview.length > 0) {
+          onPreviewReady(preview);
+        }
+      }
+
+      final previewCoveredAll =
+          preview != null &&
+          preview.ranges.isNotEmpty &&
+          preview.ranges.last.end >= content.length;
+
+      paginated = previewCoveredAll
+          ? preview
+          : await _paginationEngine.paginateAsync(
+              content: content,
+              maxWidth: textArea.width,
+              maxHeight: textArea.height,
+              style: textStyle,
+              yieldEvery: 1,
+            );
+
+      final offsets = paginated.toBreakOffsets();
+      _runtimePaginationOffsets[runtimeCacheKey] = offsets;
       await _readerRepository.savePaginationOffsets(
         bookId: bookId,
         signature: signature,
         contentLength: content.length,
-        offsets: paginated.toBreakOffsets(),
+        offsets: offsets,
       );
     }
 
@@ -141,6 +181,48 @@ class ReaderSessionController {
 
   Future<void> saveSettings(ReaderSettings settings) {
     return _settingsRepository.save(settings);
+  }
+
+  Future<void> precomputePaginationCache({
+    required String bookId,
+    required String content,
+    required String signature,
+    required Size textArea,
+    required TextStyle textStyle,
+  }) async {
+    final runtimeCacheKey = '$bookId|$signature|${content.length}';
+    if (_runtimePaginationOffsets.containsKey(runtimeCacheKey)) {
+      return;
+    }
+
+    final cachedOffsets = await _readerRepository.loadPaginationOffsets(
+      bookId: bookId,
+      signature: signature,
+      contentLength: content.length,
+    );
+    if (cachedOffsets != null && cachedOffsets.isNotEmpty) {
+      _runtimePaginationOffsets[runtimeCacheKey] = cachedOffsets;
+      return;
+    }
+
+    final pages = await _paginationEngine.paginateAsync(
+      content: content,
+      maxWidth: textArea.width,
+      maxHeight: textArea.height,
+      style: textStyle,
+      yieldEvery: 1,
+    );
+    final offsets = pages.toBreakOffsets();
+    if (offsets.isEmpty) {
+      return;
+    }
+    _runtimePaginationOffsets[runtimeCacheKey] = offsets;
+    await _readerRepository.savePaginationOffsets(
+      bookId: bookId,
+      signature: signature,
+      contentLength: content.length,
+      offsets: offsets,
+    );
   }
 
   _ResolvedPageIndex _resolvePageIndex({

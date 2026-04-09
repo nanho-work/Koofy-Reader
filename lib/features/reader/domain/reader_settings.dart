@@ -22,7 +22,7 @@ class ReaderSettings {
       backgroundMode: ReaderBackgroundMode.beige,
       fontOption: ReaderFontOption.sans,
       pageLayoutMode: ReaderPageLayoutMode.auto,
-      fontSize: 19,
+      fontSize: 18,
       lineHeight: 1.7,
       horizontalPadding: 18,
       keepScreenOn: false,
@@ -102,7 +102,7 @@ class ReaderSettings {
         backgroundMode: backgroundMode,
         fontOption: fontOption,
         pageLayoutMode: pageLayoutMode,
-        fontSize: (json['fontSize'] as num?)?.toDouble() ?? 19,
+        fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18,
         lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.7,
         horizontalPadding:
             (json['horizontalPadding'] as num?)?.toDouble() ?? 18,

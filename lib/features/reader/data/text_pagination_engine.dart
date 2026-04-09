@@ -77,6 +77,7 @@ class TextPaginationEngine {
     required double maxWidth,
     required double maxHeight,
     required TextStyle style,
+    int? maxPages,
   }) {
     final normalized = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     if (normalized.trim().isEmpty) {
@@ -103,6 +104,9 @@ class TextPaginationEngine {
     int start = 0;
 
     while (start < normalized.length) {
+      if (maxPages != null && ranges.length >= maxPages) {
+        break;
+      }
       final end = _findPageEnd(
         normalized,
         start: start,
@@ -140,6 +144,7 @@ class TextPaginationEngine {
     required double maxHeight,
     required TextStyle style,
     int yieldEvery = 20,
+    int? maxPages,
   }) async {
     final normalized = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     if (normalized.trim().isEmpty) {
@@ -167,6 +172,9 @@ class TextPaginationEngine {
     int pageCount = 0;
 
     while (start < normalized.length) {
+      if (maxPages != null && ranges.length >= maxPages) {
+        break;
+      }
       final end = _findPageEnd(
         normalized,
         start: start,
@@ -224,7 +232,9 @@ class TextPaginationEngine {
       return _adjustBreakByWordBoundary(source, start: start, end: probeEnd);
     }
 
-    final dy = math.max(0.0, maxHeight - 1);
+    final lineGuard = ((style.fontSize ?? 16) * (style.height ?? 1.5) * 1.8)
+        .clamp(16.0, 140.0);
+    final dy = math.max(0.0, maxHeight - lineGuard);
     final dx = math.max(0.0, maxWidth - 1);
     final localEnd = painter
         .getPositionForOffset(Offset(dx, dy))

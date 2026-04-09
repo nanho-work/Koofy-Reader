@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
@@ -13,7 +14,6 @@ import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_layout_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_search_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_session_controller.dart';
-import 'package:koofy_reader/features/reader/presentation/widgets/reader_bottom_panel.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_dialogs.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_page_pane.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_settings_sheet.dart';
@@ -31,6 +31,8 @@ class ReaderPage extends ConsumerStatefulWidget {
 
 class _ReaderPageState extends ConsumerState<ReaderPage>
     with WidgetsBindingObserver {
+  static const int _initialPreviewPageCount = 30;
+
   late final ReaderSessionController _sessionController;
 
   String _content = '';
@@ -48,13 +50,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   String _activeQuery = '';
   List<int> _queryPages = <int>[];
   int _queryCursor = -1;
-  bool _controlsExpanded = true;
 
   Timer? _saveDebounce;
   Size? _lastViewport;
   String? _activePaginationSignature;
   String? _lastPaginationSignature;
   int _paginationToken = 0;
+  bool _lastEffectiveDoubleMode = false;
+  final Set<String> _prewarmJobKeys = <String>{};
 
   @override
   void initState() {
@@ -144,12 +147,35 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  void _ensurePagination(Size viewport, {bool force = false}) {
+  TextStyle _readerTextStyleFor({
+    required ReaderSettings settings,
+    required ReaderPalette palette,
+  }) {
+    return TextStyle(
+      color: palette.text,
+      fontSize: settings.fontSize,
+      height: settings.lineHeight,
+      fontFamily: settings.fontFamily,
+    );
+  }
+
+  void _ensurePagination(
+    Size viewport, {
+    required MediaQueryData mediaQueryData,
+    bool force = false,
+  }) {
     if (_content.isEmpty) return;
     if (viewport.width <= 0 || viewport.height <= 0) return;
 
     _lastViewport = viewport;
-    final signature = _layout.paginationSignature(viewport);
+    _lastEffectiveDoubleMode = _layout.isDoublePageMode(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
+    final signature = _layout.paginationSignature(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
     if (!force && signature == _lastPaginationSignature && _pages != null) {
       return;
     }
@@ -158,32 +184,71 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     }
 
     _activePaginationSignature = signature;
-    unawaited(_paginate(viewport: viewport, signature: signature));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (_activePaginationSignature != signature) {
+        return;
+      }
+      unawaited(
+        _paginate(
+          viewport: viewport,
+          signature: signature,
+          mediaQueryData: mediaQueryData,
+        ),
+      );
+    });
+  }
+
+  void _setPaginatingSafely(bool value) {
+    if (!mounted) {
+      return;
+    }
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    // Only mutate state immediately when the scheduler is fully idle.
+    if (phase != SchedulerPhase.idle) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _isPaginating = value;
+        });
+      });
+      return;
+    }
+    setState(() {
+      _isPaginating = value;
+    });
   }
 
   Future<void> _paginate({
     required Size viewport,
     required String signature,
+    required MediaQueryData mediaQueryData,
   }) async {
     final token = ++_paginationToken;
     final previousTotalPages = _totalPages;
     final previousRatio = _progressRatio;
 
-    if (mounted) {
-      setState(() {
-        _isPaginating = true;
-      });
-    }
+    await Future<void>.delayed(Duration.zero);
+    _setPaginatingSafely(true);
 
     try {
-      final area = _layout.textAreaForPagination(viewport);
+      final area = _layout.textAreaForPagination(
+        viewport,
+        mediaQueryData: mediaQueryData,
+      );
       final style = _readerTextStyle(_palette);
 
       if (!mounted || token != _paginationToken) {
         return;
       }
 
-      final spreadStep = _layout.spreadStepFor(viewport);
+      final spreadStep = _layout.spreadStepFor(
+        viewport,
+        mediaQueryData: mediaQueryData,
+      );
+      var previewApplied = false;
       final result = await _sessionController.paginate(
         bookId: widget.book.id,
         content: _content,
@@ -194,14 +259,50 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         restoredProgress: _restoredProgress,
         previousTotalPages: previousTotalPages,
         previousRatio: previousRatio,
+        previewPageCount: _initialPreviewPageCount,
+        onPreviewReady: (previewPages) {
+          void applyPreview() {
+            if (!mounted || token != _paginationToken) {
+              return;
+            }
+            previewApplied = true;
+            setState(() {
+              _pages = previewPages;
+              _pageIndex = _layout.clampPageIndex(
+                0,
+                totalPages: previewPages.length,
+                step: spreadStep,
+              );
+              _lastPaginationSignature = signature;
+            });
+          }
+
+          final phase = SchedulerBinding.instance.schedulerPhase;
+          if (phase == SchedulerPhase.idle) {
+            applyPreview();
+            return;
+          }
+          WidgetsBinding.instance.addPostFrameCallback((_) => applyPreview());
+        },
       );
       if (!mounted || token != _paginationToken) {
         return;
       }
 
+      int resolvedPageIndex = result.pageIndex;
+      if (previewApplied && _pages != null && _pages!.length > 1) {
+        final carryRatio = (_pageIndex / (_pages!.length - 1)).clamp(0.0, 1.0);
+        final mapped = (carryRatio * (result.pages.length - 1)).round();
+        resolvedPageIndex = _layout.clampPageIndex(
+          mapped,
+          totalPages: result.pages.length,
+          step: spreadStep,
+        );
+      }
+
       setState(() {
         _pages = result.pages;
-        _pageIndex = result.pageIndex;
+        _pageIndex = resolvedPageIndex;
         if (result.restoredProgressConsumed) {
           _restoredProgress = null;
         }
@@ -211,6 +312,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
       _scheduleProgressSave();
       _refreshQueryResultsForCurrentPagination();
+      _schedulePrecomputeCaches(
+        viewport: viewport,
+        mediaQueryData: mediaQueryData,
+      );
     } catch (error) {
       if (!mounted || token != _paginationToken) {
         return;
@@ -224,6 +329,78 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _activePaginationSignature = null;
       }
     }
+  }
+
+  void _schedulePrecomputeCaches({
+    required Size viewport,
+    required MediaQueryData mediaQueryData,
+  }) {
+    if (_content.isEmpty) {
+      return;
+    }
+
+    final bool foldLike =
+        mediaQueryData.displayFeatures.any(
+          (feature) =>
+              feature.type.toString().toLowerCase().contains('fold') ||
+              feature.type.toString().toLowerCase().contains('hinge'),
+        ) ||
+        _layout.isDoublePageMode(viewport, mediaQueryData: mediaQueryData);
+
+    final widthBucket = ((viewport.width / 24).round() * 24).toInt();
+    final heightBucket = ((viewport.height / 120).round() * 120).toInt();
+    final jobKey = [
+      widget.book.id,
+      _settings.fontFamily,
+      _settings.lineHeight.toStringAsFixed(2),
+      _settings.horizontalPadding.toStringAsFixed(1),
+      foldLike ? 'fold' : 'plain',
+      '$widthBucket:$heightBucket',
+    ].join('|');
+    if (!_prewarmJobKeys.add(jobKey)) {
+      return;
+    }
+
+    final targetLayouts = <ReaderPageLayoutMode>[
+      ReaderPageLayoutMode.single,
+      if (foldLike) ReaderPageLayoutMode.double,
+    ];
+    final targetFontSizes = <double>[readerFontSizeNormal, readerFontSizeLarge];
+    final palette = _palette;
+
+    unawaited(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      for (final layoutMode in targetLayouts) {
+        for (final fontSize in targetFontSizes) {
+          final profileSettings = _settings.copyWith(
+            pageLayoutMode: layoutMode,
+            fontSize: fontSize,
+          );
+          final profileLayout = ReaderLayoutController(
+            settings: profileSettings,
+          );
+          final signature = profileLayout.paginationSignature(
+            viewport,
+            mediaQueryData: mediaQueryData,
+          );
+          final textArea = profileLayout.textAreaForPagination(
+            viewport,
+            mediaQueryData: mediaQueryData,
+          );
+          final style = _readerTextStyleFor(
+            settings: profileSettings,
+            palette: palette,
+          );
+          await _sessionController.precomputePaginationCache(
+            bookId: widget.book.id,
+            content: _content,
+            signature: signature,
+            textArea: textArea,
+            textStyle: style,
+          );
+        }
+      }
+    }());
   }
 
   Future<void> _persistProgressNow() async {
@@ -252,7 +429,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     final viewport = _lastViewport;
     if (pages == null || viewport == null) return;
 
-    final step = _layout.spreadStepFor(viewport);
+    final step = _lastEffectiveDoubleMode ? 2 : 1;
     final clamped = _layout.clampPageIndex(
       target,
       totalPages: pages.length,
@@ -269,15 +446,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _goNext() {
-    final viewport = _lastViewport;
-    if (viewport == null) return;
-    _goToPage(_pageIndex + _layout.spreadStepFor(viewport));
+    final step = _lastEffectiveDoubleMode ? 2 : 1;
+    _goToPage(_pageIndex + step);
   }
 
   void _goPrev() {
-    final viewport = _lastViewport;
-    if (viewport == null) return;
-    _goToPage(_pageIndex - _layout.spreadStepFor(viewport));
+    final step = _lastEffectiveDoubleMode ? 2 : 1;
+    _goToPage(_pageIndex - step);
   }
 
   void _handleTapNavigation(TapUpDetails details, Size viewport) {
@@ -293,24 +468,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _goNext();
         break;
       case ReaderTapAction.toggleControls:
-        setState(() {
-          _controlsExpanded = !_controlsExpanded;
-        });
+        // Keep controls stable to avoid layout shifts while paging.
         break;
     }
-  }
-
-  void _toggleCurrentBookmark() {
-    if (_totalPages == 0) return;
-
-    setState(() {
-      if (_bookmarks.contains(_pageIndex)) {
-        _bookmarks.remove(_pageIndex);
-      } else {
-        _bookmarks.add(_pageIndex);
-      }
-    });
-    unawaited(_sessionController.saveBookmarks(widget.book.id, _bookmarks));
   }
 
   Future<void> _openBookmarksSheet() async {
@@ -476,29 +636,20 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
     await _sessionController.saveSettings(result);
     await _applyWakelock();
-
-    final viewport = _lastViewport;
-    if (viewport != null) {
-      _ensurePagination(viewport, force: true);
-    }
-  }
-
-  void _setFontPreset(bool large) {
-    final target = large ? readerFontSizeLarge : readerFontSizeNormal;
-    if ((_settings.fontSize - target).abs() < 0.01) {
+    if (!mounted) {
       return;
     }
 
-    final next = _settings.copyWith(fontSize: target);
-    setState(() {
-      _settings = next;
-      _lastPaginationSignature = null;
-    });
-    unawaited(_sessionController.saveSettings(next));
-
     final viewport = _lastViewport;
     if (viewport != null) {
-      _ensurePagination(viewport, force: true);
+      final mediaQueryData = MediaQuery.maybeOf(context);
+      if (mediaQueryData != null) {
+        _ensurePagination(
+          viewport,
+          mediaQueryData: mediaQueryData,
+          force: true,
+        );
+      }
     }
   }
 
@@ -524,6 +675,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
               icon: const Icon(Icons.keyboard_arrow_right),
               tooltip: '다음 검색',
             ),
+          TextButton(
+            onPressed: _openJumpDialog,
+            child: Text(
+              _totalPages > 0 ? '$_displayPage/$_totalPages' : '-/-',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
           IconButton(
             onPressed: _openSearchDialog,
             icon: const Icon(Icons.search),
@@ -542,16 +700,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         ],
       ),
       body: _buildBody(palette),
-      bottomNavigationBar: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_pages != null && _pages!.length > 0)
-              _buildBottomControlPanel(palette),
-            const AdFooterWidget(),
-          ],
-        ),
-      ),
+      bottomNavigationBar: const SafeArea(child: AdFooterWidget()),
     );
   }
 
@@ -579,14 +728,49 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = Size(constraints.maxWidth, constraints.maxHeight);
-        _ensurePagination(viewport);
+        final mediaQueryData = MediaQuery.of(context);
+        final style = _readerTextStyle(palette);
+        _ensurePagination(viewport, mediaQueryData: mediaQueryData);
 
         if (_pages == null) {
-          return const Center(child: CircularProgressIndicator());
+          final previewText = _content.length > 6000
+              ? '${_content.substring(0, 6000)}\n\n(본문 로딩 중...)'
+              : _content;
+          return Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: readerVerticalPadding,
+                ),
+                child: ReaderPagePane(
+                  text: previewText,
+                  style: style,
+                  backgroundColor: palette.background,
+                  horizontalPadding: _settings.horizontalPadding,
+                ),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette.panel,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Text('페이지 계산 중...'),
+                  ),
+                ),
+              ),
+            ],
+          );
         }
 
-        final style = _readerTextStyle(palette);
-        final doubleMode = _layout.isDoublePageMode(viewport);
+        final doubleMode = _layout.isDoublePageMode(
+          viewport,
+          mediaQueryData: mediaQueryData,
+        );
         final rightPage = _pageIndex + 1;
 
         return GestureDetector(
@@ -663,32 +847,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildBottomControlPanel(ReaderPalette palette) {
-    return ReaderBottomPanel(
-      panelColor: palette.panel,
-      displayPage: _displayPage,
-      totalPages: _totalPages,
-      pageIndex: _pageIndex,
-      progressRatio: _progressRatio,
-      controlsExpanded: _controlsExpanded,
-      isCurrentBookmarked: _bookmarks.contains(_pageIndex),
-      currentFontSize: _settings.fontSize,
-      normalFontSize: readerFontSizeNormal,
-      largeFontSize: readerFontSizeLarge,
-      activeQuery: _activeQuery,
-      queryCursor: _queryCursor,
-      queryTotal: _queryPages.length,
-      onPageChanged: _goToPage,
-      onPrevPage: _goPrev,
-      onNextPage: _goNext,
-      onToggleBookmark: _toggleCurrentBookmark,
-      onJump: () => unawaited(_openJumpDialog()),
-      onSearch: () => unawaited(_openSearchDialog()),
-      onSetNormalFont: () => _setFontPreset(false),
-      onSetLargeFont: () => _setFontPreset(true),
     );
   }
 }

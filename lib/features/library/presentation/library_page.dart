@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -116,6 +117,15 @@ class LibraryPage extends ConsumerWidget {
   }
 
   Future<void> _importTextFile(BuildContext context, WidgetRef ref) async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('웹(크롬)에서는 파일 가져오기가 제한됩니다. 안드로이드 기기에서 테스트해 주세요.'),
+        ),
+      );
+      return;
+    }
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,

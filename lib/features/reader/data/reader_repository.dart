@@ -170,7 +170,9 @@ class LocalReaderRepository implements ReaderRepository {
     required int contentLength,
   }) async {
     final key = _paginationKeyFor(bookId, signature);
-    final raw = await _storage.getString(key);
+    final raw =
+        await _storage.getString(key) ??
+        await _storage.getString(_legacyPaginationKeyFor(bookId, signature));
     if (raw == null || raw.trim().isEmpty) {
       return null;
     }
@@ -228,7 +230,24 @@ class LocalReaderRepository implements ReaderRepository {
   }
 
   String _paginationKeyFor(String bookId, String signature) {
+    final hashed = _stableHash(signature);
+    return '${AppConstants.readerPaginationCachePrefix}${bookId}_$hashed';
+  }
+
+  String _legacyPaginationKeyFor(String bookId, String signature) {
     final hashed = signature.hashCode.toUnsigned(32);
     return '${AppConstants.readerPaginationCachePrefix}${bookId}_$hashed';
+  }
+
+  String _stableHash(String value) {
+    // FNV-1a 32-bit: deterministic across app restarts.
+    const int fnvOffsetBasis = 0x811C9DC5;
+    const int fnvPrime = 0x01000193;
+    int hash = fnvOffsetBasis;
+    for (final codeUnit in value.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
   }
 }
