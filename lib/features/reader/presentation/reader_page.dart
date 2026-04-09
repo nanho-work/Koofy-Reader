@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,14 @@ import 'package:koofy_reader/features/reader/data/reader_settings_repository.dar
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
 import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
+import 'package:koofy_reader/features/reader/presentation/controllers/reader_layout_controller.dart';
+import 'package:koofy_reader/features/reader/presentation/controllers/reader_search_controller.dart';
+import 'package:koofy_reader/features/reader/presentation/controllers/reader_session_controller.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_bottom_panel.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_dialogs.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_page_pane.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_settings_sheet.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_visuals.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ReaderPage extends ConsumerStatefulWidget {
@@ -24,18 +31,7 @@ class ReaderPage extends ConsumerStatefulWidget {
 
 class _ReaderPageState extends ConsumerState<ReaderPage>
     with WidgetsBindingObserver {
-  static const double _doublePageGap = 18;
-  static const double _verticalPadding = 16;
-  static const double _fontSizeNormal = 19;
-  static const double _fontSizeLarge = 23;
-
-  late final ReaderRepository _readerRepository;
-  late final ReaderSettingsRepository _settingsRepository;
-  late final BookRepository _bookRepository;
-  final TextPaginationEngine _paginationEngine = TextPaginationEngine();
-
-  final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _jumpController = TextEditingController();
+  late final ReaderSessionController _sessionController;
 
   String _content = '';
   String? _errorText;
@@ -64,17 +60,18 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _readerRepository = ref.read(readerRepositoryProvider);
-    _settingsRepository = ref.read(readerSettingsRepositoryProvider);
-    _bookRepository = ref.read(bookRepositoryProvider);
+    _sessionController = ReaderSessionController(
+      readerRepository: ref.read(readerRepositoryProvider),
+      settingsRepository: ref.read(readerSettingsRepositoryProvider),
+      bookRepository: ref.read(bookRepositoryProvider),
+      paginationEngine: TextPaginationEngine(),
+    );
     unawaited(_bootstrap());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _searchController.dispose();
-    _jumpController.dispose();
     _saveDebounce?.cancel();
     unawaited(_persistProgressNow());
     unawaited(WakelockPlus.disable());
@@ -92,24 +89,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   Future<void> _bootstrap() async {
     try {
-      final results = await Future.wait<dynamic>([
-        _bookRepository.readBookContent(widget.book),
-        _settingsRepository.load(),
-        _readerRepository.loadBookmarks(widget.book.id),
-        _readerRepository.loadProgress(widget.book.id),
-        _readerRepository.loadSearchHistory(),
-      ]);
-
-      final rawContent = results[0] as String;
-      final normalized = rawContent
-          .replaceAll('\r\n', '\n')
-          .replaceAll('\r', '\n');
-
-      _settings = results[1] as ReaderSettings;
-      _bookmarks = (results[2] as Set<int>).where((page) => page >= 0).toSet();
-      _restoredProgress = results[3] as ReadingProgress?;
-      _searchHistory = results[4] as List<String>;
-      _content = normalized;
+      final data = await _sessionController.bootstrap(widget.book);
+      _settings = data.settings;
+      _bookmarks = data.bookmarks;
+      _restoredProgress = data.progress;
+      _searchHistory = data.searchHistory;
+      _content = data.content;
 
       await _applyWakelock();
 
@@ -146,33 +131,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     return (_pageIndex / (_totalPages - 1)).clamp(0.0, 1.0);
   }
 
-  _ReaderPalette get _palette {
-    switch (_settings.backgroundMode) {
-      case ReaderBackgroundMode.black:
-        return const _ReaderPalette(
-          background: Color(0xFF111111),
-          text: Color(0xFFF6F6F6),
-          panel: Color(0xFF1A1A1A),
-          divider: Color(0x33FFFFFF),
-        );
-      case ReaderBackgroundMode.beige:
-        return const _ReaderPalette(
-          background: Color(0xFFF3EBD9),
-          text: Color(0xFF2D241A),
-          panel: Color(0xFFE9DFC8),
-          divider: Color(0x332D241A),
-        );
-      case ReaderBackgroundMode.gray:
-        return const _ReaderPalette(
-          background: Color(0xFFE2E2E2),
-          text: Color(0xFF1F1F1F),
-          panel: Color(0xFFD4D4D4),
-          divider: Color(0x331F1F1F),
-        );
-    }
-  }
+  ReaderPalette get _palette => resolveReaderPalette(_settings.backgroundMode);
+  ReaderLayoutController get _layout =>
+      ReaderLayoutController(settings: _settings);
 
-  TextStyle _readerTextStyle(_ReaderPalette palette) {
+  TextStyle _readerTextStyle(ReaderPalette palette) {
     return TextStyle(
       color: palette.text,
       fontSize: _settings.fontSize,
@@ -181,71 +144,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  bool _isDoublePageMode(Size viewport) {
-    switch (_settings.pageLayoutMode) {
-      case ReaderPageLayoutMode.single:
-        return false;
-      case ReaderPageLayoutMode.double:
-        return true;
-      case ReaderPageLayoutMode.auto:
-        return viewport.width >= 820;
-    }
-  }
-
-  int _spreadStepFor(Size viewport) => _isDoublePageMode(viewport) ? 2 : 1;
-
-  int _clampPageIndex(
-    int target, {
-    required int totalPages,
-    required int step,
-  }) {
-    if (totalPages <= 1) {
-      return 0;
-    }
-    if (step == 1) {
-      return target.clamp(0, totalPages - 1);
-    }
-    final lastSpreadStart = ((totalPages - 1) ~/ 2) * 2;
-    final snapped = (target ~/ 2) * 2;
-    return snapped.clamp(0, lastSpreadStart);
-  }
-
-  Size _textAreaForPagination(Size viewport) {
-    final double textHeight = math.max(
-      120,
-      viewport.height - (_verticalPadding * 2),
-    );
-    final bool isDouble = _isDoublePageMode(viewport);
-    final double paneWidth = isDouble
-        ? math.max(120, (viewport.width - _doublePageGap) / 2)
-        : viewport.width;
-    final double textWidth = math.max(
-      80,
-      paneWidth - (_settings.horizontalPadding * 2),
-    );
-    return Size(textWidth, textHeight);
-  }
-
-  String _paginationSignature(Size viewport) {
-    final area = _textAreaForPagination(viewport);
-    final mode = _isDoublePageMode(viewport) ? 'double' : 'single';
-    return [
-      mode,
-      area.width.toStringAsFixed(1),
-      area.height.toStringAsFixed(1),
-      _settings.fontFamily,
-      _settings.fontSize.toStringAsFixed(1),
-      _settings.lineHeight.toStringAsFixed(2),
-      _settings.horizontalPadding.toStringAsFixed(1),
-    ].join('|');
-  }
-
   void _ensurePagination(Size viewport, {bool force = false}) {
     if (_content.isEmpty) return;
     if (viewport.width <= 0 || viewport.height <= 0) return;
 
     _lastViewport = viewport;
-    final signature = _paginationSignature(viewport);
+    final signature = _layout.paginationSignature(viewport);
     if (!force && signature == _lastPaginationSignature && _pages != null) {
       return;
     }
@@ -272,70 +176,35 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     }
 
     try {
-      final area = _textAreaForPagination(viewport);
+      final area = _layout.textAreaForPagination(viewport);
       final style = _readerTextStyle(_palette);
-
-      final cachedOffsets = await _readerRepository.loadPaginationOffsets(
-        bookId: widget.book.id,
-        signature: signature,
-        contentLength: _content.length,
-      );
-
-      PaginatedText paginated;
-      if (cachedOffsets != null && cachedOffsets.isNotEmpty) {
-        paginated = PaginatedText.fromBreakOffsets(
-          source: _content,
-          offsets: cachedOffsets,
-        );
-      } else {
-        paginated = await _paginationEngine.paginateAsync(
-          content: _content,
-          maxWidth: area.width,
-          maxHeight: area.height,
-          style: style,
-        );
-        unawaited(
-          _readerRepository.savePaginationOffsets(
-            bookId: widget.book.id,
-            signature: signature,
-            contentLength: _content.length,
-            offsets: paginated.toBreakOffsets(),
-          ),
-        );
-      }
 
       if (!mounted || token != _paginationToken) {
         return;
       }
 
-      final spreadStep = _spreadStepFor(viewport);
-      final restored = _restoredProgress;
-      int nextIndex = 0;
-
-      if (restored != null) {
-        if (restored.totalPages == paginated.length &&
-            restored.pageIndex >= 0 &&
-            restored.pageIndex < paginated.length) {
-          nextIndex = restored.pageIndex;
-        } else {
-          nextIndex =
-              (restored.positionRatio * math.max(0, paginated.length - 1))
-                  .round();
-        }
-        _restoredProgress = null;
-      } else if (previousTotalPages > 1) {
-        nextIndex = (previousRatio * math.max(0, paginated.length - 1)).round();
+      final spreadStep = _layout.spreadStepFor(viewport);
+      final result = await _sessionController.paginate(
+        bookId: widget.book.id,
+        content: _content,
+        signature: signature,
+        textArea: area,
+        textStyle: style,
+        spreadStep: spreadStep,
+        restoredProgress: _restoredProgress,
+        previousTotalPages: previousTotalPages,
+        previousRatio: previousRatio,
+      );
+      if (!mounted || token != _paginationToken) {
+        return;
       }
 
-      nextIndex = _clampPageIndex(
-        nextIndex,
-        totalPages: paginated.length,
-        step: spreadStep,
-      );
-
       setState(() {
-        _pages = paginated;
-        _pageIndex = nextIndex;
+        _pages = result.pages;
+        _pageIndex = result.pageIndex;
+        if (result.restoredProgressConsumed) {
+          _restoredProgress = null;
+        }
         _isPaginating = false;
         _lastPaginationSignature = signature;
       });
@@ -368,7 +237,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       totalPages: _totalPages,
       updatedAt: DateTime.now(),
     );
-    await _readerRepository.saveProgress(progress);
+    await _sessionController.saveProgress(progress);
   }
 
   void _scheduleProgressSave() {
@@ -383,8 +252,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     final viewport = _lastViewport;
     if (pages == null || viewport == null) return;
 
-    final step = _spreadStepFor(viewport);
-    final clamped = _clampPageIndex(
+    final step = _layout.spreadStepFor(viewport);
+    final clamped = _layout.clampPageIndex(
       target,
       totalPages: pages.length,
       step: step,
@@ -402,34 +271,33 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   void _goNext() {
     final viewport = _lastViewport;
     if (viewport == null) return;
-    _goToPage(_pageIndex + _spreadStepFor(viewport));
+    _goToPage(_pageIndex + _layout.spreadStepFor(viewport));
   }
 
   void _goPrev() {
     final viewport = _lastViewport;
     if (viewport == null) return;
-    _goToPage(_pageIndex - _spreadStepFor(viewport));
+    _goToPage(_pageIndex - _layout.spreadStepFor(viewport));
   }
 
   void _handleTapNavigation(TapUpDetails details, Size viewport) {
-    final width = viewport.width;
-    if (width <= 0) return;
-    final dx = details.localPosition.dx;
-    final leftEdge = width * 0.28;
-    final rightEdge = width * 0.72;
-
-    if (dx <= leftEdge) {
-      _goPrev();
-      return;
+    final action = _layout.resolveTapAction(
+      dx: details.localPosition.dx,
+      width: viewport.width,
+    );
+    switch (action) {
+      case ReaderTapAction.previous:
+        _goPrev();
+        break;
+      case ReaderTapAction.next:
+        _goNext();
+        break;
+      case ReaderTapAction.toggleControls:
+        setState(() {
+          _controlsExpanded = !_controlsExpanded;
+        });
+        break;
     }
-    if (dx >= rightEdge) {
-      _goNext();
-      return;
-    }
-
-    setState(() {
-      _controlsExpanded = !_controlsExpanded;
-    });
   }
 
   void _toggleCurrentBookmark() {
@@ -442,7 +310,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _bookmarks.add(_pageIndex);
       }
     });
-    unawaited(_readerRepository.saveBookmarks(widget.book.id, _bookmarks));
+    unawaited(_sessionController.saveBookmarks(widget.book.id, _bookmarks));
   }
 
   Future<void> _openBookmarksSheet() async {
@@ -454,23 +322,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
-    final sorted = _bookmarks.toList()..sort();
-    final target = await showModalBottomSheet<int>(
+    final target = await showReaderBookmarksSheet(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return ListView.separated(
-          itemCount: sorted.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final page = sorted[index] + 1;
-            return ListTile(
-              title: Text('$page 페이지'),
-              onTap: () => Navigator.pop(context, sorted[index]),
-            );
-          },
-        );
-      },
+      bookmarks: _bookmarks,
     );
 
     if (target != null) {
@@ -483,36 +337,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
-    _jumpController.text = _displayPage.toString();
-    final result = await showDialog<int>(
+    final result = await showReaderPageJumpDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('페이지 이동'),
-          content: TextField(
-            controller: _jumpController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(hintText: '1 ~ $_totalPages'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final page = int.tryParse(_jumpController.text.trim());
-                if (page == null) {
-                  Navigator.pop(context);
-                  return;
-                }
-                Navigator.pop(context, page);
-              },
-              child: const Text('이동'),
-            ),
-          ],
-        );
-      },
+      totalPages: _totalPages,
+      currentPage: _displayPage,
     );
 
     if (result == null) {
@@ -523,56 +351,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   Future<void> _openSearchDialog() async {
-    _searchController.text = _activeQuery;
-    final query = await showDialog<String>(
+    final query = await showReaderSearchDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('텍스트 검색'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _searchController,
-                autofocus: true,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(hintText: '검색어 입력'),
-                onSubmitted: (value) => Navigator.pop(context, value),
-              ),
-              const SizedBox(height: 12),
-              if (_searchHistory.isNotEmpty)
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: _searchHistory
-                      .take(6)
-                      .map(
-                        (item) => ActionChip(
-                          label: Text(item),
-                          onPressed: () => Navigator.pop(context, item),
-                        ),
-                      )
-                      .toList(),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, ''),
-              child: const Text('초기화'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, _searchController.text),
-              child: const Text('검색'),
-            ),
-          ],
-        );
-      },
+      initialQuery: _activeQuery,
+      history: _searchHistory,
     );
 
     if (query == null) {
@@ -592,23 +374,16 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
-    if (_pages == null) {
+    final searchController = _buildSearchController();
+    if (searchController == null) {
       return;
     }
 
-    final pages = _findQueryPages(trimmed);
-    final history = [trimmed, ..._searchHistory]
-        .fold<List<String>>(<String>[], (acc, item) {
-          final exists = acc.any(
-            (saved) => saved.toLowerCase() == item.toLowerCase(),
-          );
-          if (!exists) {
-            acc.add(item);
-          }
-          return acc;
-        })
-        .take(12)
-        .toList();
+    final pages = searchController.findQueryPages(trimmed);
+    final history = ReaderSearchController.normalizeHistory([
+      trimmed,
+      ..._searchHistory,
+    ]);
 
     setState(() {
       _activeQuery = trimmed;
@@ -617,7 +392,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _searchHistory = history;
     });
 
-    unawaited(_readerRepository.saveSearchHistory(history));
+    unawaited(_sessionController.saveSearchHistory(history));
 
     if (pages.isNotEmpty) {
       _goToPage(pages.first);
@@ -635,7 +410,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (_activeQuery.isEmpty || _pages == null) {
       return;
     }
-    final pages = _findQueryPages(_activeQuery);
+    final searchController = _buildSearchController();
+    if (searchController == null) {
+      return;
+    }
+    final pages = searchController.findQueryPages(_activeQuery);
     if (!mounted) {
       return;
     }
@@ -649,58 +428,15 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     });
   }
 
-  List<int> _findQueryPages(String query) {
-    final pages = _pages;
-    if (pages == null || query.isEmpty) {
-      return const <int>[];
-    }
-
-    final lowerText = _content.toLowerCase();
-    final needle = query.toLowerCase();
-    final result = <int>[];
-    int from = 0;
-
-    while (from < lowerText.length) {
-      final index = lowerText.indexOf(needle, from);
-      if (index < 0) {
-        break;
-      }
-      final page = _pageForOffset(index, pages.ranges);
-      if (page >= 0 && (result.isEmpty || result.last != page)) {
-        result.add(page);
-      }
-      from = index + needle.length;
-    }
-
-    return result;
-  }
-
-  int _pageForOffset(int offset, List<TextPageRange> ranges) {
-    if (ranges.isEmpty) return -1;
-    int low = 0;
-    int high = ranges.length - 1;
-    while (low <= high) {
-      final mid = (low + high) >> 1;
-      final range = ranges[mid];
-      if (offset < range.start) {
-        high = mid - 1;
-      } else if (offset >= range.end) {
-        low = mid + 1;
-      } else {
-        return mid;
-      }
-    }
-    return ranges.length - 1;
-  }
-
   void _moveQueryCursor(int delta) {
     if (_queryPages.isEmpty) {
       return;
     }
-    final length = _queryPages.length;
-    final current = _queryCursor < 0 ? 0 : _queryCursor;
-    final next = (current + delta) % length;
-    final normalized = next < 0 ? next + length : next;
+    final normalized = ReaderSearchController.moveCursor(
+      current: _queryCursor,
+      delta: delta,
+      length: _queryPages.length,
+    );
 
     setState(() {
       _queryCursor = normalized;
@@ -708,190 +444,20 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _goToPage(_queryPages[normalized]);
   }
 
+  ReaderSearchController? _buildSearchController() {
+    final pages = _pages;
+    if (pages == null) {
+      return null;
+    }
+    return ReaderSearchController(source: _content, ranges: pages.ranges);
+  }
+
   Future<void> _openReaderSettingsSheet() async {
-    final result = await showModalBottomSheet<ReaderSettings>(
+    final result = await showReaderSettingsSheet(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) {
-        var draft = _settings;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Widget sectionTitle(String text) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 8),
-                child: Text(
-                  text,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              );
-            }
-
-            Widget choiceChip<T>(
-              T value,
-              T selected,
-              String label,
-              void Function(T) onChanged,
-            ) {
-              return ChoiceChip(
-                label: Text(label),
-                selected: value == selected,
-                onSelected: (_) => setModalState(() => onChanged(value)),
-              );
-            }
-
-            return SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    sectionTitle('배경 모드'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        choiceChip(
-                          ReaderBackgroundMode.black,
-                          draft.backgroundMode,
-                          '검정',
-                          (value) =>
-                              draft = draft.copyWith(backgroundMode: value),
-                        ),
-                        choiceChip(
-                          ReaderBackgroundMode.beige,
-                          draft.backgroundMode,
-                          '베이지',
-                          (value) =>
-                              draft = draft.copyWith(backgroundMode: value),
-                        ),
-                        choiceChip(
-                          ReaderBackgroundMode.gray,
-                          draft.backgroundMode,
-                          '회색',
-                          (value) =>
-                              draft = draft.copyWith(backgroundMode: value),
-                        ),
-                      ],
-                    ),
-                    sectionTitle('글자 크기'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        choiceChip(
-                          _fontSizeNormal,
-                          draft.fontSize,
-                          '기본',
-                          (value) => draft = draft.copyWith(fontSize: value),
-                        ),
-                        choiceChip(
-                          _fontSizeLarge,
-                          draft.fontSize,
-                          '크게',
-                          (value) => draft = draft.copyWith(fontSize: value),
-                        ),
-                      ],
-                    ),
-                    sectionTitle('폰트'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        choiceChip(
-                          ReaderFontOption.sans,
-                          draft.fontOption,
-                          'Sans',
-                          (value) => draft = draft.copyWith(fontOption: value),
-                        ),
-                        choiceChip(
-                          ReaderFontOption.serif,
-                          draft.fontOption,
-                          'Serif',
-                          (value) => draft = draft.copyWith(fontOption: value),
-                        ),
-                        choiceChip(
-                          ReaderFontOption.mono,
-                          draft.fontOption,
-                          'Mono',
-                          (value) => draft = draft.copyWith(fontOption: value),
-                        ),
-                      ],
-                    ),
-                    sectionTitle('레이아웃'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        choiceChip(
-                          ReaderPageLayoutMode.auto,
-                          draft.pageLayoutMode,
-                          '자동',
-                          (value) =>
-                              draft = draft.copyWith(pageLayoutMode: value),
-                        ),
-                        choiceChip(
-                          ReaderPageLayoutMode.single,
-                          draft.pageLayoutMode,
-                          '1페이지',
-                          (value) =>
-                              draft = draft.copyWith(pageLayoutMode: value),
-                        ),
-                        choiceChip(
-                          ReaderPageLayoutMode.double,
-                          draft.pageLayoutMode,
-                          '2페이지',
-                          (value) =>
-                              draft = draft.copyWith(pageLayoutMode: value),
-                        ),
-                      ],
-                    ),
-                    sectionTitle(
-                      '줄 간격: ${draft.lineHeight.toStringAsFixed(2)}',
-                    ),
-                    Slider(
-                      value: draft.lineHeight,
-                      min: 1.3,
-                      max: 2.2,
-                      divisions: 9,
-                      onChanged: (value) => setModalState(
-                        () => draft = draft.copyWith(lineHeight: value),
-                      ),
-                    ),
-                    sectionTitle('좌우 여백: ${draft.horizontalPadding.round()}'),
-                    Slider(
-                      value: draft.horizontalPadding,
-                      min: 10,
-                      max: 34,
-                      divisions: 12,
-                      onChanged: (value) => setModalState(
-                        () => draft = draft.copyWith(horizontalPadding: value),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('화면 꺼짐 방지'),
-                      value: draft.keepScreenOn,
-                      onChanged: (value) => setModalState(
-                        () => draft = draft.copyWith(keepScreenOn: value),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: () => Navigator.pop(context, draft),
-                        child: const Text('적용'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      initialSettings: _settings,
+      normalFontSize: readerFontSizeNormal,
+      largeFontSize: readerFontSizeLarge,
     );
 
     if (result == null) {
@@ -908,7 +474,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _lastPaginationSignature = null;
     });
 
-    await _settingsRepository.save(result);
+    await _sessionController.saveSettings(result);
     await _applyWakelock();
 
     final viewport = _lastViewport;
@@ -918,7 +484,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _setFontPreset(bool large) {
-    final target = large ? _fontSizeLarge : _fontSizeNormal;
+    final target = large ? readerFontSizeLarge : readerFontSizeNormal;
     if ((_settings.fontSize - target).abs() < 0.01) {
       return;
     }
@@ -928,7 +494,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _settings = next;
       _lastPaginationSignature = null;
     });
-    unawaited(_settingsRepository.save(next));
+    unawaited(_sessionController.saveSettings(next));
 
     final viewport = _lastViewport;
     if (viewport != null) {
@@ -989,7 +555,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  Widget _buildBody(_ReaderPalette palette) {
+  Widget _buildBody(ReaderPalette palette) {
     if (_isBootstrapping) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1020,7 +586,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         }
 
         final style = _readerTextStyle(palette);
-        final doubleMode = _isDoublePageMode(viewport);
+        final doubleMode = _layout.isDoublePageMode(viewport);
         final rightPage = _pageIndex + 1;
 
         return GestureDetector(
@@ -1029,47 +595,49 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           child: Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: _verticalPadding),
+                padding: const EdgeInsets.symmetric(
+                  vertical: readerVerticalPadding,
+                ),
                 child: doubleMode
                     ? Row(
                         children: [
                           Expanded(
-                            child: _PagePane(
+                            child: ReaderPagePane(
                               text: _pages![_pageIndex],
                               style: style,
-                              palette: palette,
+                              backgroundColor: palette.background,
                               horizontalPadding: _settings.horizontalPadding,
                             ),
                           ),
                           Container(
-                            width: _doublePageGap,
+                            width: readerDoublePageGap,
                             color: palette.background,
                             alignment: Alignment.center,
                             child: Container(width: 1, color: palette.divider),
                           ),
                           Expanded(
                             child: rightPage < _totalPages
-                                ? _PagePane(
+                                ? ReaderPagePane(
                                     text: _pages![rightPage],
                                     style: style,
-                                    palette: palette,
+                                    backgroundColor: palette.background,
                                     horizontalPadding:
                                         _settings.horizontalPadding,
                                   )
-                                : _PagePane(
+                                : ReaderPagePane(
                                     text: '',
                                     style: style,
-                                    palette: palette,
+                                    backgroundColor: palette.background,
                                     horizontalPadding:
                                         _settings.horizontalPadding,
                                   ),
                           ),
                         ],
                       )
-                    : _PagePane(
+                    : ReaderPagePane(
                         text: _pages![_pageIndex],
                         style: style,
-                        palette: palette,
+                        backgroundColor: palette.background,
                         horizontalPadding: _settings.horizontalPadding,
                       ),
               ),
@@ -1098,149 +666,29 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  Widget _buildBottomControlPanel(_ReaderPalette palette) {
-    final pageMax = math.max(0.0, (_totalPages - 1).toDouble());
-
-    return Container(
-      color: palette.panel,
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 64,
-                child: Text(
-                  '$_displayPage/$_totalPages',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                child: Slider(
-                  value: _pageIndex.toDouble().clamp(0, pageMax),
-                  min: 0,
-                  max: pageMax,
-                  onChanged: _totalPages <= 1
-                      ? null
-                      : (value) {
-                          _goToPage(value.round());
-                        },
-                ),
-              ),
-              SizedBox(
-                width: 54,
-                child: Text(
-                  '${(_progressRatio * 100).round()}%',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-          if (_controlsExpanded)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _goPrev,
-                    icon: const Icon(Icons.chevron_left),
-                    tooltip: '이전 페이지',
-                  ),
-                  IconButton(
-                    onPressed: _goNext,
-                    icon: const Icon(Icons.chevron_right),
-                    tooltip: '다음 페이지',
-                  ),
-                  IconButton(
-                    onPressed: _toggleCurrentBookmark,
-                    icon: Icon(
-                      _bookmarks.contains(_pageIndex)
-                          ? Icons.bookmark
-                          : Icons.bookmark_border,
-                    ),
-                    tooltip: '북마크',
-                  ),
-                  IconButton(
-                    onPressed: _openJumpDialog,
-                    icon: const Icon(Icons.pin),
-                    tooltip: '페이지 이동',
-                  ),
-                  IconButton(
-                    onPressed: _openSearchDialog,
-                    icon: const Icon(Icons.search),
-                    tooltip: '검색',
-                  ),
-                  const SizedBox(width: 4),
-                  ChoiceChip(
-                    label: const Text('기본'),
-                    selected:
-                        (_settings.fontSize - _fontSizeNormal).abs() < 0.01,
-                    onSelected: (_) => _setFontPreset(false),
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('큰글'),
-                    selected:
-                        (_settings.fontSize - _fontSizeLarge).abs() < 0.01,
-                    onSelected: (_) => _setFontPreset(true),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
-            ),
-          if (_activeQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _queryPages.isEmpty
-                    ? '검색어: "$_activeQuery" (결과 없음)'
-                    : '검색어: "$_activeQuery" (${_queryCursor + 1}/${_queryPages.length})',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-        ],
-      ),
+  Widget _buildBottomControlPanel(ReaderPalette palette) {
+    return ReaderBottomPanel(
+      panelColor: palette.panel,
+      displayPage: _displayPage,
+      totalPages: _totalPages,
+      pageIndex: _pageIndex,
+      progressRatio: _progressRatio,
+      controlsExpanded: _controlsExpanded,
+      isCurrentBookmarked: _bookmarks.contains(_pageIndex),
+      currentFontSize: _settings.fontSize,
+      normalFontSize: readerFontSizeNormal,
+      largeFontSize: readerFontSizeLarge,
+      activeQuery: _activeQuery,
+      queryCursor: _queryCursor,
+      queryTotal: _queryPages.length,
+      onPageChanged: _goToPage,
+      onPrevPage: _goPrev,
+      onNextPage: _goNext,
+      onToggleBookmark: _toggleCurrentBookmark,
+      onJump: () => unawaited(_openJumpDialog()),
+      onSearch: () => unawaited(_openSearchDialog()),
+      onSetNormalFont: () => _setFontPreset(false),
+      onSetLargeFont: () => _setFontPreset(true),
     );
   }
-}
-
-class _PagePane extends StatelessWidget {
-  const _PagePane({
-    required this.text,
-    required this.style,
-    required this.palette,
-    required this.horizontalPadding,
-  });
-
-  final String text;
-  final TextStyle style;
-  final _ReaderPalette palette;
-  final double horizontalPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: palette.background,
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      alignment: Alignment.topLeft,
-      child: text.trim().isEmpty
-          ? const SizedBox.shrink()
-          : SelectableText(text, style: style),
-    );
-  }
-}
-
-class _ReaderPalette {
-  const _ReaderPalette({
-    required this.background,
-    required this.text,
-    required this.panel,
-    required this.divider,
-  });
-
-  final Color background;
-  final Color text;
-  final Color panel;
-  final Color divider;
 }
