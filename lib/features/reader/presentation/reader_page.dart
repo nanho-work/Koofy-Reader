@@ -58,6 +58,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   int _paginationToken = 0;
   bool _lastEffectiveDoubleMode = false;
   final Set<String> _prewarmJobKeys = <String>{};
+  final Map<String, PaginatedText> _pagesBySignature =
+      <String, PaginatedText>{};
 
   @override
   void initState() {
@@ -176,6 +178,37 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       viewport,
       mediaQueryData: mediaQueryData,
     );
+    final spreadStep = _layout.spreadStepFor(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
+
+    final cachedPages = _pagesBySignature[signature];
+    if (cachedPages != null && cachedPages.length > 0) {
+      final mappedIndex = _mapPageIndexForPages(
+        pages: cachedPages,
+        step: spreadStep,
+      );
+      void applyCached() {
+        if (!mounted) return;
+        setState(() {
+          _pages = cachedPages;
+          _pageIndex = mappedIndex;
+          _lastPaginationSignature = signature;
+          _isPaginating = false;
+        });
+      }
+
+      final phase = SchedulerBinding.instance.schedulerPhase;
+      if (phase == SchedulerPhase.idle) {
+        applyCached();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) => applyCached());
+      }
+      _activePaginationSignature = null;
+      return;
+    }
+
     if (!force && signature == _lastPaginationSignature && _pages != null) {
       return;
     }
@@ -268,13 +301,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             previewApplied = true;
             setState(() {
               _pages = previewPages;
-              _pageIndex = _layout.clampPageIndex(
-                0,
-                totalPages: previewPages.length,
+              _pageIndex = _mapPageIndexForPages(
+                pages: previewPages,
                 step: spreadStep,
               );
               _lastPaginationSignature = signature;
             });
+            _pagesBySignature[signature] = previewPages;
           }
 
           final phase = SchedulerBinding.instance.schedulerPhase;
@@ -290,12 +323,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       }
 
       int resolvedPageIndex = result.pageIndex;
-      if (previewApplied && _pages != null && _pages!.length > 1) {
-        final carryRatio = (_pageIndex / (_pages!.length - 1)).clamp(0.0, 1.0);
-        final mapped = (carryRatio * (result.pages.length - 1)).round();
-        resolvedPageIndex = _layout.clampPageIndex(
-          mapped,
-          totalPages: result.pages.length,
+      if (previewApplied) {
+        resolvedPageIndex = _mapPageIndexForPages(
+          pages: result.pages,
           step: spreadStep,
         );
       }
@@ -309,6 +339,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _isPaginating = false;
         _lastPaginationSignature = signature;
       });
+      _pagesBySignature[signature] = result.pages;
 
       _scheduleProgressSave();
       _refreshQueryResultsForCurrentPagination();
@@ -401,6 +432,49 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         }
       }
     }());
+  }
+
+  int _mapPageIndexForPages({required PaginatedText pages, required int step}) {
+    if (pages.length <= 1) {
+      return 0;
+    }
+
+    final currentPages = _pages;
+    if (currentPages != null &&
+        currentPages.length > 0 &&
+        _pageIndex >= 0 &&
+        _pageIndex < currentPages.length) {
+      final anchorOffset = currentPages.ranges[_pageIndex].start.clamp(
+        0,
+        pages.source.length,
+      );
+      final raw = _findPageIndexByOffset(pages, anchorOffset.toInt());
+      return _layout.clampPageIndex(raw, totalPages: pages.length, step: step);
+    }
+
+    final ratio = (_pageIndex / (_totalPages <= 1 ? 1 : (_totalPages - 1)))
+        .clamp(0.0, 1.0);
+    final fallback = (ratio * (pages.length - 1)).round();
+    return _layout.clampPageIndex(
+      fallback,
+      totalPages: pages.length,
+      step: step,
+    );
+  }
+
+  int _findPageIndexByOffset(PaginatedText pages, int offset) {
+    int low = 0;
+    int high = pages.ranges.length - 1;
+    while (low < high) {
+      final mid = (low + high) >> 1;
+      final end = pages.ranges[mid].end;
+      if (offset < end) {
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
+    }
+    return low.clamp(0, pages.ranges.length - 1);
   }
 
   Future<void> _persistProgressNow() async {
@@ -730,12 +804,25 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         final viewport = Size(constraints.maxWidth, constraints.maxHeight);
         final mediaQueryData = MediaQuery.of(context);
         final style = _readerTextStyle(palette);
+        final currentSignature = _layout.paginationSignature(
+          viewport,
+          mediaQueryData: mediaQueryData,
+        );
         _ensurePagination(viewport, mediaQueryData: mediaQueryData);
 
-        if (_pages == null) {
+        final signaturePages = _pagesBySignature[currentSignature];
+        final pagesForDisplay =
+            signaturePages ??
+            (_lastPaginationSignature == currentSignature ? _pages : null);
+
+        if (pagesForDisplay == null) {
           final previewText = _content.length > 6000
               ? '${_content.substring(0, 6000)}\n\n(본문 로딩 중...)'
               : _content;
+          final isModeSwitching =
+              _activePaginationSignature == currentSignature &&
+              _lastPaginationSignature != null &&
+              _lastPaginationSignature != currentSignature;
           return Stack(
             children: [
               Padding(
@@ -763,6 +850,24 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                   ),
                 ),
               ),
+              if (isModeSwitching)
+                Positioned(
+                  top: 44,
+                  right: 12,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: palette.panel,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Text('레이아웃 전환 중...'),
+                    ),
+                  ),
+                ),
             ],
           );
         }
@@ -771,7 +876,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           viewport,
           mediaQueryData: mediaQueryData,
         );
-        final rightPage = _pageIndex + 1;
+        final pageIndexForDisplay = _layout.clampPageIndex(
+          _pageIndex,
+          totalPages: pagesForDisplay.length,
+          step: doubleMode ? 2 : 1,
+        );
+        final totalPagesForDisplay = pagesForDisplay.length;
+        final rightPage = pageIndexForDisplay + 1;
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -787,7 +898,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                         children: [
                           Expanded(
                             child: ReaderPagePane(
-                              text: _pages![_pageIndex],
+                              text: pagesForDisplay[pageIndexForDisplay],
                               style: style,
                               backgroundColor: palette.background,
                               horizontalPadding: _settings.horizontalPadding,
@@ -800,9 +911,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                             child: Container(width: 1, color: palette.divider),
                           ),
                           Expanded(
-                            child: rightPage < _totalPages
+                            child: rightPage < totalPagesForDisplay
                                 ? ReaderPagePane(
-                                    text: _pages![rightPage],
+                                    text: pagesForDisplay[rightPage],
                                     style: style,
                                     backgroundColor: palette.background,
                                     horizontalPadding:
@@ -819,7 +930,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                         ],
                       )
                     : ReaderPagePane(
-                        text: _pages![_pageIndex],
+                        text: pagesForDisplay[pageIndexForDisplay],
                         style: style,
                         backgroundColor: palette.background,
                         horizontalPadding: _settings.horizontalPadding,

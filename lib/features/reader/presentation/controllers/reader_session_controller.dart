@@ -106,11 +106,7 @@ class ReaderSessionController {
         offsets: cachedOffsets,
       );
     } else {
-      final canUsePreview =
-          onPreviewReady != null &&
-          previewPageCount > 0 &&
-          restoredProgress == null &&
-          previousTotalPages <= 1;
+      final canUsePreview = onPreviewReady != null && previewPageCount > 0;
 
       PaginatedText? preview;
       if (canUsePreview) {
