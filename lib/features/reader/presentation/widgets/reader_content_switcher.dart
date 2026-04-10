@@ -7,8 +7,9 @@ class ReaderContentSwitcher extends StatelessWidget {
   const ReaderContentSwitcher({
     super.key,
     required this.doubleMode,
-    required this.content,
-    required this.singleChunks,
+    required this.singlePages,
+    required this.singlePageExtent,
+    required this.isSinglePaginating,
     required this.style,
     required this.palette,
     required this.horizontalPadding,
@@ -19,8 +20,9 @@ class ReaderContentSwitcher extends StatelessWidget {
   });
 
   final bool doubleMode;
-  final String content;
-  final List<String> singleChunks;
+  final PaginatedText? singlePages;
+  final double singlePageExtent;
+  final bool isSinglePaginating;
   final TextStyle style;
   final ReaderPalette palette;
   final double horizontalPadding;
@@ -38,18 +40,36 @@ class ReaderContentSwitcher extends StatelessWidget {
   }
 
   Widget _buildSingleBody() {
+    final pages = singlePages;
+    if (pages == null || pages.length == 0) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          ReaderPagePane(
+            text: '',
+            style: style,
+            backgroundColor: palette.background,
+            horizontalPadding: horizontalPadding,
+          ),
+          if (isSinglePaginating)
+            const Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        readerVerticalPadding,
-        horizontalPadding,
-        readerVerticalPadding + readerContentBottomInset,
-      ),
-      itemCount: singleChunks.isEmpty ? 1 : singleChunks.length,
+      padding: const EdgeInsets.symmetric(vertical: readerVerticalPadding),
+      itemCount: pages.length,
       itemBuilder: (context, index) {
-        final text = singleChunks.isEmpty ? content : singleChunks[index];
-        return Text(text, style: style, softWrap: true);
+        return SizedBox(
+          height: singlePageExtent,
+          child: ReaderPagePane(
+            text: pages[index],
+            style: style,
+            backgroundColor: palette.background,
+            horizontalPadding: horizontalPadding,
+          ),
+        );
       },
     );
   }

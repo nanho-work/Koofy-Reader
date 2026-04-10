@@ -4,6 +4,7 @@ class ReadingProgress {
   const ReadingProgress({
     required this.bookId,
     required this.positionRatio,
+    required this.contentOffset,
     required this.pageIndex,
     required this.totalPages,
     required this.updatedAt,
@@ -13,6 +14,7 @@ class ReadingProgress {
 
   final String bookId;
   final double positionRatio;
+  final int contentOffset;
   final int pageIndex;
   final int totalPages;
   final DateTime updatedAt;
@@ -23,6 +25,7 @@ class ReadingProgress {
     return jsonEncode({
       'bookId': bookId,
       'positionRatio': positionRatio,
+      'contentOffset': contentOffset,
       'pageIndex': pageIndex,
       'totalPages': totalPages,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
@@ -39,6 +42,7 @@ class ReadingProgress {
       }
       final bookId = json['bookId'];
       final ratio = json['positionRatio'];
+      final contentOffset = json['contentOffset'];
       final pageIndex = json['pageIndex'];
       final totalPages = json['totalPages'];
       final updatedAt = json['updatedAt'];
@@ -48,11 +52,13 @@ class ReadingProgress {
         return null;
       }
       final safeRatio = ratio.toDouble().clamp(0.0, 1.0);
+      final safeContentOffset = contentOffset is int ? contentOffset : 0;
       final safeTotalPages = totalPages is int ? totalPages : 0;
       final safePageIndex = pageIndex is int ? pageIndex : 0;
       return ReadingProgress(
         bookId: bookId,
         positionRatio: safeRatio,
+        contentOffset: safeContentOffset < 0 ? 0 : safeContentOffset,
         pageIndex: safePageIndex,
         totalPages: safeTotalPages,
         updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),

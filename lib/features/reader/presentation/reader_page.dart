@@ -43,10 +43,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   ReaderSettings _settings = ReaderSettings.defaults();
   double? _restoredRatio;
-  double? _restoredScrollOffset;
-  double? _restoredScrollMaxExtent;
+  int? _restoredContentOffset;
   bool _restoredScrollApplied = false;
-  double _lastKnownProgressRatio = 0;
+  int _lastKnownContentOffset = 0;
 
   Set<int> _bookmarks = <int>{};
   List<String> _searchHistory = <String>[];
@@ -54,10 +53,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   String _activeQuery = '';
   List<int> _queryOffsets = <int>[];
   int _queryCursor = -1;
-  List<String> _singleChunks = const <String>[];
-  int _singleChunkContentLength = -1;
 
-  double? _lastViewportHeight;
+  PaginatedText? _singlePages;
+  int _singleIndex = 0;
+  String? _singleSignature;
+  String? _activeSingleSignature;
+  int _singleToken = 0;
+  bool _isSinglePaginating = false;
+  double _singlePageExtent = 1;
   PaginatedText? _spreadPages;
   int _spreadIndex = 0;
   String? _spreadSignature;
@@ -108,12 +111,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _bookmarks = data.bookmarks;
       _searchHistory = data.searchHistory;
       _content = data.content;
-      _rebuildSingleChunks(_content);
       _restoredRatio = data.progress?.positionRatio;
-      _restoredScrollOffset = data.progress?.scrollOffsetPx;
-      _restoredScrollMaxExtent = data.progress?.scrollMaxExtentPx;
+      _restoredContentOffset = data.progress?.contentOffset;
       _restoredScrollApplied = false;
-      _lastKnownProgressRatio = (_restoredRatio ?? 0).clamp(0.0, 1.0);
+      _lastKnownContentOffset = (data.progress?.contentOffset ?? 0).clamp(
+        0,
+        _content.length,
+      );
 
       await _applyWakelock();
 
@@ -139,42 +143,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     await WakelockPlus.disable();
   }
 
-  void _rebuildSingleChunks(String source) {
-    _singleChunkContentLength = source.length;
-    if (source.isEmpty) {
-      _singleChunks = const <String>[];
-      return;
-    }
-
-    // Keep chunk size moderate so long books don't force one giant text layout.
-    const int target = 1200;
-    const int hardMax = 2000;
-    final chunks = <String>[];
-    int start = 0;
-    while (start < source.length) {
-      int end = (start + target).clamp(0, source.length);
-      if (end < source.length) {
-        final nl = source.lastIndexOf('\n', end);
-        if (nl > start + (target ~/ 2)) {
-          end = nl + 1;
-        } else {
-          end = (start + hardMax).clamp(0, source.length);
-        }
-      }
-      chunks.add(source.substring(start, end));
-      start = end;
-    }
-    _singleChunks = chunks;
-  }
-
-  void _ensureSingleChunksReady() {
-    if (_singleChunkContentLength == _content.length &&
-        _singleChunks.isNotEmpty) {
-      return;
-    }
-    _rebuildSingleChunks(_content);
-  }
-
   ReaderPalette get _palette => resolveReaderPalette(_settings.backgroundMode);
   ReaderLayoutController get _layout =>
       ReaderLayoutController(settings: _settings);
@@ -190,22 +158,19 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   double get _progressRatio {
     if (_content.isEmpty) return 0;
-    if (_isDoubleActive && _spreadPages != null && _spreadPages!.length > 0) {
-      final safeIndex = _spreadIndex.clamp(0, _spreadPages!.length - 1);
-      final offset = _spreadPages!.ranges[safeIndex].start.clamp(
-        0,
-        _spreadPages!.source.length,
-      );
-      return (offset / _content.length).clamp(0.0, 1.0);
-    }
-    if (!_scrollController.hasClients) {
-      return _lastKnownProgressRatio.clamp(0.0, 1.0);
-    }
-    final max = _scrollController.position.maxScrollExtent;
-    if (max <= 0) {
+    return (_currentContentOffset() / _content.length).clamp(0.0, 1.0);
+  }
+
+  int _currentSinglePageIndex() {
+    final pages = _singlePages;
+    if (pages == null || pages.length == 0) {
       return 0;
     }
-    return (_scrollController.offset / max).clamp(0.0, 1.0);
+    if (_scrollController.hasClients && _singlePageExtent > 0) {
+      final raw = (_scrollController.offset / _singlePageExtent).floor();
+      return raw.clamp(0, pages.length - 1);
+    }
+    return _singleIndex.clamp(0, pages.length - 1);
   }
 
   int _currentContentOffset() {
@@ -217,8 +182,37 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _spreadPages!.source.length,
       );
     }
-    final ratio = _progressRatio;
-    return (ratio * _content.length).round().clamp(0, _content.length);
+    final pages = _singlePages;
+    if (pages != null && pages.length > 0) {
+      final safeIndex = _currentSinglePageIndex();
+      return pages.ranges[safeIndex].start.clamp(0, pages.source.length);
+    }
+    return _lastKnownContentOffset.clamp(0, _content.length);
+  }
+
+  int _resolveStableAnchorOffset() {
+    if (!_isDoubleActive) {
+      final singlePages = _singlePages;
+      if (singlePages != null && singlePages.length > 0) {
+        final safeIndex = _currentSinglePageIndex();
+        return singlePages.ranges[safeIndex].start.clamp(
+          0,
+          singlePages.source.length,
+        );
+      }
+    }
+    final pages = _spreadPages;
+    if (pages != null && pages.length > 0) {
+      final safeIndex = _spreadIndex.clamp(0, pages.length - 1);
+      return pages.ranges[safeIndex].start.clamp(0, pages.source.length);
+    }
+    if (_pendingAnchorOffset != null) {
+      return _pendingAnchorOffset!.clamp(0, _content.length);
+    }
+    if (_restoredContentOffset != null) {
+      return _restoredContentOffset!.clamp(0, _content.length);
+    }
+    return _lastKnownContentOffset.clamp(0, _content.length);
   }
 
   bool get _isCurrentBookmarked {
@@ -231,7 +225,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   void _onScrollChanged() {
     if (_isBootstrapping || _content.isEmpty) return;
-    _lastKnownProgressRatio = _progressRatio.clamp(0.0, 1.0);
+    if (!_isDoubleActive && _singlePages != null && _singlePages!.length > 0) {
+      _singleIndex = _currentSinglePageIndex();
+    }
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
     _scheduleProgressSave();
   }
 
@@ -239,9 +236,17 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (_restoredScrollApplied) {
       return;
     }
-    final ratio = _restoredRatio;
-    if (ratio == null) {
+    final restoredOffset =
+        _restoredContentOffset ??
+        (_restoredRatio == null || _content.isEmpty
+            ? null
+            : ((_restoredRatio!.clamp(0.0, 1.0)) * _content.length).round());
+    if (restoredOffset == null) {
       _restoredScrollApplied = true;
+      return;
+    }
+    final pages = _singlePages;
+    if (_isDoubleActive || pages == null || pages.length == 0) {
       return;
     }
 
@@ -250,14 +255,19 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
     void attemptRestore() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted ||
-            _restoredScrollApplied ||
-            !_scrollController.hasClients) {
+        if (!mounted || _restoredScrollApplied) {
           return;
         }
-        final normalized = ratio.clamp(0.0, 1.0);
-        final max = _scrollController.position.maxScrollExtent;
-        if (normalized > 0 && max <= 0) {
+        if (!_scrollController.hasClients) {
+          attempts += 1;
+          if (attempts < maxAttempts) {
+            attemptRestore();
+            return;
+          }
+          _restoredScrollApplied = true;
+          return;
+        }
+        if (_singlePageExtent <= 0) {
           // ListView may need additional frames before content extent is ready.
           attempts += 1;
           if (attempts < maxAttempts) {
@@ -268,22 +278,17 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _restoredScrollApplied = true;
           return;
         }
-
-        final ratioTarget = (normalized * max).clamp(0.0, max);
-        final savedOffset = _restoredScrollOffset;
-        final savedMax = _restoredScrollMaxExtent;
-        double target = ratioTarget;
-        if (savedOffset != null) {
-          final absoluteTarget = savedOffset.clamp(0.0, max);
-          final canUseAbsolute =
-              savedMax == null ||
-              savedMax <= 0 ||
-              (max / savedMax >= 0.85 && max / savedMax <= 1.15);
-          target = canUseAbsolute ? absoluteTarget : ratioTarget;
-        }
-
+        final mapped = _findPageIndexByOffset(pages, restoredOffset);
+        _singleIndex = mapped;
+        final target = (_singlePageExtent * mapped).clamp(
+          0.0,
+          _scrollController.position.maxScrollExtent,
+        );
         _scrollController.jumpTo(target);
-        _lastKnownProgressRatio = normalized;
+        _lastKnownContentOffset = _currentContentOffset().clamp(
+          0,
+          _content.length,
+        );
         _restoredScrollApplied = true;
       });
     }
@@ -296,7 +301,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
     final ratio = _progressRatio.clamp(0.0, 1.0);
-    _lastKnownProgressRatio = ratio;
+    final contentOffset = _currentContentOffset().clamp(0, _content.length);
     final isSingleActive = !_isDoubleActive;
     final offsetPx = isSingleActive && _scrollController.hasClients
         ? _scrollController.offset
@@ -308,6 +313,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     final progress = ReadingProgress(
       bookId: widget.book.id,
       positionRatio: ratio,
+      contentOffset: contentOffset,
       pageIndex: 0,
       totalPages: 0,
       updatedAt: DateTime.now(),
@@ -321,61 +327,58 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _progressSaver.schedule(_persistProgressNow);
   }
 
-  Future<void> _scrollByViewport({required bool forward}) async {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-    final viewport = (_lastViewportHeight ?? 600).clamp(240, 2400).toDouble();
-    final delta = viewport * 0.92;
-    final current = _scrollController.offset;
-    final max = _scrollController.position.maxScrollExtent;
-    final target = (current + (forward ? delta : -delta)).clamp(0.0, max);
-
-    await _scrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
   Future<void> _jumpToContentOffset(int offset) async {
     if (_content.isEmpty) return;
+    final clampedOffset = offset.clamp(0, _content.length);
+    final ratio = (clampedOffset / _content.length).clamp(0.0, 1.0);
+
+    _restoredContentOffset = clampedOffset;
+    _restoredRatio = ratio;
+    _lastKnownContentOffset = clampedOffset;
+
     if (_isDoubleActive) {
       final spreadPages = _spreadPages;
       if (spreadPages == null || spreadPages.length == 0) {
-        _pendingAnchorOffset = offset.clamp(0, _content.length);
+        _pendingAnchorOffset = clampedOffset;
         return;
       }
-      final mapped = _mapSpreadIndexByOffset(
-        spreadPages,
-        offset.clamp(0, _content.length),
-      );
+      final mapped = _mapSpreadIndexByOffset(spreadPages, clampedOffset);
       if (!mounted) return;
       setState(() {
         _spreadIndex = mapped;
       });
-      _lastKnownProgressRatio = _progressRatio.clamp(0.0, 1.0);
+      _restoredScrollApplied = true;
+      _lastKnownContentOffset = clampedOffset;
       _scheduleProgressSave();
       return;
     }
 
-    final ratio = (offset / _content.length).clamp(0.0, 1.0);
+    final singlePages = _singlePages;
+    if (singlePages == null || singlePages.length == 0) {
+      _pendingAnchorOffset = clampedOffset;
+      _restoredScrollApplied = false;
+      return;
+    }
 
-    if (!_scrollController.hasClients) {
-      _restoredRatio = ratio;
+    if (!_scrollController.hasClients || _singlePageExtent <= 0) {
       _restoredScrollApplied = false;
       _deferRestoreScrollIfNeeded();
       return;
     }
 
-    final max = _scrollController.position.maxScrollExtent;
-    final target = (ratio * max).clamp(0.0, max);
+    final mapped = _findPageIndexByOffset(singlePages, clampedOffset);
+    _singleIndex = mapped;
+    _restoredScrollApplied = true;
+    final target = (_singlePageExtent * mapped).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
     await _scrollController.animateTo(
       target,
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
-    _lastKnownProgressRatio = _progressRatio.clamp(0.0, 1.0);
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
   }
 
   void _goSpread({required bool forward}) {
@@ -395,7 +398,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     setState(() {
       _spreadIndex = clamped;
     });
-    _lastKnownProgressRatio = _progressRatio.clamp(0.0, 1.0);
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
     _scheduleProgressSave();
   }
 
@@ -421,6 +424,133 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       offset.clamp(0, pages.source.length),
     );
     return _layout.clampPageIndex(raw, totalPages: pages.length, step: 2);
+  }
+
+  double _singlePageExtentForViewport(double viewportHeight) {
+    return (viewportHeight - (readerVerticalPadding * 2)).clamp(120.0, 8000.0);
+  }
+
+  Future<void> _goSinglePage({required bool forward}) async {
+    final pages = _singlePages;
+    if (pages == null || pages.length == 0) return;
+    if (!_scrollController.hasClients || _singlePageExtent <= 0) return;
+    final next = (_singleIndex + (forward ? 1 : -1)).clamp(0, pages.length - 1);
+    if (next == _singleIndex) return;
+    _singleIndex = next;
+    final target = (_singlePageExtent * next).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    await _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+    );
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
+    _scheduleProgressSave();
+  }
+
+  void _ensureSinglePagination({
+    required Size viewport,
+    required MediaQueryData mediaQueryData,
+    required TextStyle style,
+  }) {
+    if (_content.isEmpty) return;
+    if (viewport.width <= 0 || viewport.height <= 0) return;
+
+    _singlePageExtent = _singlePageExtentForViewport(viewport.height);
+    final signature = _layout.paginationSignature(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
+    if (signature == _singleSignature && _singlePages != null) {
+      if (_pendingAnchorOffset != null) {
+        final mapped = _findPageIndexByOffset(
+          _singlePages!,
+          _pendingAnchorOffset!,
+        );
+        _singleIndex = mapped;
+      }
+      return;
+    }
+    if (signature == _activeSingleSignature) {
+      return;
+    }
+
+    _activeSingleSignature = signature;
+    final token = ++_singleToken;
+    final requestedAnchor =
+        (_pendingAnchorOffset ?? _resolveStableAnchorOffset()).clamp(
+          0,
+          _content.length,
+        );
+    setState(() {
+      _isSinglePaginating = true;
+    });
+
+    final textArea = _layout.textAreaForPagination(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
+
+    unawaited(() async {
+      try {
+        final result = await _sessionController.paginate(
+          bookId: widget.book.id,
+          content: _content,
+          signature: signature,
+          textArea: textArea,
+          textStyle: style,
+          spreadStep: 1,
+          restoredProgress: null,
+          previousTotalPages: 0,
+          previousRatio: 0,
+          previewPageCount: 50,
+          onPreviewReady: (previewPages) {
+            if (!mounted || token != _singleToken) return;
+            final liveAnchor = (_pendingAnchorOffset ?? requestedAnchor).clamp(
+              0,
+              _content.length,
+            );
+            final mapped = _findPageIndexByOffset(previewPages, liveAnchor);
+            _singleIndex = mapped;
+            setState(() {
+              _singlePages = previewPages;
+              _singleSignature = signature;
+            });
+            _lastKnownContentOffset = previewPages.ranges[mapped].start.clamp(
+              0,
+              _content.length,
+            );
+          },
+        );
+        if (!mounted || token != _singleToken) return;
+        final liveAnchor = (_pendingAnchorOffset ?? requestedAnchor).clamp(
+          0,
+          _content.length,
+        );
+        final mapped = _findPageIndexByOffset(result.pages, liveAnchor);
+        _singleIndex = mapped;
+        setState(() {
+          _singlePages = result.pages;
+          _singleSignature = signature;
+          _isSinglePaginating = false;
+        });
+        _lastKnownContentOffset = result.pages.ranges[mapped].start.clamp(
+          0,
+          _content.length,
+        );
+      } catch (_) {
+        if (!mounted || token != _singleToken) return;
+        setState(() {
+          _isSinglePaginating = false;
+        });
+      } finally {
+        if (_activeSingleSignature == signature) {
+          _activeSingleSignature = null;
+        }
+      }
+    }());
   }
 
   void _ensureSpreadPagination({
@@ -454,6 +584,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
     _activeSpreadSignature = signature;
     final token = ++_spreadToken;
+    final requestedAnchor =
+        (_pendingAnchorOffset ?? _resolveStableAnchorOffset()).clamp(
+          0,
+          _content.length,
+        );
     setState(() {
       _isSpreadPaginating = true;
     });
@@ -478,19 +613,27 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           previewPageCount: 30,
           onPreviewReady: (previewPages) {
             if (!mounted || token != _spreadToken) return;
-            final liveAnchor = (_pendingAnchorOffset ?? _currentContentOffset())
-                .clamp(0, _content.length);
+            final liveAnchor = (_pendingAnchorOffset ?? requestedAnchor).clamp(
+              0,
+              _content.length,
+            );
             final mapped = _mapSpreadIndexByOffset(previewPages, liveAnchor);
             setState(() {
               _spreadPages = previewPages;
               _spreadIndex = mapped;
               _spreadSignature = signature;
             });
+            _lastKnownContentOffset = previewPages.ranges[mapped].start.clamp(
+              0,
+              _content.length,
+            );
           },
         );
         if (!mounted || token != _spreadToken) return;
-        final liveAnchor = (_pendingAnchorOffset ?? _currentContentOffset())
-            .clamp(0, _content.length);
+        final liveAnchor = (_pendingAnchorOffset ?? requestedAnchor).clamp(
+          0,
+          _content.length,
+        );
         final mapped = _mapSpreadIndexByOffset(result.pages, liveAnchor);
         setState(() {
           _spreadPages = result.pages;
@@ -498,6 +641,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _spreadSignature = signature;
           _isSpreadPaginating = false;
         });
+        _lastKnownContentOffset = result.pages.ranges[mapped].start.clamp(
+          0,
+          _content.length,
+        );
         _pendingAnchorOffset = null;
       } catch (_) {
         if (!mounted || token != _spreadToken) return;
@@ -653,14 +800,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         if (doubleMode) {
           _goSpread(forward: false);
         } else {
-          unawaited(_scrollByViewport(forward: false));
+          unawaited(_goSinglePage(forward: false));
         }
         break;
       case ReaderTapAction.next:
         if (doubleMode) {
           _goSpread(forward: true);
         } else {
-          unawaited(_scrollByViewport(forward: true));
+          unawaited(_goSinglePage(forward: true));
         }
         break;
       case ReaderTapAction.toggleControls:
@@ -715,7 +862,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (_content.trim().isEmpty) {
       return const Center(child: Text('본문이 비어 있습니다.'));
     }
-    _ensureSingleChunksReady();
 
     final style = _readerTextStyle(palette);
 
@@ -727,12 +873,24 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           viewport,
           mediaQueryData: mediaQueryData,
         );
+        final wasDoubleMode = _isDoubleActive;
+        final modeSwitchAnchor = (doubleMode != wasDoubleMode)
+            ? _resolveStableAnchorOffset()
+            : null;
         _isDoubleActive = doubleMode;
-        _lastViewportHeight = constraints.maxHeight;
+        _singlePageExtent = _singlePageExtentForViewport(constraints.maxHeight);
+        if (modeSwitchAnchor != null) {
+          _pendingAnchorOffset = modeSwitchAnchor.clamp(0, _content.length);
+        }
 
         if (doubleMode) {
-          if (!_restoredScrollApplied && _restoredRatio != null) {
-            _pendingAnchorOffset =
+          if (!_restoredScrollApplied &&
+              (_restoredContentOffset != null || _restoredRatio != null)) {
+            _pendingAnchorOffset = _restoredContentOffset?.clamp(
+              0,
+              _content.length,
+            );
+            _pendingAnchorOffset ??=
                 ((_restoredRatio!.clamp(0.0, 1.0)) * _content.length).round();
             _restoredScrollApplied = true;
           }
@@ -745,11 +903,21 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             );
           });
         } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _isDoubleActive) return;
+            _ensureSinglePagination(
+              viewport: viewport,
+              mediaQueryData: mediaQueryData,
+              style: style,
+            );
+          });
           _deferRestoreScrollIfNeeded();
           if (_pendingAnchorOffset != null) {
             final target = _pendingAnchorOffset!;
-            _pendingAnchorOffset = null;
             WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _isDoubleActive) return;
+              if (_singlePages == null || _singlePages!.length == 0) return;
+              _pendingAnchorOffset = null;
               unawaited(_jumpToContentOffset(target));
             });
           }
@@ -764,8 +932,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           ),
           child: ReaderContentSwitcher(
             doubleMode: doubleMode,
-            content: _content,
-            singleChunks: _singleChunks,
+            singlePages: _singlePages,
+            singlePageExtent: _singlePageExtent,
+            isSinglePaginating: _isSinglePaginating,
             style: style,
             palette: palette,
             horizontalPadding: _settings.horizontalPadding,
