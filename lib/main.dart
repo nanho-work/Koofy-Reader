@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +12,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageMigrationRunner().run();
   if (!kIsWeb && AdMobIds.isSupportedPlatform) {
-    await MobileAds.instance.initialize();
+    unawaited(MobileAds.instance.initialize());
   }
   runApp(const ProviderScope(child: KoofyReaderApp()));
 }

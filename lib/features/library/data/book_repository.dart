@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
@@ -194,41 +195,7 @@ class LocalBookRepository implements BookRepository {
 
   Future<String> _readEpubContent(File file) async {
     final bytes = await file.readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
-    final filesByPath = <String, ArchiveFile>{};
-    for (final entry in archive.files) {
-      if (!entry.isFile) continue;
-      filesByPath[_normalizePath(entry.name)] = entry;
-    }
-
-    final readingOrder = _resolveEpubReadingOrder(filesByPath);
-    final chapterPaths = readingOrder.isNotEmpty
-        ? readingOrder
-        : _fallbackChapterOrder(filesByPath.keys.toList());
-
-    if (chapterPaths.isEmpty) {
-      throw Exception('EPUB에서 본문 파일을 찾지 못했습니다.');
-    }
-
-    final buffer = StringBuffer();
-    for (final chapterPath in chapterPaths) {
-      final chapterFile = filesByPath[_normalizePath(chapterPath)];
-      if (chapterFile == null) {
-        continue;
-      }
-      final raw = utf8.decode(chapterFile.content, allowMalformed: true);
-      final text = _stripHtml(raw);
-      if (text.trim().isNotEmpty) {
-        buffer.writeln(text.trim());
-        buffer.writeln();
-      }
-    }
-
-    final content = buffer.toString().trim();
-    if (content.isEmpty) {
-      throw Exception('EPUB 본문 추출 결과가 비어 있습니다.');
-    }
-    return content;
+    return Isolate.run(() => _extractEpubContentFromBytes(bytes));
   }
 
   Future<_EpubMetadata> _readEpubMetadata(File file) async {
@@ -311,99 +278,6 @@ class LocalBookRepository implements BookRepository {
     return null;
   }
 
-  List<String> _resolveEpubReadingOrder(Map<String, ArchiveFile> filesByPath) {
-    final opfPath = _resolveOpfPath(filesByPath);
-    if (opfPath == null) {
-      return const [];
-    }
-    final opfFile = filesByPath[opfPath];
-    if (opfFile == null) {
-      return const [];
-    }
-
-    try {
-      final opfXml = utf8.decode(opfFile.content, allowMalformed: true);
-      final opfDoc = XmlDocument.parse(opfXml);
-      final baseDir = _dirName(opfPath);
-
-      final manifestById = <String, String>{};
-      for (final item in opfDoc.findAllElements('item')) {
-        final id = item.getAttribute('id');
-        final href = item.getAttribute('href');
-        if (id == null || href == null || href.trim().isEmpty) {
-          continue;
-        }
-        manifestById[id] = _joinPath(baseDir, href);
-      }
-
-      final ordered = <String>[];
-      for (final itemref in opfDoc.findAllElements('itemref')) {
-        final idref = itemref.getAttribute('idref');
-        if (idref == null) {
-          continue;
-        }
-        final href = manifestById[idref];
-        if (href == null) {
-          continue;
-        }
-        if (filesByPath.containsKey(href)) {
-          ordered.add(href);
-        }
-      }
-      return ordered;
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  List<String> _fallbackChapterOrder(List<String> paths) {
-    final filtered =
-        paths
-            .where(
-              (path) =>
-                  path.endsWith('.xhtml') ||
-                  path.endsWith('.html') ||
-                  path.endsWith('.htm'),
-            )
-            .toList()
-          ..sort();
-    return filtered;
-  }
-
-  String _stripHtml(String html) {
-    try {
-      final doc = XmlDocument.parse(html);
-      final body = doc.findAllElements('body');
-      if (body.isNotEmpty) {
-        final text = body.first.innerText;
-        return _normalizeWhitespace(text);
-      }
-      return _normalizeWhitespace(doc.innerText);
-    } catch (_) {
-      final withoutScript = html
-          .replaceAll(
-            RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
-            ' ',
-          )
-          .replaceAll(
-            RegExp(r'<style[\s\S]*?</style>', caseSensitive: false),
-            ' ',
-          );
-      final withoutTags = withoutScript.replaceAll(RegExp(r'<[^>]+>'), ' ');
-      return _normalizeWhitespace(withoutTags);
-    }
-  }
-
-  String _normalizeWhitespace(String input) {
-    final collapsed = input
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .replaceAll(RegExp(r'[\t\f\v ]+'), ' ')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-        .trim();
-    return collapsed;
-  }
-
   Iterable<XmlElement> _elementsByName(XmlDocument doc, String localName) {
     return doc.descendants.whereType<XmlElement>().where(
       (element) => element.name.local.toLowerCase() == localName,
@@ -427,21 +301,202 @@ class LocalBookRepository implements BookRepository {
     }
     return segments.join('/');
   }
+}
 
-  String _dirName(String path) {
-    final index = path.lastIndexOf('/');
-    if (index < 0) {
-      return '';
-    }
-    return path.substring(0, index);
+String _extractEpubContentFromBytes(List<int> bytes) {
+  final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+  final filesByPath = <String, ArchiveFile>{};
+  for (final entry in archive.files) {
+    if (!entry.isFile) continue;
+    filesByPath[_normalizePathWorker(entry.name)] = entry;
   }
 
-  String _joinPath(String baseDir, String child) {
-    if (baseDir.isEmpty) {
-      return _normalizePath(child);
-    }
-    return _normalizePath('$baseDir/$child');
+  final readingOrder = _resolveEpubReadingOrderWorker(filesByPath);
+  final chapterPaths = readingOrder.isNotEmpty
+      ? readingOrder
+      : _fallbackChapterOrderWorker(filesByPath.keys.toList());
+
+  if (chapterPaths.isEmpty) {
+    throw Exception('EPUB에서 본문 파일을 찾지 못했습니다.');
   }
+
+  final buffer = StringBuffer();
+  for (final chapterPath in chapterPaths) {
+    final chapterFile = filesByPath[_normalizePathWorker(chapterPath)];
+    if (chapterFile == null) {
+      continue;
+    }
+    final raw = utf8.decode(chapterFile.content, allowMalformed: true);
+    final text = _stripHtmlWorker(raw);
+    if (text.trim().isNotEmpty) {
+      buffer.writeln(text.trim());
+      buffer.writeln();
+    }
+  }
+
+  final content = buffer.toString().trim();
+  if (content.isEmpty) {
+    throw Exception('EPUB 본문 추출 결과가 비어 있습니다.');
+  }
+  return content;
+}
+
+List<String> _resolveEpubReadingOrderWorker(
+  Map<String, ArchiveFile> filesByPath,
+) {
+  final opfPath = _resolveOpfPathWorker(filesByPath);
+  if (opfPath == null) {
+    return const [];
+  }
+  final opfFile = filesByPath[opfPath];
+  if (opfFile == null) {
+    return const [];
+  }
+
+  try {
+    final opfXml = utf8.decode(opfFile.content, allowMalformed: true);
+    final opfDoc = XmlDocument.parse(opfXml);
+    final baseDir = _dirNameWorker(opfPath);
+
+    final manifestById = <String, String>{};
+    for (final item in opfDoc.findAllElements('item')) {
+      final id = item.getAttribute('id');
+      final href = item.getAttribute('href');
+      if (id == null || href == null || href.trim().isEmpty) {
+        continue;
+      }
+      manifestById[id] = _joinPathWorker(baseDir, href);
+    }
+
+    final ordered = <String>[];
+    for (final itemref in opfDoc.findAllElements('itemref')) {
+      final idref = itemref.getAttribute('idref');
+      if (idref == null) {
+        continue;
+      }
+      final href = manifestById[idref];
+      if (href == null) {
+        continue;
+      }
+      if (filesByPath.containsKey(href)) {
+        ordered.add(href);
+      }
+    }
+    return ordered;
+  } catch (_) {
+    return const [];
+  }
+}
+
+String? _resolveOpfPathWorker(Map<String, ArchiveFile> filesByPath) {
+  const containerPath = 'meta-inf/container.xml';
+  final container = filesByPath[containerPath];
+  if (container != null) {
+    try {
+      final containerXml = utf8.decode(container.content, allowMalformed: true);
+      final doc = XmlDocument.parse(containerXml);
+      final rootfiles = doc.findAllElements('rootfile');
+      for (final rootfile in rootfiles) {
+        final fullPath = rootfile.getAttribute('full-path');
+        if (fullPath == null || fullPath.trim().isEmpty) {
+          continue;
+        }
+        final normalized = _normalizePathWorker(fullPath);
+        if (filesByPath.containsKey(normalized)) {
+          return normalized;
+        }
+      }
+    } catch (_) {
+      // Continue fallback below.
+    }
+  }
+
+  for (final path in filesByPath.keys) {
+    if (path.endsWith('.opf')) {
+      return path;
+    }
+  }
+  return null;
+}
+
+List<String> _fallbackChapterOrderWorker(List<String> paths) {
+  final filtered =
+      paths
+          .where(
+            (path) =>
+                path.endsWith('.xhtml') ||
+                path.endsWith('.html') ||
+                path.endsWith('.htm'),
+          )
+          .toList()
+        ..sort();
+  return filtered;
+}
+
+String _stripHtmlWorker(String html) {
+  try {
+    final doc = XmlDocument.parse(html);
+    final body = doc.findAllElements('body');
+    if (body.isNotEmpty) {
+      final text = body.first.innerText;
+      return _normalizeWhitespaceWorker(text);
+    }
+    return _normalizeWhitespaceWorker(doc.innerText);
+  } catch (_) {
+    final withoutScript = html
+        .replaceAll(
+          RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(r'<style[\s\S]*?</style>', caseSensitive: false),
+          ' ',
+        );
+    final withoutTags = withoutScript.replaceAll(RegExp(r'<[^>]+>'), ' ');
+    return _normalizeWhitespaceWorker(withoutTags);
+  }
+}
+
+String _normalizeWhitespaceWorker(String input) {
+  return input
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n')
+      .replaceAll(RegExp(r'[\t\f\v ]+'), ' ')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+}
+
+String _normalizePathWorker(String path) {
+  final normalized = path.replaceAll('\\', '/').toLowerCase();
+  final segments = <String>[];
+  for (final segment in normalized.split('/')) {
+    if (segment.isEmpty || segment == '.') {
+      continue;
+    }
+    if (segment == '..') {
+      if (segments.isNotEmpty) {
+        segments.removeLast();
+      }
+      continue;
+    }
+    segments.add(segment);
+  }
+  return segments.join('/');
+}
+
+String _dirNameWorker(String path) {
+  final index = path.lastIndexOf('/');
+  if (index < 0) {
+    return '';
+  }
+  return path.substring(0, index);
+}
+
+String _joinPathWorker(String baseDir, String child) {
+  if (baseDir.isEmpty) {
+    return _normalizePathWorker(child);
+  }
+  return _normalizePathWorker('$baseDir/$child');
 }
 
 class _EpubMetadata {

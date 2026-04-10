@@ -7,6 +7,8 @@ class ReadingProgress {
     required this.pageIndex,
     required this.totalPages,
     required this.updatedAt,
+    this.scrollOffsetPx,
+    this.scrollMaxExtentPx,
   });
 
   final String bookId;
@@ -14,6 +16,8 @@ class ReadingProgress {
   final int pageIndex;
   final int totalPages;
   final DateTime updatedAt;
+  final double? scrollOffsetPx;
+  final double? scrollMaxExtentPx;
 
   String toRaw() {
     return jsonEncode({
@@ -22,6 +26,8 @@ class ReadingProgress {
       'pageIndex': pageIndex,
       'totalPages': totalPages,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
+      if (scrollOffsetPx != null) 'scrollOffsetPx': scrollOffsetPx,
+      if (scrollMaxExtentPx != null) 'scrollMaxExtentPx': scrollMaxExtentPx,
     });
   }
 
@@ -36,6 +42,8 @@ class ReadingProgress {
       final pageIndex = json['pageIndex'];
       final totalPages = json['totalPages'];
       final updatedAt = json['updatedAt'];
+      final scrollOffsetPx = json['scrollOffsetPx'];
+      final scrollMaxExtentPx = json['scrollMaxExtentPx'];
       if (bookId is! String || ratio is! num || updatedAt is! int) {
         return null;
       }
@@ -48,6 +56,12 @@ class ReadingProgress {
         pageIndex: safePageIndex,
         totalPages: safeTotalPages,
         updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),
+        scrollOffsetPx: scrollOffsetPx is num
+            ? scrollOffsetPx.toDouble().clamp(0.0, double.infinity)
+            : null,
+        scrollMaxExtentPx: scrollMaxExtentPx is num
+            ? scrollMaxExtentPx.toDouble().clamp(0.0, double.infinity)
+            : null,
       );
     } catch (_) {
       return null;

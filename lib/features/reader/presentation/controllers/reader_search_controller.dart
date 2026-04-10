@@ -11,21 +11,17 @@ class ReaderSearchController {
       return const <int>[];
     }
 
-    final lowerText = source.toLowerCase();
-    final needle = query.toLowerCase();
-    final result = <int>[];
-    int from = 0;
+    final offsets = findQueryOffsets(source: source, query: query);
+    if (offsets.isEmpty) {
+      return const <int>[];
+    }
 
-    while (from < lowerText.length) {
-      final index = lowerText.indexOf(needle, from);
-      if (index < 0) {
-        break;
-      }
+    final result = <int>[];
+    for (final index in offsets) {
       final page = _pageForOffset(index);
       if (page >= 0 && (result.isEmpty || result.last != page)) {
         result.add(page);
       }
-      from = index + needle.length;
     }
 
     return result;
@@ -79,5 +75,36 @@ class ReaderSearchController {
     final normalizedCurrent = current < 0 ? 0 : current % length;
     final next = (normalizedCurrent + delta) % length;
     return next < 0 ? next + length : next;
+  }
+
+  static List<int> findQueryOffsets({
+    required String source,
+    required String query,
+    int limit = 1000,
+  }) {
+    if (source.isEmpty) {
+      return const <int>[];
+    }
+
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) {
+      return const <int>[];
+    }
+
+    final haystack = source.toLowerCase();
+    final offsets = <int>[];
+    int cursor = 0;
+    while (cursor < haystack.length) {
+      final found = haystack.indexOf(needle, cursor);
+      if (found < 0) {
+        break;
+      }
+      offsets.add(found);
+      if (offsets.length >= limit) {
+        break;
+      }
+      cursor = found + needle.length;
+    }
+    return offsets;
   }
 }

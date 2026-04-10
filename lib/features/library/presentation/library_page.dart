@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
@@ -16,18 +15,14 @@ class LibraryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final booksAsync = ref.watch(booksProvider);
-    final progressAsync = ref.watch(allReadingProgressProvider);
-    final recentIdsAsync = ref.watch(recentBookIdsProvider);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF4EFE6),
       appBar: AppBar(
         title: const Text('쿠피 리더'),
+        backgroundColor: const Color(0xFFF4EFE6),
+        surfaceTintColor: Colors.transparent,
         actions: [
-          IconButton(
-            onPressed: () => _importTextFile(context, ref),
-            icon: const Icon(Icons.upload_file),
-            tooltip: '책 파일 가져오기',
-          ),
           IconButton(
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
             icon: const Icon(Icons.settings),
@@ -41,72 +36,75 @@ class LibraryPage extends ConsumerWidget {
           child: Text('서재를 불러오지 못했습니다.\n$error', textAlign: TextAlign.center),
         ),
         data: (books) {
-          final progressMap = progressAsync.valueOrNull ?? const {};
-          final recentIds = recentIdsAsync.valueOrNull ?? const <String>[];
-          final recentIndexById = <String, int>{
-            for (int i = 0; i < recentIds.length; i++) recentIds[i]: i,
-          };
-
           final sortedBooks = [...books]
             ..sort((a, b) {
-              final aIndex = recentIndexById[a.id] ?? 999999;
-              final bIndex = recentIndexById[b.id] ?? 999999;
-              if (aIndex != bIndex) {
-                return aIndex.compareTo(bIndex);
+              final titleCompare = a.title.compareTo(b.title);
+              if (titleCompare != 0) {
+                return titleCompare;
               }
-              return a.title.compareTo(b.title);
+              return a.author.compareTo(b.author);
             });
 
-          if (books.isEmpty) {
-            return const Center(child: Text('표시할 책이 없습니다.'));
-          }
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final gridCount = _resolveGridCount(constraints.maxWidth);
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(booksProvider);
+                  ref.invalidate(allReadingProgressProvider);
+                  ref.invalidate(recentBookIdsProvider);
+                },
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      sliver: SliverToBoxAdapter(
+                        child: _LibraryHeader(bookCount: sortedBooks.length),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      sliver: SliverGrid.builder(
+                        itemCount: sortedBooks.length + 1,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: gridCount,
+                          mainAxisSpacing: 18,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 0.58,
+                        ),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return AddBookTile(
+                              onTap: () => _importTextFile(context, ref),
+                            );
+                          }
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(booksProvider);
-              ref.invalidate(allReadingProgressProvider);
-              ref.invalidate(recentBookIdsProvider);
+                          final book = sortedBooks[index - 1];
+                          return BookTile(
+                            book: book,
+                            onTap: () => _openReader(context, ref, book),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
             },
-            child: ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: sortedBooks.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _LibraryHeader(bookCount: sortedBooks.length);
-                }
-                final book = sortedBooks[index - 1];
-                final progress = progressMap[book.id];
-                final lastReadText = progress == null
-                    ? null
-                    : DateFormat(
-                        'yyyy-MM-dd HH:mm',
-                      ).format(progress.updatedAt.toLocal());
-
-                final totalPages = progress?.totalPages ?? 0;
-                final currentPage = totalPages == 0
-                    ? 0
-                    : (progress!.pageIndex + 1).clamp(1, totalPages);
-                final percent = ((progress?.positionRatio ?? 0) * 100).round();
-                final progressText = totalPages == 0
-                    ? '$percent% 읽음'
-                    : '$currentPage/$totalPages 페이지 · $percent%';
-
-                return BookTile(
-                  book: book,
-                  progressRatio: progress?.positionRatio.clamp(0.0, 1.0) ?? 0.0,
-                  progressText: progressText,
-                  lastReadText: lastReadText,
-                  onTap: () => _openReader(context, ref, book),
-                );
-              },
-            ),
           );
         },
       ),
       bottomNavigationBar: const SafeArea(child: AdFooterWidget()),
     );
+  }
+
+  int _resolveGridCount(double width) {
+    if (width >= 1400) return 8;
+    if (width >= 1200) return 7;
+    if (width >= 980) return 6;
+    if (width >= 760) return 5;
+    return 3;
   }
 
   void _openReader(BuildContext context, WidgetRef ref, Book book) {
@@ -176,14 +174,23 @@ class _LibraryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE8D7BE), Color(0xFFD9BE98)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x33A06E3B)),
       ),
       child: Text(
-        '내 서재: $bookCount권\n오프라인에서도 책을 바로 읽을 수 있습니다.',
-        style: Theme.of(context).textTheme.bodyLarge,
+        '표지 책장 · $bookCount권\n책 표지를 눌러 바로 이어읽기',
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: const Color(0xFF3B2B1F),
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

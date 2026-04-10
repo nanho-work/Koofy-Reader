@@ -13,53 +13,16 @@ Future<int?> showReaderBookmarksSheet({
         itemCount: sorted.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          final page = sorted[index] + 1;
+          final offset = sorted[index];
           return ListTile(
-            title: Text('$page 페이지'),
+            title: Text('북마크 ${index + 1}'),
+            subtitle: Text('문서 위치: $offset'),
             onTap: () => Navigator.pop(context, sorted[index]),
           );
         },
       );
     },
   );
-}
-
-Future<int?> showReaderPageJumpDialog({
-  required BuildContext context,
-  required int totalPages,
-  required int currentPage,
-}) async {
-  final controller = TextEditingController(text: currentPage.toString());
-  try {
-    return await showDialog<int>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('페이지 이동'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(hintText: '1 ~ $totalPages'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final page = int.tryParse(controller.text.trim());
-                Navigator.pop(context, page);
-              },
-              child: const Text('이동'),
-            ),
-          ],
-        );
-      },
-    );
-  } finally {
-    controller.dispose();
-  }
 }
 
 Future<String?> showReaderSearchDialog({

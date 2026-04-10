@@ -4,12 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/presentation/banner_ad_widget.dart';
 
+final connectivityResultsProvider = StreamProvider<List<ConnectivityResult>>((
+  ref,
+) {
+  return Connectivity().onConnectivityChanged;
+});
+
 class AdFooterWidget extends ConsumerWidget {
   const AdFooterWidget({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final adStateAsync = ref.watch(adStateProvider);
+    final connectivityAsync = ref.watch(connectivityResultsProvider);
 
     return adStateAsync.when(
       loading: () => _AdBox(
@@ -27,18 +34,17 @@ class AdFooterWidget extends ConsumerWidget {
             backgroundColor: Colors.green.shade50,
           );
         }
-        return StreamBuilder<List<ConnectivityResult>>(
-          stream: Connectivity().onConnectivityChanged,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return _AdBox(
-                message: '광고 로딩중...',
-                backgroundColor: Colors.blue.shade50,
-              );
-            }
-            final connected =
-                snapshot.data?.any((e) => e != ConnectivityResult.none) ??
-                false;
+        return connectivityAsync.when(
+          loading: () => _AdBox(
+            message: '광고 로딩중...',
+            backgroundColor: Colors.blue.shade50,
+          ),
+          error: (_, _) => _AdBox(
+            message: '네트워크 상태 확인 실패',
+            backgroundColor: Colors.grey.shade100,
+          ),
+          data: (results) {
+            final connected = results.any((e) => e != ConnectivityResult.none);
             if (connected) {
               return const BannerAdWidget();
             }
