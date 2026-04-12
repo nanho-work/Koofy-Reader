@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/features/reader/data/reader_font_registry.dart';
 import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
 
 Future<ReaderSettings?> showReaderSettingsSheet({
@@ -6,6 +9,7 @@ Future<ReaderSettings?> showReaderSettingsSheet({
   required ReaderSettings initialSettings,
   required double normalFontSize,
   required double largeFontSize,
+  required List<ReaderFontItem> fontItems,
 }) async {
   return showModalBottomSheet<ReaderSettings>(
     context: context,
@@ -13,6 +17,7 @@ Future<ReaderSettings?> showReaderSettingsSheet({
     isScrollControlled: true,
     builder: (context) {
       var draft = initialSettings;
+      var fontExpanded = false;
       return StatefulBuilder(
         builder: (context, setModalState) {
           Widget sectionTitle(String text) {
@@ -89,27 +94,53 @@ Future<ReaderSettings?> showReaderSettingsSheet({
                     ],
                   ),
                   sectionTitle('폰트'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  ExpansionTile(
+                    initiallyExpanded: fontExpanded,
+                    onExpansionChanged: (value) =>
+                        setModalState(() => fontExpanded = value),
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(
+                      _selectedFontLabel(
+                        selectedKey: draft.fontKey,
+                        fontItems: fontItems,
+                      ),
+                    ),
+                    subtitle: const Text('목록에서 글꼴을 선택하세요'),
                     children: [
-                      choiceChip(
-                        ReaderFontOption.sans,
-                        draft.fontOption,
-                        'Sans',
-                        (value) => draft = draft.copyWith(fontOption: value),
-                      ),
-                      choiceChip(
-                        ReaderFontOption.serif,
-                        draft.fontOption,
-                        'Serif',
-                        (value) => draft = draft.copyWith(fontOption: value),
-                      ),
-                      choiceChip(
-                        ReaderFontOption.mono,
-                        draft.fontOption,
-                        'Mono',
-                        (value) => draft = draft.copyWith(fontOption: value),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: math
+                              .min(280.0, fontItems.length * 64.0)
+                              .toDouble(),
+                        ),
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: fontItems
+                              .map(
+                                (font) => ListTile(
+                                  onTap: () => setModalState(
+                                    () => draft = draft.copyWith(
+                                      fontKey: font.key,
+                                    ),
+                                  ),
+                                  leading: Icon(
+                                    draft.fontKey == font.key
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_off,
+                                  ),
+                                  title: Text(
+                                    font.label,
+                                    style: TextStyle(
+                                      fontFamily: font.previewFamily,
+                                    ),
+                                  ),
+                                  subtitle: font.isCustom
+                                      ? const Text('추가한 폰트')
+                                      : const Text('기본 폰트'),
+                                ),
+                              )
+                              .toList(),
+                        ),
                       ),
                     ],
                   ),
@@ -144,9 +175,9 @@ Future<ReaderSettings?> showReaderSettingsSheet({
                   sectionTitle('줄 간격: ${draft.lineHeight.toStringAsFixed(2)}'),
                   Slider(
                     value: draft.lineHeight,
-                    min: 1.3,
-                    max: 2.2,
-                    divisions: 9,
+                    min: 1.1,
+                    max: 2.8,
+                    divisions: 17,
                     onChanged: (value) => setModalState(
                       () => draft = draft.copyWith(lineHeight: value),
                     ),
@@ -154,9 +185,9 @@ Future<ReaderSettings?> showReaderSettingsSheet({
                   sectionTitle('좌우 여백: ${draft.horizontalPadding.round()}'),
                   Slider(
                     value: draft.horizontalPadding,
-                    min: 10,
-                    max: 34,
-                    divisions: 12,
+                    min: 0,
+                    max: 64,
+                    divisions: 32,
                     onChanged: (value) => setModalState(
                       () => draft = draft.copyWith(horizontalPadding: value),
                     ),
@@ -186,4 +217,19 @@ Future<ReaderSettings?> showReaderSettingsSheet({
       );
     },
   );
+}
+
+String _selectedFontLabel({
+  required String selectedKey,
+  required List<ReaderFontItem> fontItems,
+}) {
+  for (final item in fontItems) {
+    if (item.key == selectedKey) {
+      return item.label;
+    }
+  }
+  if (fontItems.isNotEmpty) {
+    return fontItems.first.label;
+  }
+  return '기본 Sans';
 }

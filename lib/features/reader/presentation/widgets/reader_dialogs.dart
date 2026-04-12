@@ -51,53 +51,47 @@ class _ReaderSearchDialog extends StatefulWidget {
 }
 
 class _ReaderSearchDialogState extends State<_ReaderSearchDialog> {
-  late final TextEditingController _controller;
+  late String _query;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialQuery);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    _query = widget.initialQuery;
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       title: const Text('텍스트 검색'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(hintText: '검색어 입력'),
-              onSubmitted: (value) => Navigator.pop(context, value),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            initialValue: _query,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(hintText: '검색어 입력'),
+            onChanged: (value) => _query = value,
+            onFieldSubmitted: (value) => Navigator.pop(context, value),
+          ),
+          const SizedBox(height: 12),
+          if (widget.history.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: widget.history
+                  .take(6)
+                  .map(
+                    (item) => ActionChip(
+                      label: Text(item),
+                      onPressed: () => Navigator.pop(context, item),
+                    ),
+                  )
+                  .toList(),
             ),
-            const SizedBox(height: 12),
-            if (widget.history.isNotEmpty)
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: widget.history
-                    .take(6)
-                    .map(
-                      (item) => ActionChip(
-                        label: Text(item),
-                        onPressed: () => Navigator.pop(context, item),
-                      ),
-                    )
-                    .toList(),
-              ),
-          ],
-        ),
+        ],
       ),
       actions: [
         TextButton(
@@ -109,7 +103,7 @@ class _ReaderSearchDialogState extends State<_ReaderSearchDialog> {
           child: const Text('취소'),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
+          onPressed: () => Navigator.pop(context, _query),
           child: const Text('검색'),
         ),
       ],

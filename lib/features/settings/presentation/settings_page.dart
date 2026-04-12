@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 
@@ -35,16 +36,21 @@ class SettingsPage extends ConsumerWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              FilledButton(
-                onPressed: () => _runRewardedFlow(context, ref, 5),
-                child: const Text('보상형 5시간'),
-              ),
-              FilledButton.tonal(
-                onPressed: () => _runRewardedFlow(context, ref, 6),
-                child: const Text('보상형 6시간'),
-              ),
-            ],
+            children: AppConstants.adRewardHourOptions
+                .map((hours) {
+                  final label = Text('보상형 $hours시간');
+                  if (hours == AppConstants.adRewardHourOptions.first) {
+                    return FilledButton(
+                      onPressed: () => _runRewardedFlow(context, ref, hours),
+                      child: label,
+                    );
+                  }
+                  return FilledButton.tonal(
+                    onPressed: () => _runRewardedFlow(context, ref, hours),
+                    child: label,
+                  );
+                })
+                .toList(growable: false),
           ),
           const SizedBox(height: 24),
           Text(

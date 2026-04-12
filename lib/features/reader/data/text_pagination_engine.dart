@@ -72,72 +72,6 @@ class PaginatedText {
 }
 
 class TextPaginationEngine {
-  PaginatedText paginate({
-    required String content,
-    required double maxWidth,
-    required double maxHeight,
-    required TextStyle style,
-    int? maxPages,
-  }) {
-    final normalized = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    if (normalized.trim().isEmpty) {
-      return const PaginatedText(
-        source: '',
-        ranges: [TextPageRange(start: 0, end: 0)],
-      );
-    }
-
-    final safeWidth = maxWidth.clamp(80.0, 5000.0);
-    final safeHeight = maxHeight.clamp(80.0, 6000.0);
-    final painter = TextPainter(textDirection: TextDirection.ltr);
-    final estimatedChars = _estimateMaxCharsPerPage(
-      maxWidth: safeWidth,
-      maxHeight: safeHeight,
-      style: style,
-    );
-    final maxCharsToTry = _maxCharsWindowFor(
-      contentLength: normalized.length,
-      estimatedChars: estimatedChars,
-    );
-
-    final ranges = <TextPageRange>[];
-    int start = 0;
-
-    while (start < normalized.length) {
-      if (maxPages != null && ranges.length >= maxPages) {
-        break;
-      }
-      final end = _findPageEnd(
-        normalized,
-        start: start,
-        maxWidth: safeWidth,
-        maxHeight: safeHeight,
-        style: style,
-        painter: painter,
-        maxCharsToTry: maxCharsToTry,
-      );
-      if (end <= start) {
-        final forcedEnd = (start + 1).clamp(0, normalized.length);
-        ranges.add(TextPageRange(start: start, end: forcedEnd));
-        start = forcedEnd;
-        continue;
-      }
-
-      final trimmedEnd = _trimRightBoundary(normalized, start, end);
-      final safeEnd = trimmedEnd <= start ? end : trimmedEnd;
-      ranges.add(TextPageRange(start: start, end: safeEnd));
-      start = _consumeLeadingSpaces(normalized, end);
-    }
-
-    if (ranges.isEmpty) {
-      return const PaginatedText(
-        source: '',
-        ranges: [TextPageRange(start: 0, end: 0)],
-      );
-    }
-    return PaginatedText(source: normalized, ranges: ranges);
-  }
-
   Future<PaginatedText> paginateAsync({
     required String content,
     required double maxWidth,
@@ -232,12 +166,27 @@ class TextPaginationEngine {
       return _adjustBreakByWordBoundary(source, start: start, end: probeEnd);
     }
 
-    final lineGuard = ((style.fontSize ?? 16) * (style.height ?? 1.5) * 1.8)
-        .clamp(16.0, 140.0);
-    final dy = math.max(0.0, maxHeight - lineGuard);
+    // Prefer an exact line boundary that fully fits inside maxHeight.
+    double? targetY;
+    final lines = painter.computeLineMetrics();
+    if (lines.isNotEmpty) {
+      final safeBottom = math.max(0.0, maxHeight - 0.5);
+      for (final line in lines) {
+        final lineBottom = line.baseline + line.descent;
+        if (lineBottom <= safeBottom) {
+          final lineTop = line.baseline - line.ascent;
+          targetY = ((lineTop + lineBottom) * 0.5).clamp(0.0, safeBottom);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Fallback for extremely tight heights where no full line fits.
+    targetY ??= math.max(0.0, maxHeight * 0.35);
     final dx = math.max(0.0, maxWidth - 1);
     final localEnd = painter
-        .getPositionForOffset(Offset(dx, dy))
+        .getPositionForOffset(Offset(dx, targetY))
         .offset
         .clamp(1, probe.length)
         .toInt();

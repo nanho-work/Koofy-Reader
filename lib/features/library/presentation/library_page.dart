@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
+import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -69,9 +70,12 @@ class LibraryPage extends ConsumerWidget {
                         itemCount: sortedBooks.length + 1,
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: gridCount,
-                          mainAxisSpacing: 18,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 0.58,
+                          mainAxisSpacing:
+                              AppConstants.libraryGridMainAxisSpacing,
+                          crossAxisSpacing:
+                              AppConstants.libraryGridCrossAxisSpacing,
+                          childAspectRatio:
+                              AppConstants.libraryGridChildAspectRatio,
                         ),
                         itemBuilder: (context, index) {
                           if (index == 0) {
@@ -100,11 +104,17 @@ class LibraryPage extends ConsumerWidget {
   }
 
   int _resolveGridCount(double width) {
-    if (width >= 1400) return 8;
-    if (width >= 1200) return 7;
-    if (width >= 980) return 6;
-    if (width >= 760) return 5;
-    return 3;
+    final breakpoints = AppConstants.libraryGridWidthBreakpoints;
+    final counts = AppConstants.libraryGridCounts;
+    final length = breakpoints.length < counts.length
+        ? breakpoints.length
+        : counts.length;
+    for (var i = 0; i < length; i++) {
+      if (width >= breakpoints[i]) {
+        return counts[i];
+      }
+    }
+    return AppConstants.libraryGridDefaultCount;
   }
 
   void _openReader(BuildContext context, WidgetRef ref, Book book) {

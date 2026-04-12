@@ -33,6 +33,10 @@ class ReaderPagePane extends StatelessWidget {
                 : Text(
                     text,
                     style: style,
+                    strutStyle: StrutStyle.fromTextStyle(
+                      style,
+                      forceStrutHeight: true,
+                    ),
                     softWrap: true,
                     overflow: TextOverflow.clip,
                   ),

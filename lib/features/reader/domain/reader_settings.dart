@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:koofy_reader/features/reader/domain/reader_font_keys.dart';
+
 enum ReaderBackgroundMode { black, beige, gray }
 
 enum ReaderFontOption { sans, serif, mono }
@@ -9,7 +11,7 @@ enum ReaderPageLayoutMode { auto, single, double }
 class ReaderSettings {
   const ReaderSettings({
     required this.backgroundMode,
-    required this.fontOption,
+    required this.fontKey,
     required this.pageLayoutMode,
     required this.fontSize,
     required this.lineHeight,
@@ -20,7 +22,7 @@ class ReaderSettings {
   factory ReaderSettings.defaults() {
     return const ReaderSettings(
       backgroundMode: ReaderBackgroundMode.beige,
-      fontOption: ReaderFontOption.sans,
+      fontKey: ReaderFontKeys.builtinSans,
       pageLayoutMode: ReaderPageLayoutMode.auto,
       fontSize: 18,
       lineHeight: 1.7,
@@ -30,7 +32,7 @@ class ReaderSettings {
   }
 
   final ReaderBackgroundMode backgroundMode;
-  final ReaderFontOption fontOption;
+  final String fontKey;
   final ReaderPageLayoutMode pageLayoutMode;
   final double fontSize;
   final double lineHeight;
@@ -39,7 +41,7 @@ class ReaderSettings {
 
   ReaderSettings copyWith({
     ReaderBackgroundMode? backgroundMode,
-    ReaderFontOption? fontOption,
+    String? fontKey,
     ReaderPageLayoutMode? pageLayoutMode,
     double? fontSize,
     double? lineHeight,
@@ -48,7 +50,7 @@ class ReaderSettings {
   }) {
     return ReaderSettings(
       backgroundMode: backgroundMode ?? this.backgroundMode,
-      fontOption: fontOption ?? this.fontOption,
+      fontKey: fontKey ?? this.fontKey,
       pageLayoutMode: pageLayoutMode ?? this.pageLayoutMode,
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
@@ -58,20 +60,13 @@ class ReaderSettings {
   }
 
   String get fontFamily {
-    switch (fontOption) {
-      case ReaderFontOption.sans:
-        return 'sans-serif';
-      case ReaderFontOption.serif:
-        return 'serif';
-      case ReaderFontOption.mono:
-        return 'monospace';
-    }
+    return ReaderFontKeys.resolveFamily(fontKey);
   }
 
   String toRaw() {
     return jsonEncode({
       'backgroundMode': backgroundMode.name,
-      'fontOption': fontOption.name,
+      'fontKey': fontKey,
       'pageLayoutMode': pageLayoutMode.name,
       'fontSize': fontSize,
       'lineHeight': lineHeight,
@@ -90,17 +85,19 @@ class ReaderSettings {
         (value) => value.name == json['backgroundMode'],
         orElse: () => ReaderBackgroundMode.beige,
       );
-      final fontOption = ReaderFontOption.values.firstWhere(
-        (value) => value.name == json['fontOption'],
-        orElse: () => ReaderFontOption.sans,
-      );
       final pageLayoutMode = ReaderPageLayoutMode.values.firstWhere(
         (value) => value.name == json['pageLayoutMode'],
         orElse: () => ReaderPageLayoutMode.auto,
       );
+      final fontKeyRaw = json['fontKey'];
+      final legacyFontOptionRaw = json['fontOption'];
+      final normalizedFontKey = _normalizeFontKey(
+        fontKeyRaw: fontKeyRaw,
+        legacyFontOptionRaw: legacyFontOptionRaw,
+      );
       return ReaderSettings(
         backgroundMode: backgroundMode,
-        fontOption: fontOption,
+        fontKey: normalizedFontKey,
         pageLayoutMode: pageLayoutMode,
         fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18,
         lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.7,
@@ -110,6 +107,27 @@ class ReaderSettings {
       );
     } catch (_) {
       return null;
+    }
+  }
+
+  static String _normalizeFontKey({
+    required Object? fontKeyRaw,
+    required Object? legacyFontOptionRaw,
+  }) {
+    if (fontKeyRaw is String && fontKeyRaw.trim().isNotEmpty) {
+      return fontKeyRaw;
+    }
+    final legacy = ReaderFontOption.values.firstWhere(
+      (value) => value.name == legacyFontOptionRaw,
+      orElse: () => ReaderFontOption.sans,
+    );
+    switch (legacy) {
+      case ReaderFontOption.sans:
+        return ReaderFontKeys.builtinSans;
+      case ReaderFontOption.serif:
+        return ReaderFontKeys.builtinSerif;
+      case ReaderFontOption.mono:
+        return ReaderFontKeys.builtinMono;
     }
   }
 }

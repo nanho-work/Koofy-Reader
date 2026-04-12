@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_visuals.dart';
 
-enum ReaderTapAction { previous, next, toggleControls }
+enum ReaderTapAction { previous, next }
 
 class ReaderLayoutController {
   const ReaderLayoutController({required this.settings});
@@ -22,35 +22,20 @@ class ReaderLayoutController {
     }
   }
 
-  int spreadStepFor(Size viewport, {MediaQueryData? mediaQueryData}) {
-    return isDoublePageMode(viewport, mediaQueryData: mediaQueryData) ? 2 : 1;
-  }
-
-  int clampPageIndex(int target, {required int totalPages, required int step}) {
-    if (totalPages <= 1) {
-      return 0;
-    }
-    if (step == 1) {
-      return target.clamp(0, totalPages - 1);
-    }
-    final lastSpreadStart = ((totalPages - 1) ~/ 2) * 2;
-    final snapped = (target ~/ 2) * 2;
-    return snapped.clamp(0, lastSpreadStart);
-  }
-
   Size textAreaForPagination(Size viewport, {MediaQueryData? mediaQueryData}) {
     final linePixels = (settings.fontSize * settings.lineHeight).clamp(
       12.0,
       120.0,
     );
-    // Keep a generous guard zone so no lines are clipped at page bottom.
-    final heightGuard = (linePixels * 2.2) + 16;
+    // Keep pagination height aligned with actual pane height and add
+    // only a small safety margin to prevent bottom-line clipping.
+    final heightSafety = (linePixels * 0.35) + 4;
     final double textHeight = math.max(
-      120,
+      24,
       viewport.height -
           (readerVerticalPadding * 2) -
           readerContentBottomInset -
-          heightGuard,
+          heightSafety,
     );
     final bool isDouble = isDoublePageMode(
       viewport,
@@ -74,17 +59,12 @@ class ReaderLayoutController {
     final mode = isDoublePageMode(viewport, mediaQueryData: mediaQueryData)
         ? 'double'
         : 'single';
-    final hasFoldFeature =
-        mediaQueryData?.displayFeatures.any(
-          (feature) => _isFoldLikeType(feature.type.toString()),
-        ) ??
-        false;
-    // Quantize dimensions so tiny viewport shifts don't invalidate cache.
-    final widthBucket = ((area.width / 24).round() * 24).toDouble();
-    final heightBucket = ((area.height / 160).round() * 160).toDouble();
+    // Quantize lightly to absorb tiny jitter while still reacting to
+    // real viewport changes (fold/IME/system bars).
+    final widthBucket = ((area.width / 8).round() * 8).toDouble();
+    final heightBucket = ((area.height / 8).round() * 8).toDouble();
     return [
       mode,
-      hasFoldFeature ? 'fold' : 'plain',
       widthBucket.toStringAsFixed(0),
       heightBucket.toStringAsFixed(0),
       settings.fontFamily,
@@ -100,7 +80,7 @@ class ReaderLayoutController {
     double leftRatio = 0.5,
   }) {
     if (width <= 0) {
-      return ReaderTapAction.toggleControls;
+      return ReaderTapAction.next;
     }
     final leftEdge = width * leftRatio;
     if (dx <= leftEdge) {

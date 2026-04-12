@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
+import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
+import 'package:path_provider/path_provider.dart';
 
 final readerRepositoryProvider = Provider<ReaderRepository>(
   (ref) => LocalReaderRepository(ref.watch(localStorageProvider)),
@@ -26,16 +29,14 @@ abstract class ReaderRepository {
   Future<List<String>> loadRecentBookIds();
   Future<List<String>> loadSearchHistory();
   Future<void> saveSearchHistory(List<String> history);
-  Future<List<int>?> loadPaginationOffsets({
+  Future<ReaderStructureIndex?> loadStructureIndex({
     required String bookId,
-    required String signature,
     required int contentLength,
+    required String contentHash,
   });
-  Future<void> savePaginationOffsets({
+  Future<void> saveStructureIndex({
     required String bookId,
-    required String signature,
-    required int contentLength,
-    required List<int> offsets,
+    required ReaderStructureIndex index,
   });
 }
 
@@ -164,61 +165,52 @@ class LocalReaderRepository implements ReaderRepository {
   }
 
   @override
-  Future<List<int>?> loadPaginationOffsets({
+  Future<ReaderStructureIndex?> loadStructureIndex({
     required String bookId,
-    required String signature,
     required int contentLength,
+    required String contentHash,
   }) async {
-    final key = _paginationKeyFor(bookId, signature);
-    final raw =
-        await _storage.getString(key) ??
-        await _storage.getString(_legacyPaginationKeyFor(bookId, signature));
-    if (raw == null || raw.trim().isEmpty) {
+    final fromFile = await _loadStructureIndexFromFile(
+      bookId: bookId,
+      contentLength: contentLength,
+      contentHash: contentHash,
+    );
+    if (fromFile != null) {
+      return fromFile;
+    }
+
+    // Legacy fallback: previously persisted in SharedPreferences.
+    final key = _structureIndexKeyFor(bookId);
+    final raw = await _storage.getString(key);
+    final parsed = _parseStructureIndexIfValid(
+      raw: raw,
+      contentLength: contentLength,
+      contentHash: contentHash,
+    );
+    if (parsed == null) {
       return null;
     }
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        return null;
-      }
-      final storedLength = decoded['contentLength'];
-      final offsetsRaw = decoded['offsets'];
-      if (storedLength is! int || storedLength != contentLength) {
-        return null;
-      }
-      if (offsetsRaw is! List) {
-        return null;
-      }
-      final offsets = offsetsRaw
-          .whereType<num>()
-          .map((value) => value.toInt())
-          .where((value) => value > 0 && value <= contentLength)
-          .toList();
-      if (offsets.isEmpty) {
-        return null;
-      }
-      return offsets;
-    } catch (_) {
-      return null;
-    }
+    await saveStructureIndex(bookId: bookId, index: parsed);
+    return parsed;
   }
 
   @override
-  Future<void> savePaginationOffsets({
+  Future<void> saveStructureIndex({
     required String bookId,
-    required String signature,
-    required int contentLength,
-    required List<int> offsets,
+    required ReaderStructureIndex index,
   }) async {
-    if (offsets.isEmpty) {
+    final payload = index.toRaw();
+    // Guard against pathological payload sizes.
+    if (payload.length > 8 * 1024 * 1024) {
       return;
     }
-    final key = _paginationKeyFor(bookId, signature);
-    final payload = jsonEncode({
-      'contentLength': contentLength,
-      'offsets': offsets,
-    });
-    await _storage.setString(key, payload);
+    try {
+      final file = await _structureIndexFileFor(bookId);
+      await file.parent.create(recursive: true);
+      await file.writeAsString(payload, flush: true);
+    } catch (_) {
+      // Ignore write failures and continue without cache.
+    }
   }
 
   Future<void> _touchRecentBook(String bookId) async {
@@ -229,14 +221,62 @@ class LocalReaderRepository implements ReaderRepository {
     await _storage.setString(AppConstants.recentBooksKey, jsonEncode(limited));
   }
 
-  String _paginationKeyFor(String bookId, String signature) {
-    final hashed = _stableHash(signature);
-    return '${AppConstants.readerPaginationCachePrefix}${bookId}_$hashed';
+  String _structureIndexKeyFor(String bookId) {
+    return '${AppConstants.readerStructureIndexPrefix}$bookId';
   }
 
-  String _legacyPaginationKeyFor(String bookId, String signature) {
-    final hashed = signature.hashCode.toUnsigned(32);
-    return '${AppConstants.readerPaginationCachePrefix}${bookId}_$hashed';
+  Future<ReaderStructureIndex?> _loadStructureIndexFromFile({
+    required String bookId,
+    required int contentLength,
+    required String contentHash,
+  }) async {
+    try {
+      final file = await _structureIndexFileFor(bookId);
+      if (!await file.exists()) {
+        return null;
+      }
+      final raw = await file.readAsString();
+      final parsed = _parseStructureIndexIfValid(
+        raw: raw,
+        contentLength: contentLength,
+        contentHash: contentHash,
+      );
+      if (parsed == null) {
+        await file.delete();
+      }
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ReaderStructureIndex? _parseStructureIndexIfValid({
+    required String? raw,
+    required int contentLength,
+    required String contentHash,
+  }) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    final parsed = ReaderStructureIndex.fromRaw(raw);
+    if (parsed == null) {
+      return null;
+    }
+    if (parsed.schemaVersion != ReaderStructureIndex.currentSchemaVersion) {
+      return null;
+    }
+    if (parsed.contentLength != contentLength ||
+        parsed.contentHash != contentHash) {
+      return null;
+    }
+    return parsed;
+  }
+
+  Future<File> _structureIndexFileFor(String bookId) async {
+    final baseDir = await getApplicationSupportDirectory();
+    final cacheDir = Directory('${baseDir.path}/reader_index_cache');
+    final safeId = _stableHash(bookId);
+    return File('${cacheDir.path}/$safeId.json');
   }
 
   String _stableHash(String value) {

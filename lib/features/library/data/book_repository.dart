@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
 
 final bookRepositoryProvider = Provider<BookRepository>(
@@ -28,8 +29,9 @@ class LocalBookRepository implements BookRepository {
   LocalBookRepository(this._storage);
 
   final LocalStorage _storage;
-  static const int _maxTxtBytes = 20 * 1024 * 1024;
-  static const int _maxEpubBytes = 40 * 1024 * 1024;
+  static const int _contentCacheSchemaVersion = 1;
+  static final Map<String, _InMemoryContentCacheEntry> _inMemoryContentCache =
+      <String, _InMemoryContentCacheEntry>{};
 
   static final List<Book> _books = [
     Book.asset(
@@ -56,12 +58,47 @@ class LocalBookRepository implements BookRepository {
 
   @override
   Future<String> readBookContent(Book book) async {
+    String sourceStamp;
+    String rawContent;
+
     if (book.sourceType == BookSourceType.asset) {
       final path = book.assetPath;
       if (path == null) {
         throw Exception('assetPath is missing for ${book.id}');
       }
-      return rootBundle.loadString(path);
+      sourceStamp = 'asset:$path';
+      final inMemory = _readInMemoryContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+      );
+      if (inMemory != null) {
+        return inMemory;
+      }
+      final cached = await _readNormalizedContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+      );
+      if (cached != null) {
+        _writeInMemoryContentCache(
+          bookId: book.id,
+          sourceStamp: sourceStamp,
+          content: cached,
+        );
+        return cached;
+      }
+      rawContent = await rootBundle.loadString(path);
+      final normalized = _normalizeContent(rawContent);
+      await _writeNormalizedContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+        normalizedContent: normalized,
+      );
+      _writeInMemoryContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+        content: normalized,
+      );
+      return normalized;
     }
 
     final path = book.localPath;
@@ -74,18 +111,54 @@ class LocalBookRepository implements BookRepository {
     }
 
     final isEpub = path.toLowerCase().endsWith('.epub');
-    final fileLength = await file.length();
-    if (isEpub && fileLength > _maxEpubBytes) {
+    final stat = await file.stat();
+    final fileLength = stat.size;
+    if (isEpub && fileLength > AppConstants.maxEpubBytes) {
       throw Exception('EPUB 용량이 너무 큽니다. 40MB 이하 파일을 사용해 주세요.');
     }
-    if (!isEpub && fileLength > _maxTxtBytes) {
+    if (!isEpub && fileLength > AppConstants.maxTxtBytes) {
       throw Exception('TXT 용량이 너무 큽니다. 20MB 이하 파일을 사용해 주세요.');
     }
 
-    if (isEpub) {
-      return _readEpubContent(file);
+    sourceStamp =
+        'local:$path:${stat.size}:${stat.modified.millisecondsSinceEpoch}';
+    final inMemory = _readInMemoryContentCache(
+      bookId: book.id,
+      sourceStamp: sourceStamp,
+    );
+    if (inMemory != null) {
+      return inMemory;
     }
-    return file.readAsString();
+    final cached = await _readNormalizedContentCache(
+      bookId: book.id,
+      sourceStamp: sourceStamp,
+    );
+    if (cached != null) {
+      _writeInMemoryContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+        content: cached,
+      );
+      return cached;
+    }
+
+    if (isEpub) {
+      rawContent = await _readEpubContent(file);
+    } else {
+      rawContent = await file.readAsString();
+    }
+    final normalized = _normalizeContent(rawContent);
+    await _writeNormalizedContentCache(
+      bookId: book.id,
+      sourceStamp: sourceStamp,
+      normalizedContent: normalized,
+    );
+    _writeInMemoryContentCache(
+      bookId: book.id,
+      sourceStamp: sourceStamp,
+      content: normalized,
+    );
+    return normalized;
   }
 
   @override
@@ -301,6 +374,120 @@ class LocalBookRepository implements BookRepository {
     }
     return segments.join('/');
   }
+
+  String _normalizeContent(String raw) {
+    return raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  }
+
+  String? _readInMemoryContentCache({
+    required String bookId,
+    required String sourceStamp,
+  }) {
+    final entry = _inMemoryContentCache[bookId];
+    if (entry == null || entry.sourceStamp != sourceStamp) {
+      return null;
+    }
+    return entry.content;
+  }
+
+  void _writeInMemoryContentCache({
+    required String bookId,
+    required String sourceStamp,
+    required String content,
+  }) {
+    _inMemoryContentCache.remove(bookId);
+    _inMemoryContentCache[bookId] = _InMemoryContentCacheEntry(
+      sourceStamp: sourceStamp,
+      content: content,
+    );
+    const maxEntries = 3;
+    while (_inMemoryContentCache.length > maxEntries) {
+      final oldestKey = _inMemoryContentCache.keys.first;
+      _inMemoryContentCache.remove(oldestKey);
+    }
+  }
+
+  Future<String?> _readNormalizedContentCache({
+    required String bookId,
+    required String sourceStamp,
+  }) async {
+    try {
+      final file = await _contentCacheFileFor(bookId);
+      if (!await file.exists()) {
+        return null;
+      }
+      final raw = await file.readAsString();
+      if (raw.trim().isEmpty) {
+        return null;
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final schema = decoded['schemaVersion'];
+      final cachedStamp = decoded['sourceStamp'];
+      final content = decoded['normalizedContent'];
+      if (schema is! int || schema != _contentCacheSchemaVersion) {
+        return null;
+      }
+      if (cachedStamp is! String || cachedStamp != sourceStamp) {
+        return null;
+      }
+      if (content is! String) {
+        return null;
+      }
+      return content;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeNormalizedContentCache({
+    required String bookId,
+    required String sourceStamp,
+    required String normalizedContent,
+  }) async {
+    try {
+      final file = await _contentCacheFileFor(bookId);
+      await file.parent.create(recursive: true);
+      final payload = jsonEncode({
+        'schemaVersion': _contentCacheSchemaVersion,
+        'sourceStamp': sourceStamp,
+        'normalizedContent': normalizedContent,
+      });
+      await file.writeAsString(payload, flush: true);
+    } catch (_) {
+      // Fallback to raw read path if cache write fails.
+    }
+  }
+
+  Future<File> _contentCacheFileFor(String bookId) async {
+    final baseDir = await getApplicationSupportDirectory();
+    final cacheDir = Directory('${baseDir.path}/reader_content_cache');
+    final fileId = _stableHash(bookId);
+    return File('${cacheDir.path}/$fileId.json');
+  }
+
+  String _stableHash(String value) {
+    const int fnvOffsetBasis = 0x811C9DC5;
+    const int fnvPrime = 0x01000193;
+    int hash = fnvOffsetBasis;
+    for (final codeUnit in value.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+}
+
+class _InMemoryContentCacheEntry {
+  const _InMemoryContentCacheEntry({
+    required this.sourceStamp,
+    required this.content,
+  });
+
+  final String sourceStamp;
+  final String content;
 }
 
 String _extractEpubContentFromBytes(List<int> bytes) {

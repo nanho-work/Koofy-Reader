@@ -7,9 +7,7 @@ class ReaderContentSwitcher extends StatelessWidget {
   const ReaderContentSwitcher({
     super.key,
     required this.doubleMode,
-    required this.singlePages,
-    required this.singlePageExtent,
-    required this.isSinglePaginating,
+    required this.singleContent,
     required this.style,
     required this.palette,
     required this.horizontalPadding,
@@ -20,9 +18,7 @@ class ReaderContentSwitcher extends StatelessWidget {
   });
 
   final bool doubleMode;
-  final PaginatedText? singlePages;
-  final double singlePageExtent;
-  final bool isSinglePaginating;
+  final String singleContent;
   final TextStyle style;
   final ReaderPalette palette;
   final double horizontalPadding;
@@ -40,37 +36,37 @@ class ReaderContentSwitcher extends StatelessWidget {
   }
 
   Widget _buildSingleBody() {
-    final pages = singlePages;
-    if (pages == null || pages.length == 0) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          ReaderPagePane(
-            text: '',
-            style: style,
-            backgroundColor: palette.background,
-            horizontalPadding: horizontalPadding,
-          ),
-          if (isSinglePaginating)
-            const Center(child: CircularProgressIndicator()),
-        ],
+    if (singleContent.trim().isEmpty) {
+      return ReaderPagePane(
+        text: '',
+        style: style,
+        backgroundColor: palette.background,
+        horizontalPadding: horizontalPadding,
       );
     }
-    return ListView.builder(
+
+    return SingleChildScrollView(
       controller: scrollController,
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: readerVerticalPadding),
-      itemCount: pages.length,
-      itemBuilder: (context, index) {
-        return SizedBox(
-          height: singlePageExtent,
-          child: ReaderPagePane(
-            text: pages[index],
-            style: style,
-            backgroundColor: palette.background,
-            horizontalPadding: horizontalPadding,
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            0,
+            horizontalPadding,
+            readerContentBottomInset,
           ),
-        );
-      },
+          child: Text(
+            singleContent,
+            style: style,
+            strutStyle: StrutStyle.fromTextStyle(style, forceStrutHeight: true),
+            softWrap: true,
+            overflow: TextOverflow.clip,
+          ),
+        ),
+      ),
     );
   }
 

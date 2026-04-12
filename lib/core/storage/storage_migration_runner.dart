@@ -56,8 +56,6 @@ class StorageMigrationRunner {
           bookId: bookId,
           positionRatio: ratio.toDouble().clamp(0.0, 1.0),
           contentOffset: 0,
-          pageIndex: 0,
-          totalPages: 0,
           updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),
         );
         await _storage.setString(entry.key, normalized.toRaw());
