@@ -38,6 +38,80 @@ class ReadingAnchor {
   }
 }
 
+class ReadingLocator {
+  const ReadingLocator({
+    required this.chapterId,
+    required this.paragraphIndex,
+    required this.charOffset,
+    required this.globalOffset,
+    required this.progression,
+  });
+
+  factory ReadingLocator.fromAnchor({
+    required ReadingAnchor anchor,
+    required int globalOffset,
+    required double progression,
+  }) {
+    return ReadingLocator(
+      chapterId: anchor.chapterId,
+      paragraphIndex: anchor.paragraphIndex,
+      charOffset: anchor.charOffset,
+      globalOffset: globalOffset.clamp(0, 1 << 30),
+      progression: progression.clamp(0.0, 1.0),
+    );
+  }
+
+  final String chapterId;
+  final int paragraphIndex;
+  final int charOffset;
+  final int globalOffset;
+  final double progression;
+
+  ReadingAnchor toAnchor() {
+    return ReadingAnchor(
+      chapterId: chapterId,
+      paragraphIndex: paragraphIndex,
+      charOffset: charOffset,
+    );
+  }
+
+  Map<String, Object> toJson() {
+    return {
+      'chapterId': chapterId,
+      'paragraphIndex': paragraphIndex,
+      'charOffset': charOffset,
+      'globalOffset': globalOffset,
+      'progression': progression,
+    };
+  }
+
+  static ReadingLocator? fromJson(Object? raw) {
+    if (raw is! Map) {
+      return null;
+    }
+    final map = raw.map((key, value) => MapEntry('$key', value));
+    final chapterId = map['chapterId'];
+    final paragraphIndex = map['paragraphIndex'];
+    final charOffset = map['charOffset'];
+    final globalOffset = map['globalOffset'];
+    final progression = map['progression'];
+    if (chapterId is! String ||
+        paragraphIndex is! num ||
+        charOffset is! num ||
+        globalOffset is! num ||
+        progression is! num) {
+      return null;
+    }
+    return ReadingLocator(
+      chapterId: chapterId,
+      paragraphIndex: paragraphIndex.toInt().clamp(0, 1 << 30),
+      charOffset: charOffset.toInt().clamp(0, 1 << 30),
+      globalOffset: globalOffset.toInt().clamp(0, 1 << 30),
+      progression: progression.toDouble().clamp(0.0, 1.0),
+    );
+  }
+}
+
 class ReadingProgress {
   const ReadingProgress({
     required this.bookId,
@@ -49,6 +123,7 @@ class ReadingProgress {
     this.scrollOffsetPx,
     this.scrollMaxExtentPx,
     this.anchor,
+    this.locator,
   });
 
   final String bookId;
@@ -61,6 +136,7 @@ class ReadingProgress {
   final double? scrollOffsetPx;
   final double? scrollMaxExtentPx;
   final ReadingAnchor? anchor;
+  final ReadingLocator? locator;
 
   String toRaw() {
     return jsonEncode({
@@ -73,6 +149,7 @@ class ReadingProgress {
       if (scrollOffsetPx != null) 'scrollOffsetPx': scrollOffsetPx,
       if (scrollMaxExtentPx != null) 'scrollMaxExtentPx': scrollMaxExtentPx,
       if (anchor != null) 'anchor': anchor!.toJson(),
+      if (locator != null) 'locator': locator!.toJson(),
     });
   }
 
@@ -91,6 +168,7 @@ class ReadingProgress {
       final scrollOffsetPx = json['scrollOffsetPx'];
       final scrollMaxExtentPx = json['scrollMaxExtentPx'];
       final anchor = ReadingAnchor.fromJson(json['anchor']);
+      final locator = ReadingLocator.fromJson(json['locator']);
       if (bookId is! String || ratio is! num || updatedAt is! int) {
         return null;
       }
@@ -112,6 +190,7 @@ class ReadingProgress {
             ? scrollMaxExtentPx.toDouble().clamp(0.0, double.infinity)
             : null,
         anchor: anchor,
+        locator: locator,
       );
     } catch (_) {
       return null;

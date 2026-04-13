@@ -17,10 +17,10 @@ class ReaderPaginationWindow {
 class ReaderSpreadWindowController {
   const ReaderSpreadWindowController._();
 
-  static const int doubleWindowBeforeParagraphs = 36;
-  static const int doubleWindowAfterParagraphs = 72;
-  static const int doubleWindowMinChars = 11000;
-  static const int doubleWindowMaxChars = 60000;
+  static const int doubleWindowBeforeParagraphs = 16;
+  static const int doubleWindowAfterParagraphs = 28;
+  static const int doubleWindowMinChars = 7000;
+  static const int doubleWindowMaxChars = 24000;
 
   static ReaderPaginationWindow buildWindow({
     required String content,

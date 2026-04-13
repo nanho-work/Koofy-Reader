@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
 
 void main() {
-  test('ReadingProgress persists anchor fields', () {
+  test('ReadingProgress persists anchor and locator fields', () {
     final progress = ReadingProgress(
       bookId: 'book_1',
       positionRatio: 0.42,
@@ -17,6 +17,13 @@ void main() {
         paragraphIndex: 45,
         charOffset: 128,
       ),
+      locator: const ReadingLocator(
+        chapterId: 'ch_12',
+        paragraphIndex: 45,
+        charOffset: 128,
+        globalOffset: 1234,
+        progression: 0.42,
+      ),
     );
 
     final decoded = ReadingProgress.fromRaw(progress.toRaw());
@@ -28,6 +35,9 @@ void main() {
     expect(decoded.anchor!.chapterId, 'ch_12');
     expect(decoded.anchor!.paragraphIndex, 45);
     expect(decoded.anchor!.charOffset, 128);
+    expect(decoded.locator, isNotNull);
+    expect(decoded.locator!.globalOffset, 1234);
+    expect(decoded.locator!.progression, 0.42);
   });
 
   test('ReadingProgress keeps backward compatibility without anchor', () {
@@ -46,6 +56,7 @@ void main() {
     expect(decoded!.bookId, 'legacy_book');
     expect(decoded.contentOffset, 987);
     expect(decoded.anchor, isNull);
+    expect(decoded.locator, isNull);
   });
 
   test('ReadingProgress ignores malformed anchor payload', () {
