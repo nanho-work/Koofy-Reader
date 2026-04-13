@@ -16,7 +16,9 @@ import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_bookmark_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_content_indexer.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_layout_controller.dart';
+import 'package:koofy_reader/features/reader/presentation/controllers/reader_position_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_progress_saver.dart';
+import 'package:koofy_reader/features/reader/presentation/controllers/reader_restore_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_search_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_session_controller.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_app_bar_actions.dart';
@@ -37,15 +39,10 @@ class ReaderPage extends ConsumerStatefulWidget {
 
 class _ReaderPageState extends ConsumerState<ReaderPage>
     with WidgetsBindingObserver {
-  static const int _doubleWindowBeforeParagraphs = 36;
-  static const int _doubleWindowAfterParagraphs = 72;
-  static const int _doubleWindowMinChars = 11000;
-  static const int _doubleWindowMaxChars = 60000;
-  static const int _previewPageCount = 10;
-
   late final ReaderSessionController _sessionController;
   final ReaderProgressSaver _progressSaver = ReaderProgressSaver();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _spreadScrollController = ScrollController();
 
   String _content = '';
   String? _errorText;
@@ -54,11 +51,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   ReaderSettings _settings = ReaderSettings.defaults();
   double? _restoredRatio;
   int? _restoredContentOffset;
+  double? _restoredSingleScrollRatio;
   bool _restoredScrollApplied = false;
   int _lastKnownContentOffset = 0;
   List<ReaderParagraphRange> _paragraphRanges = const <ReaderParagraphRange>[];
   List<ReaderChapterRange> _chapterRanges = const <ReaderChapterRange>[];
-
   Set<int> _bookmarks = <int>{};
   List<String> _searchHistory = <String>[];
 
@@ -76,7 +73,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   int _spreadToken = 0;
   bool _isSpreadPaginating = false;
   bool _isDoubleActive = false;
+  double _spreadViewportExtent = 0;
   int? _pendingAnchorOffset;
+  int? _pendingSpreadJumpIndex;
   bool _forceSpreadAnchorTop = false;
   int _modeEpoch = 0;
   bool _hasInitializedMode = false;
@@ -84,13 +83,22 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   bool? _modeTransitionTarget;
   int? _pendingModeAnchorOffset;
   Timer? _modeTransitionDebounce;
+  bool _modeTransitionApplyQueued = false;
+  bool _modeTransitionRequestQueued = false;
   bool _isPersistingPop = false;
+  int _singleRestoreVerificationToken = 0;
+  String? _lastViewportLogSignature;
+  int? _lastSingleScrollLogBucket;
+  int? _lastSpreadScrollLogRow;
+  bool _preserveRawPendingSingleAnchor = false;
+  bool _isSpreadJumping = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScrollChanged);
+    _spreadScrollController.addListener(_onSpreadScrollChanged);
     _sessionController = ReaderSessionController(
       readerRepository: ref.read(readerRepositoryProvider),
       settingsRepository: ref.read(readerSettingsRepositoryProvider),
@@ -104,11 +112,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScrollChanged);
+    _spreadScrollController.removeListener(_onSpreadScrollChanged);
     _progressSaver.cancel();
     _modeTransitionDebounce?.cancel();
+    _modeTransitionApplyQueued = false;
     unawaited(_persistProgressNow(force: true));
     unawaited(WakelockPlus.disable());
     _scrollController.dispose();
+    _spreadScrollController.dispose();
     super.dispose();
   }
 
@@ -132,6 +143,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       final fontNormalizationFuture = _normalizeAndLoadFont();
       _restoredRatio = data.progress?.positionRatio;
       _restoredContentOffset = _resolveStoredOffset(data.progress);
+      _restoredSingleScrollRatio =
+          (data.progress?.scrollOffsetPx != null &&
+              data.progress?.scrollMaxExtentPx != null &&
+              (data.progress!.scrollMaxExtentPx! > 0))
+          ? (data.progress!.scrollOffsetPx! / data.progress!.scrollMaxExtentPx!)
+                .clamp(0.0, 1.0)
+          : null;
       _restoredScrollApplied = false;
       _lastKnownContentOffset = (_restoredContentOffset ?? 0).clamp(
         0,
@@ -164,9 +182,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _spreadToken++;
           _isSpreadPaginating = false;
           _restoredScrollApplied = false;
-          if (_isDoubleActive) {
-            _forceSpreadAnchorTop = true;
-          }
+          _forceSpreadAnchorTop = false;
         });
       }());
     } catch (error) {
@@ -190,32 +206,21 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   ReaderLayoutController get _layout =>
       ReaderLayoutController(settings: _settings);
 
-  int _normalizeToLineStartOffset(int offset) {
-    if (_content.isEmpty) {
-      return 0;
-    }
-    var cursor = offset.clamp(0, _content.length);
-    if (cursor >= _content.length && _content.isNotEmpty) {
-      cursor = _content.length - 1;
-    }
-    while (cursor > 0 && _content.codeUnitAt(cursor - 1) != 0x0A) {
-      cursor--;
-    }
-    return cursor.clamp(0, _content.length);
+  int _normalizeToSingleRestoreOffset(int offset) {
+    return ReaderPositionController.normalizeRestoreOffset(
+      content: _content,
+      offset: offset,
+      doubleMode: false,
+      singlePainter: _singleTextPainter,
+    );
   }
 
-  int _normalizeToVisualLineStartOffset(int offset) {
-    final fallback = _normalizeToLineStartOffset(offset);
-    final painter = _singleTextPainter;
-    if (painter == null || _content.isEmpty) {
-      return fallback;
-    }
-    var clamped = offset.clamp(0, _content.length);
-    if (clamped >= _content.length && _content.isNotEmpty) {
-      clamped = _content.length - 1;
-    }
-    final line = painter.getLineBoundary(TextPosition(offset: clamped));
-    return line.start.clamp(0, _content.length);
+  int _normalizeToDoubleRestoreOffset(int offset) {
+    return ReaderPositionController.normalizeRestoreOffset(
+      content: _content,
+      offset: offset,
+      doubleMode: true,
+    );
   }
 
   Future<bool> _normalizeAndLoadFont() async {
@@ -248,30 +253,25 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   int? _resolveStoredOffset(ReadingProgress? progress) {
-    if (progress == null) {
-      return null;
-    }
-    final fromAnchor = _offsetFromAnchor(progress.anchor);
-    if (fromAnchor != null) {
-      _tracePosition(
-        'resolve_stored_offset_anchor',
-        offset: fromAnchor,
-        anchor: progress.anchor,
-      );
-      return fromAnchor.clamp(0, _content.length);
-    }
-    _tracePosition(
-      'resolve_stored_offset_fallback',
-      offset: progress.contentOffset,
-      details: 'anchorMissingOrInvalid=true',
-    );
-    return progress.contentOffset.clamp(0, _content.length);
-  }
-
-  int _findParagraphIndexByOffset(int offset) {
-    return ReaderContentIndexer.findParagraphIndexByOffset(
-      _paragraphRanges,
-      offset,
+    return ReaderRestoreController.resolveStoredOffset(
+      progress: progress,
+      contentLength: _content.length,
+      offsetFromAnchor: _offsetFromAnchor,
+      onResolved: (source, resolvedOffset) {
+        if (source == 'anchor') {
+          _tracePosition(
+            'resolve_stored_offset_anchor',
+            offset: resolvedOffset,
+            anchor: progress?.anchor,
+          );
+          return;
+        }
+        _tracePosition(
+          'resolve_stored_offset_fallback',
+          offset: resolvedOffset,
+          details: 'anchorMissingOrInvalid=true',
+        );
+      },
     );
   }
 
@@ -306,10 +306,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _content.length,
     );
     final safeAnchor = anchor ?? _buildAnchorForOffset(safeOffset);
+    final currentSpreadIndex = _spreadPages == null || _spreadPages!.length == 0
+        ? _spreadIndex
+        : _currentSpreadStartIndex();
     final spreadStart =
         (_spreadPages != null && _spreadPages!.ranges.isNotEmpty)
         ? _spreadPages!
-              .ranges[_spreadIndex.clamp(0, _spreadPages!.length - 1)]
+              .ranges[currentSpreadIndex.clamp(0, _spreadPages!.length - 1)]
               .start
         : -1;
     final mode = _isDoubleActive ? 'double' : 'single';
@@ -320,8 +323,38 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       'offset=$safeOffset '
       'anchor=${safeAnchor.chapterId}/${safeAnchor.paragraphIndex}/${safeAnchor.charOffset} '
       'pending=$_pendingAnchorOffset restored=$_restoredContentOffset '
-      'last=$_lastKnownContentOffset spreadIndex=$_spreadIndex spreadStart=$spreadStart '
-      'forceSpreadTop=$_forceSpreadAnchorTop modeEpoch=$_modeEpoch$suffix',
+      'last=$_lastKnownContentOffset spreadIndex=$currentSpreadIndex spreadStart=$spreadStart '
+      'forceSpreadTop=$_forceSpreadAnchorTop '
+      'jumping=$_isSpreadJumping modeEpoch=$_modeEpoch$suffix',
+    );
+  }
+
+  void _traceViewportState({
+    required Size viewport,
+    required MediaQueryData mediaQueryData,
+    required bool requestedDoubleMode,
+  }) {
+    if (!kDebugMode || _content.isEmpty) {
+      return;
+    }
+    final signature = [
+      viewport.width.toStringAsFixed(1),
+      viewport.height.toStringAsFixed(1),
+      requestedDoubleMode ? 'double' : 'single',
+      _isDoubleActive ? 'double' : 'single',
+      mediaQueryData.padding.top.toStringAsFixed(1),
+      mediaQueryData.padding.bottom.toStringAsFixed(1),
+      mediaQueryData.viewInsets.bottom.toStringAsFixed(1),
+    ].join('|');
+    if (signature == _lastViewportLogSignature) {
+      return;
+    }
+    _lastViewportLogSignature = signature;
+    _tracePosition(
+      'viewport_state',
+      offset: _resolveStableAnchorOffset(),
+      details:
+          'viewport=${viewport.width.toStringAsFixed(1)}x${viewport.height.toStringAsFixed(1)} requested=${requestedDoubleMode ? 'double' : 'single'} active=${_isDoubleActive ? 'double' : 'single'} paddingTop=${mediaQueryData.padding.top.toStringAsFixed(1)} paddingBottom=${mediaQueryData.padding.bottom.toStringAsFixed(1)} insetBottom=${mediaQueryData.viewInsets.bottom.toStringAsFixed(1)}',
     );
   }
 
@@ -334,9 +367,22 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  double get _progressRatio {
-    if (_content.isEmpty) return 0;
-    return (_currentContentOffset() / _content.length).clamp(0.0, 1.0);
+  bool get _hasPendingPositionMutation {
+    return _isModeTransitioning ||
+        _isSpreadPaginating ||
+        _isSpreadJumping ||
+        _pendingAnchorOffset != null ||
+        _pendingSpreadJumpIndex != null ||
+        _modeTransitionTarget != null;
+  }
+
+  int _stableProgressOffset() {
+    final preferred =
+        _pendingAnchorOffset ??
+        _pendingModeAnchorOffset ??
+        _restoredContentOffset ??
+        _lastKnownContentOffset;
+    return preferred.clamp(0, _content.length);
   }
 
   void _ensureSingleTextLayout({
@@ -371,6 +417,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _singleTextPainter = painter;
     _singleLayoutSignature = signature;
     _singleViewportHeight = viewport.height;
+    _tracePosition(
+      'single_layout_built',
+      offset: _resolveStableAnchorOffset(),
+      details:
+          'maxWidth=${maxWidth.toStringAsFixed(1)} viewportHeight=${viewport.height.toStringAsFixed(1)} painterHeight=${painter.height.toStringAsFixed(1)}',
+    );
   }
 
   int _currentSingleContentOffset() {
@@ -379,13 +431,16 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (painter == null || !_scrollController.hasClients) {
       return _lastKnownContentOffset.clamp(0, _content.length);
     }
-    final localY = (_scrollController.offset - readerVerticalPadding).clamp(
-      0.0,
-      painter.height,
-    );
+    final maxScrollExtent = _scrollController.position.maxScrollExtent;
+    final scrollRatio = maxScrollExtent <= 0
+        ? 0.0
+        : (_scrollController.offset / maxScrollExtent).clamp(0.0, 1.0);
+    final localY = (scrollRatio * painter.height).clamp(0.0, painter.height);
     final position = painter.getPositionForOffset(Offset(0, localY));
-    return _normalizeToVisualLineStartOffset(
-      position.offset.clamp(0, _content.length),
+    return ReaderPositionController.normalizeToVisualLineStartOffset(
+      content: _content,
+      offset: position.offset.clamp(0, _content.length),
+      painter: painter,
     );
   }
 
@@ -394,33 +449,118 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (painter == null || _content.isEmpty) {
       return 0;
     }
-    final clampedOffset = _normalizeToVisualLineStartOffset(contentOffset);
+    final clampedOffset =
+        ReaderPositionController.normalizeToVisualLineStartOffset(
+          content: _content,
+          offset: contentOffset,
+          painter: painter,
+        );
     final caretOffset = painter.getOffsetForCaret(
       TextPosition(offset: clampedOffset),
       Rect.zero,
     );
-    final raw = (caretOffset.dy + readerVerticalPadding).clamp(
-      0.0,
-      double.infinity,
-    );
+    final raw = caretOffset.dy.clamp(0.0, double.infinity);
 
     if (_scrollController.hasClients) {
-      return raw.clamp(0.0, _scrollController.position.maxScrollExtent);
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      if (maxScrollExtent <= 0 || painter.height <= 0) {
+        return 0;
+      }
+      final ratio = (raw / painter.height).clamp(0.0, 1.0);
+      return (ratio * maxScrollExtent).clamp(0.0, maxScrollExtent);
     }
 
-    final estimatedExtent =
-        painter.height +
-        readerContentBottomInset +
-        (readerVerticalPadding * 2) -
-        _singleViewportHeight;
+    final estimatedExtent = painter.height - _singleViewportHeight;
     final estimatedMax = estimatedExtent > 0 ? estimatedExtent : 0.0;
-    return raw.clamp(0.0, estimatedMax);
+    final ratio = painter.height <= 0
+        ? 0.0
+        : (raw / painter.height).clamp(0.0, 1.0);
+    return (ratio * estimatedMax).clamp(0.0, estimatedMax);
+  }
+
+  double _singleScrollOffsetForRawContentOffset(int contentOffset) {
+    final painter = _singleTextPainter;
+    if (painter == null || _content.isEmpty) {
+      return 0;
+    }
+    final clampedOffset = contentOffset.clamp(0, _content.length);
+    final caretOffset = painter.getOffsetForCaret(
+      TextPosition(offset: clampedOffset),
+      Rect.zero,
+    );
+    final raw = caretOffset.dy.clamp(0.0, double.infinity);
+
+    if (_scrollController.hasClients) {
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      if (maxScrollExtent <= 0 || painter.height <= 0) {
+        return 0;
+      }
+      final ratio = (raw / painter.height).clamp(0.0, 1.0);
+      return (ratio * maxScrollExtent).clamp(0.0, maxScrollExtent);
+    }
+
+    final estimatedExtent = painter.height - _singleViewportHeight;
+    final estimatedMax = estimatedExtent > 0 ? estimatedExtent : 0.0;
+    final ratio = painter.height <= 0
+        ? 0.0
+        : (raw / painter.height).clamp(0.0, 1.0);
+    return (ratio * estimatedMax).clamp(0.0, estimatedMax);
+  }
+
+  void _scheduleSingleRestoreVerification(
+    int targetOffset, {
+    required String reason,
+    int attempt = 0,
+  }) {
+    final verificationToken = ++_singleRestoreVerificationToken;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _isDoubleActive ||
+          verificationToken != _singleRestoreVerificationToken) {
+        return;
+      }
+      if (!_scrollController.hasClients || _singleTextPainter == null) {
+        return;
+      }
+      final expected = _normalizeToSingleRestoreOffset(
+        targetOffset,
+      ).clamp(0, _content.length);
+      final actual = _currentSingleContentOffset().clamp(0, _content.length);
+      final delta = (actual - expected).abs();
+      _tracePosition(
+        'restore_single_verify',
+        offset: actual,
+        details:
+            'expected=$expected delta=$delta attempt=$attempt reason=$reason',
+      );
+      if (delta <= 1 || attempt >= 2) {
+        return;
+      }
+      final correctedTarget = _singleScrollOffsetForContentOffset(expected);
+      final currentPixels = _scrollController.offset;
+      if ((currentPixels - correctedTarget).abs() <= 0.5) {
+        return;
+      }
+      _scrollController.jumpTo(correctedTarget);
+      _lastKnownContentOffset = _currentContentOffset().clamp(
+        0,
+        _content.length,
+      );
+      _scheduleSingleRestoreVerification(
+        expected,
+        reason: reason,
+        attempt: attempt + 1,
+      );
+    });
   }
 
   int _currentContentOffset() {
     if (_content.isEmpty) return 0;
     if (_isDoubleActive && _spreadPages != null && _spreadPages!.length > 0) {
-      final safeIndex = _spreadIndex.clamp(0, _spreadPages!.length - 1);
+      final safeIndex = _currentSpreadStartIndex().clamp(
+        0,
+        _spreadPages!.length - 1,
+      );
       return _spreadPages!.ranges[safeIndex].start.clamp(
         0,
         _spreadPages!.source.length,
@@ -435,7 +575,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     }
     final pages = _spreadPages;
     if (pages != null && pages.length > 0) {
-      final safeIndex = _spreadIndex.clamp(0, pages.length - 1);
+      final safeIndex = _currentSpreadStartIndex().clamp(0, pages.length - 1);
       return pages.ranges[safeIndex].start.clamp(0, pages.source.length);
     }
     if (_pendingAnchorOffset != null) {
@@ -458,6 +598,62 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   void _onScrollChanged() {
     if (_isBootstrapping || _content.isEmpty || _isModeTransitioning) return;
     _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
+    if (_scrollController.hasClients) {
+      final bucket = (_scrollController.offset / 48).floor();
+      if (bucket != _lastSingleScrollLogBucket) {
+        _lastSingleScrollLogBucket = bucket;
+        _tracePosition(
+          'single_scroll_state',
+          offset: _lastKnownContentOffset,
+          details:
+              'pixels=${_scrollController.offset.toStringAsFixed(1)} max=${_scrollController.position.maxScrollExtent.toStringAsFixed(1)} bucket=$bucket',
+        );
+      }
+    }
+    _scheduleProgressSave();
+  }
+
+  int _currentSpreadStartIndex() {
+    final pages = _spreadPages;
+    if (pages == null || pages.length == 0) {
+      return 0;
+    }
+    if (_isSpreadJumping) {
+      return _spreadIndex.clamp(0, pages.length - 1);
+    }
+    if (!_spreadScrollController.hasClients || _spreadViewportExtent <= 0) {
+      return _spreadIndex.clamp(0, pages.length - 1);
+    }
+    final rowCount = (pages.length / 2).ceil();
+    final row = (_spreadScrollController.offset / _spreadViewportExtent)
+        .floor();
+    final safeRow = row.clamp(0, rowCount - 1);
+    return _clampSpreadStartIndex(safeRow * 2, pages.length);
+  }
+
+  void _onSpreadScrollChanged() {
+    if (_isBootstrapping || _content.isEmpty || _isModeTransitioning) return;
+    if (!_isDoubleActive) return;
+    final pages = _spreadPages;
+    if (pages == null || pages.length == 0) return;
+    if (_isSpreadJumping) {
+      return;
+    }
+    _spreadIndex = _currentSpreadStartIndex();
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
+    if (_spreadScrollController.hasClients && _spreadViewportExtent > 0) {
+      final row = (_spreadScrollController.offset / _spreadViewportExtent)
+          .floor();
+      if (row != _lastSpreadScrollLogRow) {
+        _lastSpreadScrollLogRow = row;
+        _tracePosition(
+          'spread_scroll_state',
+          offset: _lastKnownContentOffset,
+          details:
+              'pixels=${_spreadScrollController.offset.toStringAsFixed(1)} row=$row viewportExtent=${_spreadViewportExtent.toStringAsFixed(1)} max=${_spreadScrollController.position.maxScrollExtent.toStringAsFixed(1)}',
+        );
+      }
+    }
     _scheduleProgressSave();
   }
 
@@ -488,6 +684,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         }
         if (!_scrollController.hasClients) {
           attempts += 1;
+          if (attempts == 1 || attempts == maxAttempts) {
+            _tracePosition(
+              'restore_single_wait_scroll',
+              offset: restoredOffsetRaw,
+              details: 'attempt=$attempts max=$maxAttempts',
+            );
+          }
           if (attempts < maxAttempts) {
             attemptRestore();
             return;
@@ -497,6 +700,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         }
         if (_singleTextPainter == null) {
           attempts += 1;
+          if (attempts == 1 || attempts == maxAttempts) {
+            _tracePosition(
+              'restore_single_wait_layout',
+              offset: restoredOffsetRaw,
+              details: 'attempt=$attempts max=$maxAttempts',
+            );
+          }
           if (attempts < maxAttempts) {
             attemptRestore();
             return;
@@ -504,10 +714,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _restoredScrollApplied = true;
           return;
         }
-        final restoredOffset = _normalizeToVisualLineStartOffset(
+        final restoredOffset = _normalizeToSingleRestoreOffset(
           restoredOffsetRaw,
         );
-        final target = _singleScrollOffsetForContentOffset(restoredOffset);
+        final target = _restoredSingleScrollRatio != null
+            ? (_restoredSingleScrollRatio! *
+                      _scrollController.position.maxScrollExtent)
+                  .clamp(0.0, _scrollController.position.maxScrollExtent)
+            : _singleScrollOffsetForContentOffset(restoredOffset);
         _scrollController.jumpTo(target);
         _lastKnownContentOffset = _currentContentOffset().clamp(
           0,
@@ -518,6 +732,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           offset: _lastKnownContentOffset,
           details: 'targetPx=${target.toStringAsFixed(1)}',
         );
+        _scheduleSingleRestoreVerification(
+          restoredOffset,
+          reason: 'deferred_restore',
+        );
         _restoredScrollApplied = true;
       });
     }
@@ -526,14 +744,20 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   Future<void> _persistProgressNow({bool force = false}) async {
-    if (_content.isEmpty || (_isModeTransitioning && !force)) {
+    if (_content.isEmpty || (_hasPendingPositionMutation && !force)) {
       return;
     }
-    final ratio = _progressRatio.clamp(0.0, 1.0);
-    final rawOffset = _currentContentOffset().clamp(0, _content.length);
+    final rawOffset =
+        (_hasPendingPositionMutation
+                ? _stableProgressOffset()
+                : _currentContentOffset())
+            .clamp(0, _content.length);
+    final ratio = _content.isEmpty
+        ? 0.0
+        : (rawOffset / _content.length).clamp(0.0, 1.0);
     final contentOffset = _isDoubleActive
-        ? _normalizeToLineStartOffset(rawOffset)
-        : _normalizeToVisualLineStartOffset(rawOffset);
+        ? _normalizeToDoubleRestoreOffset(rawOffset)
+        : _normalizeToSingleRestoreOffset(rawOffset);
     final anchor = _buildAnchorForOffset(contentOffset);
     final isSingleActive = !_isDoubleActive;
     final offsetPx = isSingleActive && _scrollController.hasClients
@@ -549,9 +773,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       details: 'force=$force ratio=${ratio.toStringAsFixed(4)}',
     );
 
-    final progress = ReadingProgress(
+    final progress = ReaderRestoreController.buildProgress(
       bookId: widget.book.id,
-      positionRatio: ratio,
+      ratio: ratio,
       contentOffset: contentOffset,
       updatedAt: DateTime.now(),
       scrollOffsetPx: offsetPx,
@@ -562,36 +786,57 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _scheduleProgressSave() {
-    if (_isModeTransitioning) {
+    if (_hasPendingPositionMutation) {
       return;
     }
     _progressSaver.schedule(_persistProgressNow);
   }
 
-  Future<void> _jumpToContentOffset(int offset, {bool animate = true}) async {
+  Future<void> _jumpToContentOffset(
+    int offset, {
+    bool animate = true,
+    bool preserveRawSingleOffset = false,
+  }) async {
     if (_content.isEmpty) return;
     final clampedOffset = offset.clamp(0, _content.length);
     final targetOffset = _isDoubleActive
-        ? _normalizeToLineStartOffset(clampedOffset)
-        : _normalizeToVisualLineStartOffset(clampedOffset);
+        ? _normalizeToDoubleRestoreOffset(clampedOffset)
+        : preserveRawSingleOffset
+        ? clampedOffset
+        : _normalizeToSingleRestoreOffset(clampedOffset);
     final ratio = (targetOffset / _content.length).clamp(0.0, 1.0);
     _tracePosition(
       'jump_request',
       offset: targetOffset,
-      details: 'mode=${_isDoubleActive ? 'double' : 'single'}',
+      details:
+          'mode=${_isDoubleActive ? 'double' : 'single'} preserveRawSingle=$preserveRawSingleOffset raw=$clampedOffset',
     );
 
     _restoredContentOffset = targetOffset;
     _restoredRatio = ratio;
+    _restoredSingleScrollRatio = null;
     _lastKnownContentOffset = targetOffset;
 
     if (_isDoubleActive) {
-      _forceSpreadAnchorTop = true;
-      _requestSpreadWindowRepagination(targetOffset);
+      final pages = _spreadPages;
+      if (pages != null &&
+          pages.length > 0 &&
+          _spreadSignature != null &&
+          _containsOffset(pages, targetOffset)) {
+        final mapped = _mapSpreadIndexByOffset(pages, targetOffset);
+        await _jumpSpreadToIndex(mapped, animate: animate);
+        _tracePosition(
+          'jump_applied_double_reuse',
+          offset: _lastKnownContentOffset,
+          details: 'mapped=$mapped animate=$animate',
+        );
+        return;
+      }
+      _requestSpreadWindowRepagination(targetOffset, forceTop: false);
       _tracePosition(
         'jump_request_double_repaginate',
         offset: targetOffset,
-        details: 'forceSpreadTop=true',
+        details: 'forceSpreadTop=false',
       );
       return;
     }
@@ -607,7 +852,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
     _restoredScrollApplied = true;
-    final target = _singleScrollOffsetForContentOffset(targetOffset);
+    final target = preserveRawSingleOffset
+        ? _singleScrollOffsetForRawContentOffset(targetOffset)
+        : _singleScrollOffsetForContentOffset(targetOffset);
     if (animate) {
       await _scrollController.animateTo(
         target,
@@ -617,12 +864,20 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     } else {
       _scrollController.jumpTo(target);
     }
-    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
+    final actualOffset = _currentContentOffset().clamp(0, _content.length);
+    _lastKnownContentOffset = actualOffset;
     _tracePosition(
       'jump_applied_single',
-      offset: _lastKnownContentOffset,
-      details: 'targetPx=${target.toStringAsFixed(1)}',
+      offset: preserveRawSingleOffset ? targetOffset : _lastKnownContentOffset,
+      details:
+          'targetPx=${target.toStringAsFixed(1)} actual=$actualOffset preserveRawSingle=$preserveRawSingleOffset',
     );
+    if (!preserveRawSingleOffset) {
+      _scheduleSingleRestoreVerification(
+        targetOffset,
+        reason: animate ? 'jump_animate' : 'jump_immediate',
+      );
+    }
   }
 
   Future<void> _handlePopInvoked(bool didPop, Object? result) async {
@@ -641,45 +896,32 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _goSpread({required bool forward}) {
-    if (_isSpreadPaginating) {
+    if (_isSpreadPaginating || _isSpreadJumping) {
       return;
     }
     final pages = _spreadPages;
     if (pages == null || pages.length == 0) {
       return;
     }
-    final next = _spreadIndex + (forward ? 2 : -2);
-    final clamped = _clampSpreadStartIndex(next, pages.length);
-    if (clamped == _spreadIndex) {
-      if (forward &&
-          _spreadIndex >= pages.length - 2 &&
-          pages.ranges.last.end < _content.length) {
-        final rightIndex = (_spreadIndex + 1).clamp(0, pages.length - 1);
-        final nextAnchor = pages.ranges[rightIndex].end.clamp(
-          0,
-          _content.length,
-        );
-        _forceSpreadAnchorTop = true;
-        _requestSpreadWindowRepagination(nextAnchor);
-      } else if (!forward &&
-          _spreadIndex == 0 &&
-          pages.ranges.first.start > 0) {
-        final prevAnchor = (pages.ranges.first.start - 1).clamp(
-          0,
-          _content.length,
-        );
-        _forceSpreadAnchorTop = true;
-        _requestSpreadWindowRepagination(prevAnchor);
-      }
+    final current = _spreadIndex.clamp(0, pages.length - 1);
+    final rowCount = (pages.length / 2).ceil();
+    final currentRow = (current / 2).floor();
+    final targetRow = (currentRow + (forward ? 1 : -1)).clamp(0, rowCount - 1);
+    if (targetRow == currentRow) {
       return;
     }
-    setState(() {
-      _spreadIndex = clamped;
-      _pendingAnchorOffset = null;
-      _forceSpreadAnchorTop = false;
+    final targetIndex = _clampSpreadStartIndex(targetRow * 2, pages.length);
+    unawaited(_jumpSpreadToIndex(targetIndex, animate: true));
+  }
+
+  Future<void> _waitForNextFrame() {
+    final completer = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     });
-    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
-    _scheduleProgressSave();
+    return completer.future;
   }
 
   int _findPageIndexByOffset(PaginatedText pages, int offset) {
@@ -720,194 +962,99 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     return normalized >= start && normalized < end;
   }
 
-  _PaginationWindow _buildPaginationWindow({
-    required int anchorOffset,
-    int? forceStartOffset,
+  void _requestSpreadWindowRepagination(
+    int anchorOffset, {
+    bool forceTop = false,
   }) {
-    if (_content.isEmpty || _paragraphRanges.isEmpty) {
-      return _PaginationWindow(
-        startOffset: 0,
-        endOffset: _content.length,
-        content: _content,
-      );
-    }
-
-    if (forceStartOffset != null) {
-      int startOffset = _normalizeToLineStartOffset(
-        forceStartOffset,
-      ).clamp(0, _content.length);
-      if (startOffset >= _content.length && _content.isNotEmpty) {
-        startOffset = _content.length - 1;
-      }
-      int endOffset = (startOffset + _doubleWindowMaxChars).clamp(
-        startOffset,
-        _content.length,
-      );
-      final minimumEnd = (startOffset + _doubleWindowMinChars).clamp(
-        startOffset,
-        _content.length,
-      );
-      if (endOffset < minimumEnd) {
-        endOffset = minimumEnd;
-      }
-      while (endOffset < _content.length &&
-          _content.codeUnitAt(endOffset) != 0x0A) {
-        endOffset++;
-      }
-      if (endOffset <= startOffset) {
-        return _PaginationWindow(
-          startOffset: 0,
-          endOffset: _content.length,
-          content: _content,
-        );
-      }
-      return _PaginationWindow(
-        startOffset: startOffset,
-        endOffset: endOffset,
-        content: _content.substring(startOffset, endOffset),
-      );
-    }
-
-    final clampedAnchor = anchorOffset.clamp(0, _content.length);
-    final centerParagraph = _findParagraphIndexByOffset(clampedAnchor);
-    final before = _doubleWindowBeforeParagraphs;
-    final after = _doubleWindowAfterParagraphs;
-    final minChars = _doubleWindowMinChars;
-    final maxChars = _doubleWindowMaxChars;
-
-    int startParagraph = (centerParagraph - before).clamp(
-      0,
-      _paragraphRanges.length - 1,
-    );
-    int endParagraph = (centerParagraph + after).clamp(
-      0,
-      _paragraphRanges.length - 1,
-    );
-    int startOffset = _paragraphRanges[startParagraph].start;
-    int endOffset = _paragraphRanges[endParagraph].end;
-
-    while (startOffset > 0 && _content.codeUnitAt(startOffset - 1) == 0x0A) {
-      startOffset--;
-    }
-    while (endOffset < _content.length &&
-        _content.codeUnitAt(endOffset) == 0x0A) {
-      endOffset++;
-    }
-
-    int span = endOffset - startOffset;
-    if (span < minChars && _content.length > minChars) {
-      final desiredStart = (clampedAnchor - (minChars ~/ 2)).clamp(
-        0,
-        _content.length,
-      );
-      final desiredEnd = (desiredStart + minChars).clamp(0, _content.length);
-      startOffset = desiredStart;
-      endOffset = desiredEnd;
-      while (startOffset > 0 && _content.codeUnitAt(startOffset - 1) != 0x0A) {
-        startOffset--;
-      }
-      while (endOffset < _content.length &&
-          _content.codeUnitAt(endOffset) != 0x0A) {
-        endOffset++;
-      }
-    }
-
-    span = endOffset - startOffset;
-    if (span > maxChars) {
-      final desiredStart = (clampedAnchor - (maxChars ~/ 2)).clamp(
-        0,
-        _content.length,
-      );
-      final desiredEnd = (desiredStart + maxChars).clamp(0, _content.length);
-      startOffset = desiredStart;
-      endOffset = desiredEnd;
-      while (startOffset > 0 && _content.codeUnitAt(startOffset - 1) != 0x0A) {
-        startOffset--;
-      }
-      while (endOffset < _content.length &&
-          _content.codeUnitAt(endOffset) != 0x0A) {
-        endOffset++;
-      }
-    }
-
-    if (endOffset <= startOffset) {
-      return _PaginationWindow(
-        startOffset: 0,
-        endOffset: _content.length,
-        content: _content,
-      );
-    }
-    return _PaginationWindow(
-      startOffset: startOffset,
-      endOffset: endOffset,
-      content: _content.substring(startOffset, endOffset),
-    );
-  }
-
-  PaginatedText _toGlobalPaginatedText({
-    required PaginatedText localPages,
-    required int windowStartOffset,
-  }) {
-    if (localPages.length == 0 || localPages.ranges.isEmpty) {
-      return PaginatedText(
-        source: _content,
-        ranges: const [TextPageRange(start: 0, end: 0)],
-      );
-    }
-
-    final globalRanges = <TextPageRange>[];
-    for (final range in localPages.ranges) {
-      final start = (windowStartOffset + range.start).clamp(0, _content.length);
-      final end = (windowStartOffset + range.end).clamp(start, _content.length);
-      if (end <= start) {
-        continue;
-      }
-      globalRanges.add(TextPageRange(start: start, end: end));
-    }
-
-    if (globalRanges.isEmpty) {
-      final start = windowStartOffset.clamp(0, _content.length);
-      final end = (start + 1).clamp(start, _content.length);
-      globalRanges.add(TextPageRange(start: start, end: end));
-    }
-
-    return PaginatedText(source: _content, ranges: globalRanges);
-  }
-
-  void _requestSpreadWindowRepagination(int anchorOffset) {
-    _pendingAnchorOffset = _normalizeToLineStartOffset(
+    _pendingAnchorOffset = _normalizeToDoubleRestoreOffset(
       anchorOffset.clamp(0, _content.length),
     );
+    _forceSpreadAnchorTop = forceTop;
     _spreadSignature = null;
     _activeSpreadSignature = null;
     _spreadToken++;
     _tracePosition(
       'spread_repaginate_requested',
       offset: _pendingAnchorOffset,
-      details: 'spreadToken=$_spreadToken',
+      details: 'spreadToken=$_spreadToken forceTop=$forceTop',
     );
     if (mounted) {
       setState(() {});
     }
   }
 
+  Future<void> _jumpSpreadToIndex(
+    int spreadStartIndex, {
+    bool animate = false,
+  }) async {
+    final pages = _spreadPages;
+    if (pages == null || pages.length == 0) {
+      return;
+    }
+    final clamped = _clampSpreadStartIndex(spreadStartIndex, pages.length);
+    _spreadIndex = clamped;
+    _pendingAnchorOffset = null;
+    _forceSpreadAnchorTop = false;
+    if (!_spreadScrollController.hasClients || _spreadViewportExtent <= 0) {
+      _pendingSpreadJumpIndex = clamped;
+      _tracePosition(
+        'spread_jump_deferred',
+        offset: pages.ranges[clamped].start.clamp(0, _content.length),
+        details:
+            'index=$clamped animate=$animate viewportExtent=${_spreadViewportExtent.toStringAsFixed(1)}',
+      );
+      return;
+    }
+    final row = (clamped / 2).floor();
+    final target = (row * _spreadViewportExtent).clamp(
+      0.0,
+      _spreadScrollController.position.maxScrollExtent,
+    );
+    _isSpreadJumping = true;
+    try {
+      if (animate) {
+        await _spreadScrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _spreadScrollController.jumpTo(target);
+      }
+      await _waitForNextFrame();
+    } finally {
+      _isSpreadJumping = false;
+    }
+    _spreadIndex = clamped;
+    _lastKnownContentOffset = _currentContentOffset().clamp(0, _content.length);
+    _tracePosition(
+      'spread_jump_applied',
+      offset: _lastKnownContentOffset,
+      details:
+          'index=$clamped row=$row targetPx=${target.toStringAsFixed(1)} animate=$animate',
+    );
+    _scheduleProgressSave();
+  }
+
   void _scheduleModeTransition({
     required bool targetMode,
     required int anchorOffset,
   }) {
-    final normalizedIncoming = targetMode
-        ? _normalizeToLineStartOffset(anchorOffset)
-        : _normalizeToVisualLineStartOffset(anchorOffset);
-    final clampedAnchor = normalizedIncoming.clamp(0, _content.length);
+    final clampedAnchor = anchorOffset.clamp(0, _content.length);
+    final previewNormalized = targetMode
+        ? _normalizeToDoubleRestoreOffset(clampedAnchor)
+        : _normalizeToSingleRestoreOffset(clampedAnchor);
     _tracePosition(
       'mode_transition_schedule',
       offset: clampedAnchor,
-      details: 'target=${targetMode ? 'double' : 'single'}',
+      details:
+          'target=${targetMode ? 'double' : 'single'} previewNormalized=$previewNormalized',
     );
 
     _modeEpoch++;
     _pendingModeAnchorOffset = clampedAnchor;
     _modeTransitionTarget = targetMode;
+    _preserveRawPendingSingleAnchor = !targetMode;
     _isModeTransitioning = true;
     // Invalidate any in-flight spread pagination so stale callbacks
     // cannot overwrite the position during mode transitions.
@@ -922,38 +1069,47 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     }
 
     void applyTransitionNow() {
-      if (!mounted) return;
-      final applyMode = _modeTransitionTarget ?? targetMode;
-      final applyAnchor = (_pendingModeAnchorOffset ?? clampedAnchor).clamp(
-        0,
-        _content.length,
-      );
-      setState(() {
-        _isDoubleActive = applyMode;
-        _pendingAnchorOffset = applyAnchor;
-        if (applyMode) {
-          _forceSpreadAnchorTop = true;
-          _spreadPages = null;
-          _spreadIndex = 0;
-          _spreadSignature = null;
-          _activeSpreadSignature = null;
-        } else {
-          _isSpreadPaginating = false;
-          _forceSpreadAnchorTop = false;
-          _spreadPages = null;
-          _spreadIndex = 0;
-          _spreadSignature = null;
-          _activeSpreadSignature = null;
-        }
-        _isModeTransitioning = false;
+      if (!mounted || _modeTransitionApplyQueued) return;
+      _modeTransitionApplyQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _modeTransitionApplyQueued = false;
+        if (!mounted) return;
+        final applyMode = _modeTransitionTarget ?? targetMode;
+        final applyAnchor = (_pendingModeAnchorOffset ?? clampedAnchor).clamp(
+          0,
+          _content.length,
+        );
+        setState(() {
+          _isDoubleActive = applyMode;
+          _pendingAnchorOffset = applyAnchor;
+          if (applyMode) {
+            _forceSpreadAnchorTop = false;
+            _singleLayoutSignature = null;
+            _singleTextPainter = null;
+            _singleViewportHeight = 0;
+            _spreadPages = null;
+            _spreadIndex = 0;
+            _spreadSignature = null;
+            _activeSpreadSignature = null;
+          } else {
+            _isSpreadPaginating = false;
+            _forceSpreadAnchorTop = false;
+            _spreadPages = null;
+            _spreadIndex = 0;
+            _spreadSignature = null;
+            _activeSpreadSignature = null;
+          }
+          _isModeTransitioning = false;
+        });
+        _tracePosition(
+          'mode_transition_applied',
+          offset: applyAnchor,
+          details:
+              'applied=${applyMode ? 'double' : 'single'} preserveRawSingle=$_preserveRawPendingSingleAnchor',
+        );
+        _modeTransitionTarget = null;
+        _pendingModeAnchorOffset = null;
       });
-      _tracePosition(
-        'mode_transition_applied',
-        offset: applyAnchor,
-        details: 'applied=${applyMode ? 'double' : 'single'}',
-      );
-      _modeTransitionTarget = null;
-      _pendingModeAnchorOffset = null;
     }
 
     _modeTransitionDebounce?.cancel();
@@ -1012,30 +1168,17 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       viewport,
       mediaQueryData: mediaQueryData,
     );
-    final signatureChanged =
-        _spreadSignature != null && signature != _spreadSignature;
-    final shouldForceSpreadAnchorTop =
-        _forceSpreadAnchorTop ||
-        _pendingAnchorOffset != null ||
-        signatureChanged;
+    final shouldForceSpreadAnchorTop = _forceSpreadAnchorTop;
     if (!shouldForceSpreadAnchorTop &&
         signature == _spreadSignature &&
         _spreadPages != null) {
       if (_pendingAnchorOffset != null) {
         final pending = _pendingAnchorOffset!.clamp(0, _content.length);
-        if (_containsOffset(_spreadPages!, pending)) {
-          final mapped = _mapSpreadIndexByOffset(_spreadPages!, pending);
-          _pendingAnchorOffset = null;
-          setState(() {
-            _spreadIndex = mapped;
-          });
-        } else {
-          _spreadSignature = null;
-        }
+        final mapped = _mapSpreadIndexByOffset(_spreadPages!, pending);
+        _pendingAnchorOffset = null;
+        unawaited(_jumpSpreadToIndex(mapped));
       }
-      if (signature == _spreadSignature) {
-        return;
-      }
+      return;
     }
     if (signature == _activeSpreadSignature) {
       return;
@@ -1044,7 +1187,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _activeSpreadSignature = signature;
     final token = ++_spreadToken;
     final modeEpochAtRequest = _modeEpoch;
-    final requestedAnchor = _normalizeToLineStartOffset(
+    final requestedAnchor = _normalizeToDoubleRestoreOffset(
       (_pendingAnchorOffset ?? _resolveStableAnchorOffset()).clamp(
         0,
         _content.length,
@@ -1054,11 +1197,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       'spread_paginate_start',
       offset: requestedAnchor,
       details:
-          'signature=$signature forceTop=$shouldForceSpreadAnchorTop token=$token',
-    );
-    final paginationWindow = _buildPaginationWindow(
-      anchorOffset: requestedAnchor,
-      forceStartOffset: shouldForceSpreadAnchorTop ? requestedAnchor : null,
+          'signature=$signature forceTop=$shouldForceSpreadAnchorTop token=$token fullDocument=true',
     );
     setState(() {
       _isSpreadPaginating = true;
@@ -1072,47 +1211,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     unawaited(() async {
       try {
         final result = await _sessionController.paginate(
-          content: paginationWindow.content,
+          content: _content,
           textArea: textArea,
           textStyle: style,
-          previewPageCount: _previewPageCount,
-          onPreviewReady: (preview) {
-            if (!mounted ||
-                token != _spreadToken ||
-                _modeEpoch != modeEpochAtRequest ||
-                !_isDoubleActive) {
-              return;
-            }
-            final previewGlobal = _toGlobalPaginatedText(
-              localPages: preview,
-              windowStartOffset: paginationWindow.startOffset,
-            );
-            final previewMapped = shouldForceSpreadAnchorTop
-                ? 0
-                : _mapSpreadIndexByOffset(
-                    previewGlobal,
-                    (_pendingAnchorOffset ?? requestedAnchor).clamp(
-                      0,
-                      _content.length,
-                    ),
-                  );
-            setState(() {
-              _spreadPages = previewGlobal;
-              _spreadIndex = previewMapped;
-            });
-            _lastKnownContentOffset = shouldForceSpreadAnchorTop
-                ? requestedAnchor
-                : previewGlobal.ranges[previewMapped].start.clamp(
-                    0,
-                    _content.length,
-                  );
-            _tracePosition(
-              'spread_paginate_preview',
-              offset: _lastKnownContentOffset,
-              details:
-                  'mapped=$previewMapped forceTop=$shouldForceSpreadAnchorTop',
-            );
-          },
+          previewPageCount: 0,
         );
         if (!mounted ||
             token != _spreadToken ||
@@ -1120,10 +1222,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             !_isDoubleActive) {
           return;
         }
-        final globalPages = _toGlobalPaginatedText(
-          localPages: result.pages,
-          windowStartOffset: paginationWindow.startOffset,
-        );
+        final globalPages = result.pages;
         final mapped = shouldForceSpreadAnchorTop
             ? 0
             : _mapSpreadIndexByOffset(
@@ -1139,6 +1238,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _spreadSignature = signature;
           _isSpreadPaginating = false;
         });
+        unawaited(_jumpSpreadToIndex(mapped));
         _lastKnownContentOffset = shouldForceSpreadAnchorTop
             ? requestedAnchor
             : globalPages.ranges[mapped].start.clamp(0, _content.length);
@@ -1147,7 +1247,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _tracePosition(
           'spread_paginate_done',
           offset: _lastKnownContentOffset,
-          details: 'mapped=$mapped forceTop=$shouldForceSpreadAnchorTop',
+          details:
+              'mapped=$mapped forceTop=$shouldForceSpreadAnchorTop fullDocument=true',
         );
       } catch (_) {
         if (!mounted || token != _spreadToken) return;
@@ -1313,6 +1414,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _restoredRatio = _content.isEmpty
           ? 0.0
           : (restoredOffset / _content.length).clamp(0.0, 1.0);
+      _restoredSingleScrollRatio = null;
       _lastKnownContentOffset = restoredOffset;
       _singleLayoutSignature = null;
       _singleTextPainter = null;
@@ -1326,7 +1428,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _modeTransitionTarget = null;
       _pendingModeAnchorOffset = null;
       if (_isDoubleActive) {
-        _forceSpreadAnchorTop = true;
+        _forceSpreadAnchorTop = false;
       }
       _restoredScrollApplied = false;
     });
@@ -1341,7 +1443,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     required BoxConstraints constraints,
     required bool doubleMode,
   }) {
-    if (doubleMode && _isSpreadPaginating) {
+    if (doubleMode && (_isSpreadPaginating || _isSpreadJumping)) {
       return;
     }
     final action = _layout.resolveTapAction(
@@ -1428,17 +1530,54 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           viewport,
           mediaQueryData: mediaQueryData,
         );
+        final hasPendingRequestedTransition =
+            requestedDoubleMode != _isDoubleActive &&
+            _modeTransitionTarget == requestedDoubleMode &&
+            _pendingModeAnchorOffset != null;
+        _traceViewportState(
+          viewport: viewport,
+          mediaQueryData: mediaQueryData,
+          requestedDoubleMode: requestedDoubleMode,
+        );
+        _spreadViewportExtent = constraints.maxHeight.clamp(1.0, 10000.0);
         if (!_hasInitializedMode) {
           _hasInitializedMode = true;
           _isDoubleActive = requestedDoubleMode;
-        } else if (requestedDoubleMode != _isDoubleActive) {
-          _scheduleModeTransition(
-            targetMode: requestedDoubleMode,
-            anchorOffset: _resolveStableAnchorOffset(),
+          _tracePosition(
+            'initial_mode_set',
+            offset: _resolveStableAnchorOffset(),
+            details: 'mode=${requestedDoubleMode ? 'double' : 'single'}',
           );
+        } else if (requestedDoubleMode != _isDoubleActive) {
+          final anchorOffset =
+              (_pendingModeAnchorOffset ?? _resolveStableAnchorOffset()).clamp(
+                0,
+                _content.length,
+              );
+          if (!_modeTransitionRequestQueued && !hasPendingRequestedTransition) {
+            _modeTransitionRequestQueued = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _modeTransitionRequestQueued = false;
+              if (!mounted) {
+                return;
+              }
+              if (requestedDoubleMode == _isDoubleActive &&
+                  !_isModeTransitioning) {
+                return;
+              }
+              _scheduleModeTransition(
+                targetMode: requestedDoubleMode,
+                anchorOffset: anchorOffset,
+              );
+            });
+          }
         }
         final doubleMode = _isDoubleActive;
-        _ensureSingleTextLayout(viewport: viewport, style: style);
+        final freezeOutgoingSingleLayout =
+            !doubleMode && requestedDoubleMode != _isDoubleActive;
+        if (!doubleMode && !freezeOutgoingSingleLayout) {
+          _ensureSingleTextLayout(viewport: viewport, style: style);
+        }
 
         if (doubleMode) {
           if (!_restoredScrollApplied &&
@@ -1449,7 +1588,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             );
             _pendingAnchorOffset ??=
                 ((_restoredRatio!.clamp(0.0, 1.0)) * _content.length).round();
-            _forceSpreadAnchorTop = true;
+            _forceSpreadAnchorTop = false;
             _tracePosition(
               'double_restore_pending_set',
               offset: _pendingAnchorOffset,
@@ -1464,15 +1603,28 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
               mediaQueryData: mediaQueryData,
               style: style,
             );
+            if (_pendingSpreadJumpIndex != null) {
+              final pending = _pendingSpreadJumpIndex!;
+              _pendingSpreadJumpIndex = null;
+              unawaited(_jumpSpreadToIndex(pending));
+            }
           });
         } else {
           _deferRestoreScrollIfNeeded();
           if (_pendingAnchorOffset != null) {
             final target = _pendingAnchorOffset!;
+            final preserveRawSingle = _preserveRawPendingSingleAnchor;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _isDoubleActive) return;
               _pendingAnchorOffset = null;
-              unawaited(_jumpToContentOffset(target, animate: false));
+              _preserveRawPendingSingleAnchor = false;
+              unawaited(
+                _jumpToContentOffset(
+                  target,
+                  animate: false,
+                  preserveRawSingleOffset: preserveRawSingle,
+                ),
+              );
             });
           }
         }
@@ -1491,24 +1643,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             palette: palette,
             horizontalPadding: _settings.horizontalPadding,
             scrollController: _scrollController,
+            spreadScrollController: _spreadScrollController,
+            spreadViewportExtent: _spreadViewportExtent,
             spreadPages: _spreadPages,
-            spreadIndex: _spreadIndex,
             isSpreadPaginating: _isSpreadPaginating,
           ),
         );
       },
     );
   }
-}
-
-class _PaginationWindow {
-  const _PaginationWindow({
-    required this.startOffset,
-    required this.endOffset,
-    required this.content,
-  });
-
-  final int startOffset;
-  final int endOffset;
-  final String content;
 }

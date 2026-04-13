@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_page_pane.dart';
+import 'package:koofy_reader/features/reader/presentation/widgets/reader_single_content_list.dart';
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_visuals.dart';
 
 class ReaderContentSwitcher extends StatelessWidget {
@@ -12,8 +13,9 @@ class ReaderContentSwitcher extends StatelessWidget {
     required this.palette,
     required this.horizontalPadding,
     required this.scrollController,
+    required this.spreadScrollController,
+    required this.spreadViewportExtent,
     required this.spreadPages,
-    required this.spreadIndex,
     required this.isSpreadPaginating,
   });
 
@@ -23,8 +25,9 @@ class ReaderContentSwitcher extends StatelessWidget {
   final ReaderPalette palette;
   final double horizontalPadding;
   final ScrollController scrollController;
+  final ScrollController spreadScrollController;
+  final double spreadViewportExtent;
   final PaginatedText? spreadPages;
-  final int spreadIndex;
   final bool isSpreadPaginating;
 
   @override
@@ -45,28 +48,11 @@ class ReaderContentSwitcher extends StatelessWidget {
       );
     }
 
-    return SingleChildScrollView(
-      controller: scrollController,
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: readerVerticalPadding),
-      child: SizedBox(
-        width: double.infinity,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            0,
-            horizontalPadding,
-            readerContentBottomInset,
-          ),
-          child: Text(
-            singleContent,
-            style: style,
-            strutStyle: StrutStyle.fromTextStyle(style, forceStrutHeight: true),
-            softWrap: true,
-            overflow: TextOverflow.clip,
-          ),
-        ),
-      ),
+    return ReaderSingleContentList(
+      scrollController: scrollController,
+      horizontalPadding: horizontalPadding,
+      style: style,
+      singleContent: singleContent,
     );
   }
 
@@ -110,44 +96,69 @@ class ReaderContentSwitcher extends StatelessWidget {
         ),
       );
     }
-
-    final left = spreadIndex.clamp(0, pages.length - 1);
-    final right = left + 1;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: readerVerticalPadding),
-      child: Row(
-        children: [
-          Expanded(
-            child: ReaderPagePane(
-              text: pages[left],
-              style: style,
-              backgroundColor: palette.background,
-              horizontalPadding: horizontalPadding,
-            ),
+    final rowCount = (pages.length / 2).ceil();
+    final list = ListView.builder(
+      controller: spreadScrollController,
+      physics: const ClampingScrollPhysics(),
+      itemCount: rowCount,
+      itemExtent: spreadViewportExtent > 0 ? spreadViewportExtent : null,
+      itemBuilder: (context, row) {
+        final left = (row * 2).clamp(0, pages.length - 1);
+        final right = left + 1;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: readerVerticalPadding),
+          child: Row(
+            children: [
+              Expanded(
+                child: ReaderPagePane(
+                  text: pages[left],
+                  style: style,
+                  backgroundColor: palette.background,
+                  horizontalPadding: horizontalPadding,
+                ),
+              ),
+              Container(
+                width: readerDoublePageGap,
+                color: palette.background,
+                alignment: Alignment.center,
+                child: Container(width: 1, color: palette.divider),
+              ),
+              Expanded(
+                child: right < pages.length
+                    ? ReaderPagePane(
+                        text: pages[right],
+                        style: style,
+                        backgroundColor: palette.background,
+                        horizontalPadding: horizontalPadding,
+                      )
+                    : ReaderPagePane(
+                        text: '',
+                        style: style,
+                        backgroundColor: palette.background,
+                        horizontalPadding: horizontalPadding,
+                      ),
+              ),
+            ],
           ),
-          Container(
-            width: readerDoublePageGap,
-            color: palette.background,
-            alignment: Alignment.center,
-            child: Container(width: 1, color: palette.divider),
+        );
+      },
+    );
+    if (!isSpreadPaginating) {
+      return list;
+    }
+    return Stack(
+      children: [
+        list,
+        const Positioned(
+          top: 12,
+          right: 12,
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          Expanded(
-            child: right < pages.length
-                ? ReaderPagePane(
-                    text: pages[right],
-                    style: style,
-                    backgroundColor: palette.background,
-                    horizontalPadding: horizontalPadding,
-                  )
-                : ReaderPagePane(
-                    text: '',
-                    style: style,
-                    backgroundColor: palette.background,
-                    horizontalPadding: horizontalPadding,
-                  ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

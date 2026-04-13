@@ -58,7 +58,6 @@ class ReaderFontRegistry {
     for (final assetPath in customAssets) {
       final key = ReaderFontKeys.assetKey(assetPath);
       final family = ReaderFontKeys.resolveFamily(key);
-      await _ensureAssetLoaded(assetPath, family);
       items.add(
         ReaderFontItem(
           key: key,

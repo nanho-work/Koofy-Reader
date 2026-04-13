@@ -236,6 +236,31 @@ class ReaderContentIndexer {
     return raw.clamp(paragraph.start, paragraph.end);
   }
 
+  static List<String> buildParagraphBlocks(
+    String content,
+    List<ReaderParagraphRange> paragraphRanges,
+  ) {
+    if (content.isEmpty) {
+      return const <String>[];
+    }
+    if (paragraphRanges.isEmpty) {
+      return <String>[content];
+    }
+
+    final blocks = <String>[];
+    for (int index = 0; index < paragraphRanges.length; index++) {
+      final start = index == 0 ? 0 : paragraphRanges[index].start;
+      final end = index + 1 < paragraphRanges.length
+          ? paragraphRanges[index + 1].start
+          : content.length;
+      if (end <= start) {
+        continue;
+      }
+      blocks.add(content.substring(start, end));
+    }
+    return blocks.isEmpty ? <String>[content] : blocks;
+  }
+
   static List<ReaderChapterRange> _buildChapterRanges({
     required String content,
     required List<ReaderParagraphRange> paragraphs,
