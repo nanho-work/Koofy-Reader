@@ -32,7 +32,7 @@ void main() {
       expect(request, isNotNull);
       expect(request!.targetDoubleMode, isTrue);
       expect(request.anchorOffset, 444);
-      expect(request.delayMs, 90);
+      expect(request.delayMs, 0);
       expect(request.preserveRawSingleAnchor, isFalse);
     },
   );

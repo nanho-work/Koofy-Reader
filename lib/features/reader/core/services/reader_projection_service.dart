@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_position_controller.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_position_service.dart';
 
 class ReaderProjectionService {
   const ReaderProjectionService();
@@ -49,7 +49,7 @@ class ReaderProjectionService {
     }
     final clampedOffset = preserveRawOffset
         ? contentOffset.clamp(0, content.length)
-        : ReaderPositionController.normalizeToVisualLineStartOffset(
+        : ReaderPositionService.normalizeToVisualLineStartOffset(
             content: content,
             offset: contentOffset,
             painter: painter,
@@ -91,7 +91,12 @@ class ReaderProjectionService {
       return spreadIndex.clamp(0, pages.length - 1);
     }
     final rowCount = (pages.length / 2).ceil();
-    final row = (spreadScrollOffset / spreadViewportExtent).floor();
+    final expectedRow = (spreadIndex / 2).floor();
+    final actualRow = spreadScrollOffset / spreadViewportExtent;
+    if ((actualRow - expectedRow).abs() < 0.5) {
+      return spreadIndex.clamp(0, pages.length - 1);
+    }
+    final row = actualRow.round();
     final safeRow = row.clamp(0, rowCount - 1);
     return clampSpreadStartIndex(safeRow * 2, pages.length);
   }

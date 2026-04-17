@@ -90,6 +90,56 @@ void main() {
     expect(offset, 7);
   });
 
+  test('currentSpreadStartIndex keeps logical spread near settled row', () {
+    const pages = PaginatedText(
+      source: 'abcdefghijklmnop',
+      ranges: [
+        TextPageRange(start: 0, end: 2),
+        TextPageRange(start: 2, end: 4),
+        TextPageRange(start: 4, end: 6),
+        TextPageRange(start: 6, end: 8),
+        TextPageRange(start: 8, end: 10),
+        TextPageRange(start: 10, end: 12),
+      ],
+    );
+
+    final index = service.currentSpreadStartIndex(
+      pages: pages,
+      isSpreadJumping: false,
+      spreadIndex: 2,
+      hasSpreadClients: true,
+      spreadViewportExtent: 633,
+      spreadScrollOffset: 620,
+    );
+
+    expect(index, 2);
+  });
+
+  test('currentSpreadStartIndex rounds to nearest row when user moves away', () {
+    const pages = PaginatedText(
+      source: 'abcdefghijklmnop',
+      ranges: [
+        TextPageRange(start: 0, end: 2),
+        TextPageRange(start: 2, end: 4),
+        TextPageRange(start: 4, end: 6),
+        TextPageRange(start: 6, end: 8),
+        TextPageRange(start: 8, end: 10),
+        TextPageRange(start: 10, end: 12),
+      ],
+    );
+
+    final index = service.currentSpreadStartIndex(
+      pages: pages,
+      isSpreadJumping: false,
+      spreadIndex: 2,
+      hasSpreadClients: true,
+      spreadViewportExtent: 633,
+      spreadScrollOffset: 1700,
+    );
+
+    expect(index, 6 - 2);
+  });
+
   test('singleScrollOffsetForContentOffset returns zero without painter', () {
     expect(
       service.singleScrollOffsetForContentOffset(

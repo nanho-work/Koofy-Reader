@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_content_indexer.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
 
 void main() {
   group('ReaderContentIndexer.buildParagraphBlocks', () {

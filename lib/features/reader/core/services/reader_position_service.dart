@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
 
-class ReaderPositionController {
-  const ReaderPositionController._();
+class ReaderPositionService {
+  const ReaderPositionService._();
 
   static int normalizeToLineStartOffset({
     required String content,

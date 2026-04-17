@@ -9,6 +9,7 @@ void main() {
       bookId: 'book_1',
       positionRatio: 0.42,
       contentOffset: 1234,
+      doublePageStartOffset: 1200,
       pageIndex: 0,
       totalPages: 0,
       updatedAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
@@ -31,6 +32,7 @@ void main() {
     expect(decoded, isNotNull);
     expect(decoded!.bookId, 'book_1');
     expect(decoded.contentOffset, 1234);
+    expect(decoded.doublePageStartOffset, 1200);
     expect(decoded.anchor, isNotNull);
     expect(decoded.anchor!.chapterId, 'ch_12');
     expect(decoded.anchor!.paragraphIndex, 45);

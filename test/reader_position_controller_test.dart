@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_position_controller.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_position_service.dart';
 
 void main() {
-  group('ReaderPositionController', () {
+  group('ReaderPositionService', () {
     test('line start normalization returns beginning of current line', () {
       const content = 'alpha\nbeta\ngamma';
 
-      final result = ReaderPositionController.normalizeToLineStartOffset(
+      final result = ReaderPositionService.normalizeToLineStartOffset(
         content: content,
         offset: 8,
       );
@@ -17,7 +17,7 @@ void main() {
     test('single restore falls back to line start without painter', () {
       const content = 'alpha\nbeta\ngamma';
 
-      final result = ReaderPositionController.normalizeRestoreOffset(
+      final result = ReaderPositionService.normalizeRestoreOffset(
         content: content,
         offset: 8,
         doubleMode: false,
@@ -29,7 +29,7 @@ void main() {
     test('double restore keeps raw offset when possible', () {
       const content = 'alpha\nbeta\ngamma';
 
-      final result = ReaderPositionController.normalizeRestoreOffset(
+      final result = ReaderPositionService.normalizeRestoreOffset(
         content: content,
         offset: 8,
         doubleMode: true,

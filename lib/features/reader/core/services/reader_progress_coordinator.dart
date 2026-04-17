@@ -134,6 +134,7 @@ class ReaderProgressCoordinator {
 
   int preferredDoubleAnchorOffset({
     required ReaderProgressCoordinatorState state,
+    required int? restoredDoublePageStartOffset,
     required int? restoredContentOffset,
     required int stableAnchorOffset,
     required int lastKnownContentOffset,
@@ -145,12 +146,15 @@ class ReaderProgressCoordinator {
     if (state.pendingModeAnchorOffset != null) {
       return state.pendingModeAnchorOffset!.clamp(0, contentLength);
     }
-    if (restoredContentOffset != null) {
-      return restoredContentOffset.clamp(0, contentLength);
+    if (restoredDoublePageStartOffset != null) {
+      return restoredDoublePageStartOffset.clamp(0, contentLength);
     }
     final stable = stableAnchorOffset.clamp(0, contentLength);
     if (stable > 0 || contentLength == 0) {
       return stable;
+    }
+    if (restoredContentOffset != null) {
+      return restoredContentOffset.clamp(0, contentLength);
     }
     return lastKnownContentOffset.clamp(0, contentLength);
   }

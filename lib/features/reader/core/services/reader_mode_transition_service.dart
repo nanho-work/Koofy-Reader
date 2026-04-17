@@ -35,7 +35,7 @@ class ReaderModeTransitionService {
       targetDoubleMode: requestedDoubleMode,
       anchorOffset: anchor.clamp(0, contentLength),
       preserveRawSingleAnchor: !requestedDoubleMode,
-      delayMs: requestedDoubleMode ? 90 : 0,
+      delayMs: 0,
     );
   }
 

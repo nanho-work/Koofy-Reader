@@ -47,11 +47,26 @@ class ReaderProgressService {
     return resolved;
   }
 
+  int? resolveDoublePageStartOffset({
+    required ReaderTextDocument? document,
+    required ReadingProgress? progress,
+  }) {
+    if (progress == null || document == null || document.length == 0) {
+      return null;
+    }
+    final raw = progress.doublePageStartOffset;
+    if (raw == null) {
+      return null;
+    }
+    return raw.clamp(0, document.length);
+  }
+
   ReadingProgress buildProgress({
     required String bookId,
     required ReaderTextDocument? document,
     required int contentOffset,
     required DateTime updatedAt,
+    int? doublePageStartOffset,
     double? scrollOffsetPx,
     double? scrollMaxExtentPx,
   }) {
@@ -77,6 +92,10 @@ class ReaderProgressService {
       bookId: bookId,
       positionRatio: ratio,
       contentOffset: safeOffset,
+      doublePageStartOffset: doublePageStartOffset?.clamp(
+        0,
+        safeDocumentLength,
+      ),
       updatedAt: updatedAt,
       scrollOffsetPx: scrollOffsetPx,
       scrollMaxExtentPx: scrollMaxExtentPx,

@@ -258,6 +258,55 @@ These are the first files to rewrite around the new plan:
 - `lib/features/reader/domain/reading_progress.dart`
 - `lib/features/reader/presentation/reader_page.dart`
 - `lib/features/reader/presentation/controllers/reader_session_controller.dart`
+
+## Current Breakages To Eliminate
+
+These are the symptoms that confirm we still have widget-timed orchestration
+instead of a reader-core contract:
+
+- search dialog / IME can temporarily flip single mode into double mode
+- search jumps can execute before viewport stabilization completes
+- double-mode search can reopen on the same locator but a different visual
+  spread placement
+- double-mode tap navigation can stall on a thin tail window and then refill on
+  the next interaction
+- mode changes can briefly render the previous mode before relocation catches up
+
+These breakages all point to the same missing boundary:
+- canonical relocation target
+- view projection session
+- widget lifecycle timing
+
+## First Refactor Slice
+
+The safest first extraction is search.
+
+Reason:
+- search currently returns raw offsets
+- raw offsets are immediately interpreted by widget-local jump logic
+- search therefore inherits all current mode/viewport timing problems
+
+The first refactor slice should produce:
+
+1. `ReaderSearchResult`
+- query
+- excerpt
+- global offset
+- anchor
+- locator
+
+2. `ReaderSearchService`
+- consumes `ReaderTextDocument`
+- returns locator-aware results
+- owns normalization and excerpt building
+
+3. `ReaderPage` integration later
+- convert UI search selection into a canonical relocation target
+- let the pagination/session layer project that target into single/double
+
+This gives us a concrete migration path:
+- search stops depending on transient widget state first
+- relocation can then be unified around locator projection
 - new coordinator layer under:
   - `lib/features/reader/core/coordinator/`
   - or `lib/features/reader/core/session/`

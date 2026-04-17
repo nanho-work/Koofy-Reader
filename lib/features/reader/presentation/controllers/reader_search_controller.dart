@@ -1,49 +1,5 @@
-import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
-
 class ReaderSearchController {
-  const ReaderSearchController({required this.source, required this.ranges});
-
-  final String source;
-  final List<TextPageRange> ranges;
-
-  List<int> findQueryPages(String query) {
-    if (query.isEmpty || ranges.isEmpty || source.isEmpty) {
-      return const <int>[];
-    }
-
-    final offsets = findQueryOffsets(source: source, query: query);
-    if (offsets.isEmpty) {
-      return const <int>[];
-    }
-
-    final result = <int>[];
-    for (final index in offsets) {
-      final page = _pageForOffset(index);
-      if (page >= 0 && (result.isEmpty || result.last != page)) {
-        result.add(page);
-      }
-    }
-
-    return result;
-  }
-
-  int _pageForOffset(int offset) {
-    if (ranges.isEmpty) return -1;
-    int low = 0;
-    int high = ranges.length - 1;
-    while (low <= high) {
-      final mid = (low + high) >> 1;
-      final range = ranges[mid];
-      if (offset < range.start) {
-        high = mid - 1;
-      } else if (offset >= range.end) {
-        low = mid + 1;
-      } else {
-        return mid;
-      }
-    }
-    return ranges.length - 1;
-  }
+  const ReaderSearchController._();
 
   static List<String> normalizeHistory(
     List<String> candidates, {

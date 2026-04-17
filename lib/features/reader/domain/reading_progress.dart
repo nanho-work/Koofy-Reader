@@ -117,6 +117,7 @@ class ReadingProgress {
     required this.bookId,
     required this.positionRatio,
     required this.contentOffset,
+    this.doublePageStartOffset,
     this.pageIndex = 0,
     this.totalPages = 0,
     required this.updatedAt,
@@ -129,6 +130,7 @@ class ReadingProgress {
   final String bookId;
   final double positionRatio;
   final int contentOffset;
+  final int? doublePageStartOffset;
   // Legacy fields kept for backward compatibility only.
   final int pageIndex;
   final int totalPages;
@@ -143,6 +145,8 @@ class ReadingProgress {
       'bookId': bookId,
       'positionRatio': positionRatio,
       'contentOffset': contentOffset,
+      if (doublePageStartOffset != null)
+        'doublePageStartOffset': doublePageStartOffset,
       'pageIndex': pageIndex,
       'totalPages': totalPages,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
@@ -162,6 +166,7 @@ class ReadingProgress {
       final bookId = json['bookId'];
       final ratio = json['positionRatio'];
       final contentOffset = json['contentOffset'];
+      final doublePageStartOffset = json['doublePageStartOffset'];
       final pageIndex = json['pageIndex'];
       final totalPages = json['totalPages'];
       final updatedAt = json['updatedAt'];
@@ -180,6 +185,9 @@ class ReadingProgress {
         bookId: bookId,
         positionRatio: safeRatio,
         contentOffset: safeContentOffset < 0 ? 0 : safeContentOffset,
+        doublePageStartOffset: doublePageStartOffset is int
+            ? (doublePageStartOffset < 0 ? 0 : doublePageStartOffset)
+            : null,
         pageIndex: safePageIndex,
         totalPages: safeTotalPages,
         updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),

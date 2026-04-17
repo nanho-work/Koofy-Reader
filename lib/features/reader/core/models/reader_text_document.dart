@@ -1,7 +1,6 @@
 import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_content_indexer.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_search_controller.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
 
 class ReaderTextDocument {
   const ReaderTextDocument({
@@ -56,10 +55,29 @@ class ReaderTextDocument {
   }
 
   List<int> searchOffsets(String query, {int limit = 1000}) {
-    return ReaderSearchController.findQueryOffsets(
-      source: content,
-      query: query,
-      limit: limit,
-    );
+    if (content.isEmpty) {
+      return const <int>[];
+    }
+
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) {
+      return const <int>[];
+    }
+
+    final haystack = content.toLowerCase();
+    final offsets = <int>[];
+    int cursor = 0;
+    while (cursor < haystack.length) {
+      final found = haystack.indexOf(needle, cursor);
+      if (found < 0) {
+        break;
+      }
+      offsets.add(found);
+      if (offsets.length >= limit) {
+        break;
+      }
+      cursor = found + needle.length;
+    }
+    return offsets;
   }
 }

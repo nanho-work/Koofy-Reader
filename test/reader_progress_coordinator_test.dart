@@ -66,6 +66,7 @@ void main() {
     expect(
       service.preferredDoubleAnchorOffset(
         state: const ReaderProgressCoordinatorState(),
+        restoredDoublePageStartOffset: null,
         restoredContentOffset: null,
         stableAnchorOffset: 140,
         lastKnownContentOffset: 220,
@@ -77,12 +78,27 @@ void main() {
     expect(
       service.preferredDoubleAnchorOffset(
         state: const ReaderProgressCoordinatorState(),
+        restoredDoublePageStartOffset: null,
         restoredContentOffset: null,
         stableAnchorOffset: 0,
         lastKnownContentOffset: 220,
         contentLength: 500,
       ),
       220,
+    );
+  });
+
+  test('preferredDoubleAnchorOffset uses restored double page start hint', () {
+    expect(
+      service.preferredDoubleAnchorOffset(
+        state: const ReaderProgressCoordinatorState(),
+        restoredDoublePageStartOffset: 144,
+        restoredContentOffset: 200,
+        stableAnchorOffset: 188,
+        lastKnownContentOffset: 220,
+        contentLength: 500,
+      ),
+      144,
     );
   });
 

@@ -85,14 +85,33 @@ void main() {
       bookId: 'book',
       document: document,
       contentOffset: 16,
+      doublePageStartOffset: 12,
       updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
     );
 
     expect(progress.contentOffset, 16);
+    expect(progress.doublePageStartOffset, 12);
     expect(progress.anchor, isNotNull);
     expect(progress.anchor!.chapterId, 'root');
     expect(progress.anchor!.paragraphIndex, 2);
     expect(progress.locator, isNotNull);
     expect(progress.locator!.globalOffset, 16);
+  });
+
+  test('resolveDoublePageStartOffset returns persisted visual hint', () {
+    final progress = ReadingProgress(
+      bookId: 'book',
+      positionRatio: 0.5,
+      contentOffset: 16,
+      doublePageStartOffset: 12,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+
+    final resolved = service.resolveDoublePageStartOffset(
+      document: document,
+      progress: progress,
+    );
+
+    expect(resolved, 12);
   });
 }

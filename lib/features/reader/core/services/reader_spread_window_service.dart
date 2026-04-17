@@ -1,6 +1,6 @@
+import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_position_service.dart';
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_content_indexer.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_position_controller.dart';
 
 class ReaderPaginationWindow {
   const ReaderPaginationWindow({
@@ -14,8 +14,8 @@ class ReaderPaginationWindow {
   final String content;
 }
 
-class ReaderSpreadWindowController {
-  const ReaderSpreadWindowController._();
+class ReaderSpreadWindowService {
+  const ReaderSpreadWindowService._();
 
   static const int doubleWindowBeforeParagraphs = 16;
   static const int doubleWindowAfterParagraphs = 28;
@@ -37,7 +37,7 @@ class ReaderSpreadWindowController {
     }
 
     if (forceStartOffset != null) {
-      final startOffset = ReaderPositionController.normalizeRestoreOffset(
+      final startOffset = ReaderPositionService.normalizeRestoreOffset(
         content: content,
         offset: forceStartOffset,
         doubleMode: true,
@@ -99,7 +99,7 @@ class ReaderSpreadWindowController {
     }
 
     if ((endOffset - startOffset) > doubleWindowMaxChars) {
-      startOffset = ReaderPositionController.normalizeToLineStartOffset(
+      startOffset = ReaderPositionService.normalizeToLineStartOffset(
         content: content,
         offset: (anchorOffset - (doubleWindowMaxChars ~/ 3)).clamp(
           0,

@@ -1,16 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_content_indexer.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_spread_window_controller.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_spread_window_service.dart';
 
 void main() {
-  group('ReaderSpreadWindowController', () {
+  group('ReaderSpreadWindowService', () {
     test('force start window begins near requested anchor', () {
       final content = List.generate(3000, (index) => 'a').join();
       final ranges = <ReaderParagraphRange>[
         ReaderParagraphRange(start: 0, end: content.length),
       ];
 
-      final window = ReaderSpreadWindowController.buildWindow(
+      final window = ReaderSpreadWindowService.buildWindow(
         content: content,
         paragraphRanges: ranges,
         anchorOffset: 1500,
@@ -25,7 +25,7 @@ void main() {
       const content = 'para1\npara2\npara3\npara4\npara5';
       final index = ReaderContentIndexer.buildFromContent(content);
 
-      final window = ReaderSpreadWindowController.buildWindow(
+      final window = ReaderSpreadWindowService.buildWindow(
         content: content,
         paragraphRanges: index.paragraphRanges,
         anchorOffset: content.length,

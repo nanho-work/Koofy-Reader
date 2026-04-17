@@ -61,8 +61,8 @@ class ReaderLayoutController {
         : 'single';
     // Quantize lightly to absorb tiny jitter while still reacting to
     // real viewport changes (fold/IME/system bars).
-    final widthBucket = ((area.width / 8).round() * 8).toDouble();
-    final heightBucket = ((area.height / 8).round() * 8).toDouble();
+    final widthBucket = ((area.width / 16).round() * 16).toDouble();
+    final heightBucket = ((area.height / 16).round() * 16).toDouble();
     return [
       mode,
       widthBucket.toStringAsFixed(0),
@@ -96,11 +96,6 @@ class ReaderLayoutController {
         ) ??
         false;
     if (hasFoldFeature) {
-      return true;
-    }
-
-    final ratio = viewport.height == 0 ? 0.0 : viewport.width / viewport.height;
-    if (ratio >= 0.70) {
       return true;
     }
     if (viewport.shortestSide >= 600 || viewport.width >= 520) {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/reader/core/models/reader_text_document.dart';
-import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_projection_service.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_spread_window_service.dart';
+import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
 import 'package:koofy_reader/features/reader/presentation/controllers/reader_layout_controller.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_spread_window_controller.dart';
 
 class ReaderSpreadPaginationResult {
   const ReaderSpreadPaginationResult({
@@ -48,16 +48,18 @@ class ReaderSpreadPaginationService {
     required MediaQueryData mediaQueryData,
     required TextStyle style,
     required int anchorOffset,
+    int? forceStartOffset,
   }) async {
     final requestedAnchor = anchorOffset.clamp(0, document.length);
     final baseSignature = layout.paginationSignature(
       viewport,
       mediaQueryData: mediaQueryData,
     );
-    final primaryWindow = ReaderSpreadWindowController.buildWindow(
+    final primaryWindow = ReaderSpreadWindowService.buildWindow(
       content: document.content,
       paragraphRanges: document.paragraphRanges,
       anchorOffset: requestedAnchor,
+      forceStartOffset: forceStartOffset,
     );
     final primaryResult = await _paginateWindow(
       document: document,
@@ -76,9 +78,10 @@ class ReaderSpreadPaginationService {
 
     final fallbackStartOffset =
         (requestedAnchor -
-                (ReaderSpreadWindowController.doubleWindowMinChars ~/ 2))
-            .clamp(0, document.length);
-    final fallbackWindow = ReaderSpreadWindowController.buildWindow(
+                (ReaderSpreadWindowService.doubleWindowMinChars ~/ 2))
+            .clamp(0, document.length)
+            .toInt();
+    final fallbackWindow = ReaderSpreadWindowService.buildWindow(
       content: document.content,
       paragraphRanges: document.paragraphRanges,
       anchorOffset: requestedAnchor,
@@ -145,7 +148,7 @@ class ReaderSpreadPaginationService {
       style: style,
       yieldEvery: 12,
     );
-    final globalPages = ReaderSpreadWindowController.toGlobalPaginatedText(
+    final globalPages = ReaderSpreadWindowService.toGlobalPaginatedText(
       localPages: localPages,
       windowStartOffset: window.startOffset,
       sourceContent: document.content,
