@@ -62,5 +62,29 @@ void main() {
 
       expect(resolved, 5);
     });
+
+    test('structure index and document share the same chapter rules', () {
+      const content = '프롤로그\n제 1 장 시작\n본문 첫줄\n제 2 장 다음\n본문 둘째';
+      final structureIndex = engine.buildStructureIndex(
+        content: content,
+        contentHash: engine.stableHash(content),
+      );
+      final indexedDocument = engine.buildDocument(
+        content: content,
+        structureIndex: structureIndex,
+      );
+      final directDocument = engine.buildDocument(content: content);
+
+      final indexedAnchor = indexedDocument.buildAnchorForOffset(18);
+      final directAnchor = directDocument.buildAnchorForOffset(18);
+
+      expect(indexedAnchor.chapterId, directAnchor.chapterId);
+      expect(indexedAnchor.paragraphIndex, directAnchor.paragraphIndex);
+      expect(indexedAnchor.charOffset, directAnchor.charOffset);
+      expect(
+        structureIndex.chapters.map((item) => item.id),
+        containsAll(<String>['intro', 'ch_1', 'ch_2']),
+      );
+    });
   });
 }
