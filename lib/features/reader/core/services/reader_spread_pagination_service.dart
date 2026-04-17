@@ -3,7 +3,6 @@ import 'package:koofy_reader/features/reader/core/models/reader_text_document.da
 import 'package:koofy_reader/features/reader/core/services/reader_projection_service.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_spread_window_service.dart';
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
-import 'package:koofy_reader/features/reader/presentation/controllers/reader_layout_controller.dart';
 
 class ReaderSpreadPaginationResult {
   const ReaderSpreadPaginationResult({
@@ -43,18 +42,13 @@ class ReaderSpreadPaginationService {
 
   Future<ReaderSpreadPaginationResult> paginate({
     required ReaderTextDocument document,
-    required ReaderLayoutController layout,
-    required Size viewport,
-    required MediaQueryData mediaQueryData,
+    required String layoutSignature,
+    required Size textArea,
     required TextStyle style,
     required int anchorOffset,
     int? forceStartOffset,
   }) async {
     final requestedAnchor = anchorOffset.clamp(0, document.length);
-    final baseSignature = layout.paginationSignature(
-      viewport,
-      mediaQueryData: mediaQueryData,
-    );
     final primaryWindow = ReaderSpreadWindowService.buildWindow(
       content: document.content,
       paragraphRanges: document.paragraphRanges,
@@ -63,12 +57,10 @@ class ReaderSpreadPaginationService {
     );
     final primaryResult = await _paginateWindow(
       document: document,
-      layout: layout,
-      viewport: viewport,
-      mediaQueryData: mediaQueryData,
+      textArea: textArea,
       style: style,
       requestedAnchor: requestedAnchor,
-      baseSignature: baseSignature,
+      layoutSignature: layoutSignature,
       window: primaryWindow,
       usedFallbackWindow: false,
     );
@@ -94,12 +86,10 @@ class ReaderSpreadPaginationService {
 
     final fallbackResult = await _paginateWindow(
       document: document,
-      layout: layout,
-      viewport: viewport,
-      mediaQueryData: mediaQueryData,
+      textArea: textArea,
       style: style,
       requestedAnchor: requestedAnchor,
-      baseSignature: baseSignature,
+      layoutSignature: layoutSignature,
       window: fallbackWindow,
       usedFallbackWindow: true,
     );
@@ -111,17 +101,15 @@ class ReaderSpreadPaginationService {
 
   Future<ReaderSpreadPaginationResult> _paginateWindow({
     required ReaderTextDocument document,
-    required ReaderLayoutController layout,
-    required Size viewport,
-    required MediaQueryData mediaQueryData,
+    required Size textArea,
     required TextStyle style,
     required int requestedAnchor,
-    required String baseSignature,
+    required String layoutSignature,
     required ReaderPaginationWindow window,
     required bool usedFallbackWindow,
   }) async {
     final signature =
-        '$baseSignature|${window.startOffset}|${window.endOffset}';
+        '$layoutSignature|${window.startOffset}|${window.endOffset}';
     final cached = _cache[signature];
     if (cached != null) {
       return ReaderSpreadPaginationResult(
@@ -136,10 +124,6 @@ class ReaderSpreadPaginationService {
       );
     }
 
-    final textArea = layout.textAreaForPagination(
-      viewport,
-      mediaQueryData: mediaQueryData,
-    );
     final startedAt = DateTime.now();
     final localPages = await _engine.paginateAsync(
       content: window.content,

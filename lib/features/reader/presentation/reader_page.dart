@@ -19,6 +19,7 @@ import 'package:koofy_reader/features/reader/core/services/reader_progress_coord
 import 'package:koofy_reader/features/reader/core/services/reader_projection_service.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_spread_pagination_service.dart';
 import 'package:koofy_reader/features/reader/data/reader_repository.dart';
+import 'package:koofy_reader/features/reader/domain/reader_font_keys.dart';
 import 'package:koofy_reader/features/reader/data/reader_settings_repository.dart';
 import 'package:koofy_reader/features/reader/data/text_pagination_engine.dart';
 import 'package:koofy_reader/features/reader/data/reader_font_registry.dart';
@@ -140,7 +141,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       readerRepository: ref.read(readerRepositoryProvider),
       settingsRepository: ref.read(readerSettingsRepositoryProvider),
       bookRepository: ref.read(bookRepositoryProvider),
-      engine: _readerEngine,
     );
     unawaited(_bootstrap());
   }
@@ -181,7 +181,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _searchHistory = data.searchHistory;
       _content = data.content;
       _indexContent(data.structureIndex);
-      final fontNormalizationFuture = _normalizeAndLoadFont();
       _restoredContentOffset = _resolveStoredOffset(data.progress);
       _restoredDoublePageStartOffset = _readerEngine
           .resolveDoublePageStartOffset(
@@ -213,22 +212,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _isBootstrapping = false;
       });
       _deferRestoreScrollIfNeeded();
-      unawaited(() async {
-        final changed = await fontNormalizationFuture;
-        if (!mounted || !changed) {
-          return;
-        }
-        setState(() {
-          _singleLayoutSignature = null;
-          _singleTextPainter = null;
-          _singleViewportHeight = 0;
-          _spreadSignature = null;
-          _activeSpreadSignature = null;
-          _spreadToken++;
-          _isSpreadPaginating = false;
-          _restoredScrollApplied = false;
-        });
-      }());
+      _scheduleDeferredFontPreparation();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -305,12 +289,15 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   Future<bool> _normalizeAndLoadFont() async {
+    if (ReaderFontKeys.isBuiltin(_settings.fontKey)) {
+      return false;
+    }
     final registry = ref.read(readerFontRegistryProvider);
     final fonts = await registry.loadAvailableFonts();
-    var changed = false;
+    var shouldInvalidate = false;
     final exists = fonts.any((font) => font.key == _settings.fontKey);
     if (!exists) {
-      changed = true;
+      shouldInvalidate = true;
       _settings = ReaderSettings.defaults().copyWith(
         backgroundMode: _settings.backgroundMode,
         pageLayoutMode: _settings.pageLayoutMode,
@@ -320,8 +307,36 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         keepScreenOn: _settings.keepScreenOn,
       );
     }
-    await registry.ensureLoadedForKey(_settings.fontKey);
-    return changed;
+    final loadedNewFont = await registry.ensureLoadedForKey(_settings.fontKey);
+    return shouldInvalidate || loadedNewFont;
+  }
+
+  void _scheduleDeferredFontPreparation() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(() async {
+        final shouldInvalidate = await _normalizeAndLoadFont();
+        if (!mounted || !shouldInvalidate) {
+          return;
+        }
+        setState(() {
+          _invalidateLayoutCaches();
+          _restoredScrollApplied = false;
+        });
+      }());
+    });
+  }
+
+  void _invalidateLayoutCaches() {
+    _singleLayoutSignature = null;
+    _singleTextPainter = null;
+    _singleViewportHeight = 0;
+    _spreadSignature = null;
+    _activeSpreadSignature = null;
+    _spreadToken++;
+    _isSpreadPaginating = false;
   }
 
   void _indexContent(ReaderStructureIndex? structureIndex) {
@@ -1450,6 +1465,10 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       viewport,
       mediaQueryData: mediaQueryData,
     );
+    final textArea = _layout.textAreaForPagination(
+      viewport,
+      mediaQueryData: mediaQueryData,
+    );
     final requestedAnchor = _normalizeToDoubleRestoreOffset(
       (_pendingAnchorOffset ??
               (_isDoubleViewportSettling && _restoredContentOffset != null
@@ -1495,9 +1514,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       try {
         final result = await _spreadPaginationService.paginate(
           document: document,
-          layout: _layout,
-          viewport: viewport,
-          mediaQueryData: mediaQueryData,
+          layoutSignature: layoutSignature,
+          textArea: textArea,
           style: style,
           anchorOffset: requestedAnchor,
           forceStartOffset: _pendingSpreadForceStartOffset,

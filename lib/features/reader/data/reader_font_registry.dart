@@ -72,13 +72,13 @@ class ReaderFontRegistry {
     return items;
   }
 
-  Future<void> ensureLoadedForKey(String fontKey) async {
+  Future<bool> ensureLoadedForKey(String fontKey) async {
     final assetPath = ReaderFontKeys.assetPathFromKey(fontKey);
     if (assetPath == null || assetPath.isEmpty) {
-      return;
+      return false;
     }
     final family = ReaderFontKeys.resolveFamily(fontKey);
-    await _ensureAssetLoaded(assetPath, family);
+    return _ensureAssetLoaded(assetPath, family);
   }
 
   Future<List<String>> _loadFontAssetPaths() async {
@@ -100,17 +100,19 @@ class ReaderFontRegistry {
     }
   }
 
-  Future<void> _ensureAssetLoaded(String assetPath, String family) async {
+  Future<bool> _ensureAssetLoaded(String assetPath, String family) async {
     if (_loadedFamilies.contains(family)) {
-      return;
+      return false;
     }
     try {
       final loader = FontLoader(family);
       loader.addFont(rootBundle.load(assetPath));
       await loader.load();
       _loadedFamilies.add(family);
+      return true;
     } catch (_) {
       // Ignore malformed/missing font files and keep fallback font.
+      return false;
     }
   }
 }

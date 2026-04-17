@@ -15,6 +15,14 @@ void main() {
   const mediaQueryData = MediaQueryData();
   const viewport = Size(900, 700);
   const style = TextStyle(fontSize: 18, height: 1.7);
+  final layoutSignature = layout.paginationSignature(
+    viewport,
+    mediaQueryData: mediaQueryData,
+  );
+  final textArea = layout.textAreaForPagination(
+    viewport,
+    mediaQueryData: mediaQueryData,
+  );
 
   ReaderTextDocument buildDocument() {
     final paragraph = List.filled(40, 'lorem ipsum dolor sit amet').join(' ');
@@ -45,9 +53,8 @@ void main() {
 
     final result = await service.paginate(
       document: document,
-      layout: layout,
-      viewport: viewport,
-      mediaQueryData: mediaQueryData,
+      layoutSignature: layoutSignature,
+      textArea: textArea,
       style: style,
       anchorOffset: anchorOffset,
     );
@@ -70,17 +77,15 @@ void main() {
 
     final first = await service.paginate(
       document: document,
-      layout: layout,
-      viewport: viewport,
-      mediaQueryData: mediaQueryData,
+      layoutSignature: layoutSignature,
+      textArea: textArea,
       style: style,
       anchorOffset: anchorOffset,
     );
     final second = await service.paginate(
       document: document,
-      layout: layout,
-      viewport: viewport,
-      mediaQueryData: mediaQueryData,
+      layoutSignature: layoutSignature,
+      textArea: textArea,
       style: style,
       anchorOffset: anchorOffset,
     );
@@ -101,9 +106,8 @@ void main() {
 
       final result = await service.paginate(
         document: document,
-        layout: layout,
-        viewport: viewport,
-        mediaQueryData: mediaQueryData,
+        layoutSignature: layoutSignature,
+        textArea: textArea,
         style: style,
         anchorOffset: anchorOffset,
       );

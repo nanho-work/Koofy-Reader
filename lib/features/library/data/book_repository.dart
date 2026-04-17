@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
+import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
 
@@ -21,15 +23,28 @@ final booksProvider = FutureProvider<List<Book>>(
 
 abstract class BookRepository {
   Future<List<Book>> getBooks();
+  Future<PreparedBookContent> readPreparedBookContent(Book book);
   Future<String> readBookContent(Book book);
   Future<Book?> importBookFile(String path);
+}
+
+class PreparedBookContent {
+  const PreparedBookContent({
+    required this.content,
+    required this.contentHash,
+    required this.structureIndex,
+  });
+
+  final String content;
+  final String contentHash;
+  final ReaderStructureIndex structureIndex;
 }
 
 class LocalBookRepository implements BookRepository {
   LocalBookRepository(this._storage);
 
   final LocalStorage _storage;
-  static const int _contentCacheSchemaVersion = 1;
+  static const int _contentCacheSchemaVersion = 3;
   static final Map<String, _InMemoryContentCacheEntry> _inMemoryContentCache =
       <String, _InMemoryContentCacheEntry>{};
 
@@ -58,8 +73,14 @@ class LocalBookRepository implements BookRepository {
 
   @override
   Future<String> readBookContent(Book book) async {
+    final prepared = await readPreparedBookContent(book);
+    return prepared.content;
+  }
+
+  @override
+  Future<PreparedBookContent> readPreparedBookContent(Book book) async {
     String sourceStamp;
-    String rawContent;
+    String normalizedContent;
 
     if (book.sourceType == BookSourceType.asset) {
       final path = book.assetPath;
@@ -79,26 +100,31 @@ class LocalBookRepository implements BookRepository {
         sourceStamp: sourceStamp,
       );
       if (cached != null) {
+        await _writeNormalizedContentCache(
+          bookId: book.id,
+          sourceStamp: sourceStamp,
+          prepared: cached,
+        );
         _writeInMemoryContentCache(
           bookId: book.id,
           sourceStamp: sourceStamp,
-          content: cached,
+          prepared: cached,
         );
         return cached;
       }
-      rawContent = await rootBundle.loadString(path);
-      final normalized = _normalizeContent(rawContent);
+      normalizedContent = _normalizeContent(await rootBundle.loadString(path));
+      final prepared = _buildPreparedBookContent(normalizedContent);
       await _writeNormalizedContentCache(
         bookId: book.id,
         sourceStamp: sourceStamp,
-        normalizedContent: normalized,
+        prepared: prepared,
       );
       _writeInMemoryContentCache(
         bookId: book.id,
         sourceStamp: sourceStamp,
-        content: normalized,
+        prepared: prepared,
       );
-      return normalized;
+      return prepared;
     }
 
     final path = book.localPath;
@@ -134,31 +160,36 @@ class LocalBookRepository implements BookRepository {
       sourceStamp: sourceStamp,
     );
     if (cached != null) {
+      await _writeNormalizedContentCache(
+        bookId: book.id,
+        sourceStamp: sourceStamp,
+        prepared: cached,
+      );
       _writeInMemoryContentCache(
         bookId: book.id,
         sourceStamp: sourceStamp,
-        content: cached,
+        prepared: cached,
       );
       return cached;
     }
 
     if (isEpub) {
-      rawContent = await _readEpubContent(file);
+      normalizedContent = _normalizeContent(await _readEpubContent(file));
     } else {
-      rawContent = await file.readAsString();
+      normalizedContent = _normalizeContent(await file.readAsString());
     }
-    final normalized = _normalizeContent(rawContent);
+    final prepared = _buildPreparedBookContent(normalizedContent);
     await _writeNormalizedContentCache(
       bookId: book.id,
       sourceStamp: sourceStamp,
-      normalizedContent: normalized,
+      prepared: prepared,
     );
     _writeInMemoryContentCache(
       bookId: book.id,
       sourceStamp: sourceStamp,
-      content: normalized,
+      prepared: prepared,
     );
-    return normalized;
+    return prepared;
   }
 
   @override
@@ -379,7 +410,7 @@ class LocalBookRepository implements BookRepository {
     return raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   }
 
-  String? _readInMemoryContentCache({
+  PreparedBookContent? _readInMemoryContentCache({
     required String bookId,
     required String sourceStamp,
   }) {
@@ -387,18 +418,24 @@ class LocalBookRepository implements BookRepository {
     if (entry == null || entry.sourceStamp != sourceStamp) {
       return null;
     }
-    return entry.content;
+    return PreparedBookContent(
+      content: entry.content,
+      contentHash: entry.contentHash,
+      structureIndex: entry.structureIndex,
+    );
   }
 
   void _writeInMemoryContentCache({
     required String bookId,
     required String sourceStamp,
-    required String content,
+    required PreparedBookContent prepared,
   }) {
     _inMemoryContentCache.remove(bookId);
     _inMemoryContentCache[bookId] = _InMemoryContentCacheEntry(
       sourceStamp: sourceStamp,
-      content: content,
+      content: prepared.content,
+      contentHash: prepared.contentHash,
+      structureIndex: prepared.structureIndex,
     );
     const maxEntries = 3;
     while (_inMemoryContentCache.length > maxEntries) {
@@ -407,7 +444,7 @@ class LocalBookRepository implements BookRepository {
     }
   }
 
-  Future<String?> _readNormalizedContentCache({
+  Future<PreparedBookContent?> _readNormalizedContentCache({
     required String bookId,
     required String sourceStamp,
   }) async {
@@ -427,7 +464,9 @@ class LocalBookRepository implements BookRepository {
       final schema = decoded['schemaVersion'];
       final cachedStamp = decoded['sourceStamp'];
       final content = decoded['normalizedContent'];
-      if (schema is! int || schema != _contentCacheSchemaVersion) {
+      final contentHash = decoded['contentHash'];
+      final structureIndexRaw = decoded['structureIndex'];
+      if (schema is! int || schema < 1 || schema > _contentCacheSchemaVersion) {
         return null;
       }
       if (cachedStamp is! String || cachedStamp != sourceStamp) {
@@ -436,7 +475,13 @@ class LocalBookRepository implements BookRepository {
       if (content is! String) {
         return null;
       }
-      return content;
+      return _buildPreparedBookContent(
+        content,
+        existingHash: contentHash is String ? contentHash : null,
+        existingStructureIndex: structureIndexRaw is String
+            ? ReaderStructureIndex.fromRaw(structureIndexRaw)
+            : null,
+      );
     } catch (_) {
       return null;
     }
@@ -445,7 +490,7 @@ class LocalBookRepository implements BookRepository {
   Future<void> _writeNormalizedContentCache({
     required String bookId,
     required String sourceStamp,
-    required String normalizedContent,
+    required PreparedBookContent prepared,
   }) async {
     try {
       final file = await _contentCacheFileFor(bookId);
@@ -453,12 +498,78 @@ class LocalBookRepository implements BookRepository {
       final payload = jsonEncode({
         'schemaVersion': _contentCacheSchemaVersion,
         'sourceStamp': sourceStamp,
-        'normalizedContent': normalizedContent,
+        'normalizedContent': prepared.content,
+        'contentHash': prepared.contentHash,
+        'structureIndex': prepared.structureIndex.toRaw(),
       });
       await file.writeAsString(payload, flush: true);
     } catch (_) {
       // Fallback to raw read path if cache write fails.
     }
+  }
+
+  PreparedBookContent _buildPreparedBookContent(
+    String normalizedContent, {
+    String? existingHash,
+    ReaderStructureIndex? existingStructureIndex,
+  }) {
+    final contentHash = existingHash ?? _stableHash(normalizedContent);
+    final structureIndex =
+        _isCompatibleStructureIndex(
+          existingStructureIndex,
+          contentLength: normalizedContent.length,
+          contentHash: contentHash,
+        )
+        ? existingStructureIndex!
+        : _buildStructureIndex(
+            content: normalizedContent,
+            contentHash: contentHash,
+          );
+    return PreparedBookContent(
+      content: normalizedContent,
+      contentHash: contentHash,
+      structureIndex: structureIndex,
+    );
+  }
+
+  bool _isCompatibleStructureIndex(
+    ReaderStructureIndex? structureIndex, {
+    required int contentLength,
+    required String contentHash,
+  }) {
+    if (structureIndex == null) {
+      return false;
+    }
+    return structureIndex.contentLength == contentLength &&
+        structureIndex.contentHash == contentHash &&
+        structureIndex.paragraphs.isNotEmpty;
+  }
+
+  ReaderStructureIndex _buildStructureIndex({
+    required String content,
+    required String contentHash,
+  }) {
+    final contentIndex = ReaderContentIndexer.buildFromContent(content);
+    return ReaderStructureIndex(
+      schemaVersion: ReaderStructureIndex.currentSchemaVersion,
+      contentLength: content.length,
+      contentHash: contentHash,
+      paragraphs: contentIndex.paragraphRanges
+          .map(
+            (range) =>
+                ReaderParagraphRangeData(start: range.start, end: range.end),
+          )
+          .toList(growable: false),
+      chapters: contentIndex.chapterRanges
+          .map(
+            (range) => ReaderChapterRangeData(
+              id: range.id,
+              paragraphStartIndex: range.paragraphStartIndex,
+              paragraphEndIndex: range.paragraphEndIndex,
+            ),
+          )
+          .toList(growable: false),
+    );
   }
 
   Future<File> _contentCacheFileFor(String bookId) async {
@@ -484,10 +595,14 @@ class _InMemoryContentCacheEntry {
   const _InMemoryContentCacheEntry({
     required this.sourceStamp,
     required this.content,
+    required this.contentHash,
+    required this.structureIndex,
   });
 
   final String sourceStamp;
   final String content;
+  final String contentHash;
+  final ReaderStructureIndex structureIndex;
 }
 
 String _extractEpubContentFromBytes(List<int> bytes) {

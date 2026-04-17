@@ -5,7 +5,6 @@ import 'package:koofy_reader/features/reader/data/reader_settings_repository.dar
 import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
 import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
-import 'package:koofy_reader/features/reader/engine/reader_engine.dart';
 
 class ReaderBootstrapData {
   const ReaderBootstrapData({
@@ -30,52 +29,32 @@ class ReaderSessionController {
     required ReaderRepository readerRepository,
     required ReaderSettingsRepository settingsRepository,
     required BookRepository bookRepository,
-    required ReaderEngine engine,
   }) : _readerRepository = readerRepository,
        _settingsRepository = settingsRepository,
-       _bookRepository = bookRepository,
-       _engine = engine;
+       _bookRepository = bookRepository;
 
   final ReaderRepository _readerRepository;
   final ReaderSettingsRepository _settingsRepository;
   final BookRepository _bookRepository;
-  final ReaderEngine _engine;
 
   Future<ReaderBootstrapData> bootstrap(Book book) async {
     final results = await Future.wait<dynamic>([
-      _bookRepository.readBookContent(book),
+      _bookRepository.readPreparedBookContent(book),
       _settingsRepository.load(),
       _readerRepository.loadBookmarks(book.id),
       _readerRepository.loadProgress(book.id),
       _readerRepository.loadSearchHistory(),
     ]);
 
-    final rawContent = results[0] as String;
-    final normalized = _engine.normalizeContent(rawContent);
-    final contentHash = _engine.stableHash(normalized);
-    var structureIndex = await _readerRepository.loadStructureIndex(
-      bookId: book.id,
-      contentLength: normalized.length,
-      contentHash: contentHash,
-    );
-    if (structureIndex == null) {
-      structureIndex = _engine.buildStructureIndex(
-        content: normalized,
-        contentHash: contentHash,
-      );
-      await _readerRepository.saveStructureIndex(
-        bookId: book.id,
-        index: structureIndex,
-      );
-    }
+    final preparedContent = results[0] as PreparedBookContent;
 
     return ReaderBootstrapData(
-      content: normalized,
+      content: preparedContent.content,
       settings: results[1] as ReaderSettings,
       bookmarks: (results[2] as Set<int>).where((page) => page >= 0).toSet(),
       progress: results[3] as ReadingProgress?,
       searchHistory: results[4] as List<String>,
-      structureIndex: structureIndex,
+      structureIndex: preparedContent.structureIndex,
     );
   }
 
