@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/features/reader/core/models/reader_text_document.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_projection_service.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_spread_window_service.dart';
@@ -48,6 +49,7 @@ class ReaderSpreadPaginationService {
     required int anchorOffset,
     int? forceStartOffset,
   }) async {
+    final stopwatch = Stopwatch()..start();
     final requestedAnchor = anchorOffset.clamp(0, document.length);
     final primaryWindow = ReaderSpreadWindowService.buildWindow(
       content: document.content,
@@ -65,6 +67,18 @@ class ReaderSpreadPaginationService {
       usedFallbackWindow: false,
     );
     if (_spreadContainsAnchor(primaryResult, requestedAnchor)) {
+      DebugPerfLogger.log(
+        'SpreadPagination',
+        'paginate_done',
+        details: <String, Object?>{
+          'chars': document.length,
+          'anchor': requestedAnchor,
+          'mappedIndex': primaryResult.mappedIndex,
+          'fromCache': primaryResult.fromCache,
+          'fallback': primaryResult.usedFallbackWindow,
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
+      );
       return primaryResult;
     }
 
@@ -94,8 +108,30 @@ class ReaderSpreadPaginationService {
       usedFallbackWindow: true,
     );
     if (_spreadContainsAnchor(fallbackResult, requestedAnchor)) {
+      DebugPerfLogger.log(
+        'SpreadPagination',
+        'paginate_done',
+        details: <String, Object?>{
+          'chars': document.length,
+          'anchor': requestedAnchor,
+          'mappedIndex': fallbackResult.mappedIndex,
+          'fromCache': fallbackResult.fromCache,
+          'fallback': fallbackResult.usedFallbackWindow,
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
+      );
       return fallbackResult;
     }
+    DebugPerfLogger.log(
+      'SpreadPagination',
+      'paginate_fallback_miss',
+      details: <String, Object?>{
+        'chars': document.length,
+        'anchor': requestedAnchor,
+        'mappedIndex': primaryResult.mappedIndex,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
+    );
     return primaryResult;
   }
 
@@ -112,6 +148,16 @@ class ReaderSpreadPaginationService {
         '$layoutSignature|${window.startOffset}|${window.endOffset}';
     final cached = _cache[signature];
     if (cached != null) {
+      DebugPerfLogger.log(
+        'SpreadPagination',
+        'window_cache_hit',
+        details: <String, Object?>{
+          'signature': signature,
+          'anchor': requestedAnchor,
+          'windowStart': window.startOffset,
+          'windowEnd': window.endOffset,
+        },
+      );
       return ReaderSpreadPaginationResult(
         pages: cached,
         mappedIndex: _mapSpreadIndexByOffset(cached, requestedAnchor),

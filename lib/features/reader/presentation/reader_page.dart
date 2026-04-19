@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
+import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/reader/application/controllers/reader_location_controller.dart';
@@ -174,19 +175,23 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   Future<void> _bootstrap() async {
+    final stopwatch = Stopwatch()..start();
     try {
       final data = await _sessionController.bootstrap(widget.book);
+      final sessionLoadMs = stopwatch.elapsedMilliseconds;
       _settings = data.settings;
       _bookmarks = data.bookmarks;
       _searchHistory = data.searchHistory;
       _content = data.content;
       _indexContent(data.structureIndex);
+      final indexMs = stopwatch.elapsedMilliseconds - sessionLoadMs;
       _restoredContentOffset = _resolveStoredOffset(data.progress);
       _restoredDoublePageStartOffset = _readerEngine
           .resolveDoublePageStartOffset(
             document: _document,
             progress: data.progress,
           );
+      final restoreMs = stopwatch.elapsedMilliseconds - sessionLoadMs - indexMs;
       _restoredSingleScrollRatio =
           (data.progress?.scrollOffsetPx != null &&
               data.progress?.scrollMaxExtentPx != null &&
@@ -206,6 +211,22 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       );
 
       await _applyWakelock();
+      final wakelockMs =
+          stopwatch.elapsedMilliseconds - sessionLoadMs - indexMs - restoreMs;
+      DebugPerfLogger.log(
+        'ReaderPage',
+        'bootstrap_done',
+        details: <String, Object?>{
+          'bookId': widget.book.id,
+          'chars': _content.length,
+          'sessionLoadMs': sessionLoadMs,
+          'indexMs': indexMs,
+          'restoreMs': restoreMs,
+          'wakelockMs': wakelockMs,
+          'totalMs': stopwatch.elapsedMilliseconds,
+          'hasProgress': data.progress != null,
+        },
+      );
 
       if (!mounted) return;
       setState(() {
@@ -289,7 +310,17 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   Future<bool> _normalizeAndLoadFont() async {
+    final stopwatch = Stopwatch()..start();
     if (ReaderFontKeys.isBuiltin(_settings.fontKey)) {
+      DebugPerfLogger.log(
+        'ReaderPage',
+        'font_prepare_skipped',
+        details: <String, Object?>{
+          'fontKey': _settings.fontKey,
+          'reason': 'builtin',
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
+      );
       return false;
     }
     final registry = ref.read(readerFontRegistryProvider);
@@ -308,6 +339,16 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       );
     }
     final loadedNewFont = await registry.ensureLoadedForKey(_settings.fontKey);
+    DebugPerfLogger.log(
+      'ReaderPage',
+      'font_prepare_done',
+      details: <String, Object?>{
+        'fontKey': _settings.fontKey,
+        'loadedNewFont': loadedNewFont,
+        'invalidated': shouldInvalidate || loadedNewFont,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
+    );
     return shouldInvalidate || loadedNewFont;
   }
 
@@ -316,6 +357,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       if (!mounted) {
         return;
       }
+      DebugPerfLogger.log(
+        'ReaderPage',
+        'font_prepare_scheduled',
+        details: <String, Object?>{'bookId': widget.book.id},
+      );
       unawaited(() async {
         final shouldInvalidate = await _normalizeAndLoadFont();
         if (!mounted || !shouldInvalidate) {
@@ -585,7 +631,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   int _preferredDoubleModeAnchorOffset() {
     final transitionAnchor = !_isDoubleActive
-        ? _currentSingleFocusOffset()
+        ? _currentSingleContentOffset()
         : _resolveStableAnchorOffset();
     return _progressCoordinator.preferredDoubleAnchorOffset(
       state: _coordinatorState,
@@ -627,6 +673,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
+    final stopwatch = Stopwatch()..start();
     final painter = TextPainter(
       text: TextSpan(text: _content, style: style),
       strutStyle: StrutStyle.fromTextStyle(style, forceStrutHeight: true),
@@ -640,6 +687,16 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       offset: _resolveStableAnchorOffset(),
       details:
           'maxWidth=${maxWidth.toStringAsFixed(1)} viewportHeight=${viewport.height.toStringAsFixed(1)} painterHeight=${painter.height.toStringAsFixed(1)}',
+    );
+    DebugPerfLogger.log(
+      'ReaderPage',
+      'single_layout_built',
+      details: <String, Object?>{
+        'chars': _content.length,
+        'width': maxWidth.toStringAsFixed(1),
+        'height': viewport.height.toStringAsFixed(1),
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
     );
   }
 
@@ -929,6 +986,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _deferRestoreScrollIfNeeded() {
+    final stopwatch = Stopwatch()..start();
     _coordinatorState = _progressCoordinator.resolveRestoredOffset(
       state: _coordinatorState,
       restoredContentOffset: _restoredContentOffset,
@@ -1002,6 +1060,16 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           'restore_single_applied',
           offset: _lastKnownContentOffset,
           details: 'targetPx=${target.toStringAsFixed(1)}',
+        );
+        DebugPerfLogger.log(
+          'ReaderPage',
+          'single_restore_applied',
+          details: <String, Object?>{
+            'targetOffset': restoredOffset,
+            'attempts': attempts,
+            'targetPx': target.toStringAsFixed(1),
+            'durationMs': stopwatch.elapsedMilliseconds,
+          },
         );
         _scheduleSingleRestoreVerification(
           restoredOffset,
@@ -1339,6 +1407,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
     _coordinatorState = transitionStart.state;
     final clampedAnchor = transitionStart.anchorOffset;
+    final currentSingleContent = !_isDoubleActive
+        ? _currentSingleContentOffset()
+        : null;
+    final currentSingleFocus = !_isDoubleActive
+        ? _currentSingleFocusOffset()
+        : null;
     final previewNormalized = request.targetDoubleMode
         ? _normalizeToDoubleRestoreOffset(clampedAnchor)
         : _normalizeToSingleRestoreOffset(clampedAnchor);
@@ -1346,7 +1420,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       'mode_transition_schedule',
       offset: clampedAnchor,
       details:
-          'target=${request.targetDoubleMode ? 'double' : 'single'} previewNormalized=$previewNormalized delayMs=${request.delayMs}',
+          'target=${request.targetDoubleMode ? 'double' : 'single'} previewNormalized=$previewNormalized delayMs=${request.delayMs} singleContent=${currentSingleContent ?? 'na'} singleFocus=${currentSingleFocus ?? 'na'}',
     );
 
     _modeEpoch++;
@@ -1381,9 +1455,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _isDoubleActive = applyMode;
           if (applyMode) {
             _pinnedDoubleContentOffset = applyAnchor;
-            _singleLayoutSignature = null;
-            _singleTextPainter = null;
-            _singleViewportHeight = 0;
             _spreadPages = null;
             _spreadIndex = 0;
             _spreadSignature = null;
@@ -1498,6 +1569,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
+    final stopwatch = Stopwatch()..start();
     _activeSpreadSignature = requestSignature;
     final token = ++_spreadToken;
     final modeEpochAtRequest = _modeEpoch;
@@ -1545,6 +1617,17 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           details:
               'mapped=${result.mappedIndex} signature=${result.signature} window=${result.windowStartOffset}:${result.windowEndOffset} fallback=${result.usedFallbackWindow} durationMs=${result.durationMs ?? 0}',
         );
+        DebugPerfLogger.log(
+          'ReaderPage',
+          'spread_paginate_applied',
+          details: <String, Object?>{
+            'anchor': result.requestedAnchor,
+            'mappedIndex': result.mappedIndex,
+            'fromCache': result.fromCache,
+            'fallback': result.usedFallbackWindow,
+            'totalMs': stopwatch.elapsedMilliseconds,
+          },
+        );
         _flushProgressPersistenceHolds(reason: 'spread_paginate_done');
       } catch (_) {
         if (!mounted || token != _spreadToken) return;
@@ -1556,6 +1639,14 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           'spread_paginate_error',
           offset: requestedAnchor,
           details: 'token=$token',
+        );
+        DebugPerfLogger.log(
+          'ReaderPage',
+          'spread_paginate_error',
+          details: <String, Object?>{
+            'anchor': requestedAnchor,
+            'totalMs': stopwatch.elapsedMilliseconds,
+          },
         );
         _flushProgressPersistenceHolds(reason: 'spread_paginate_error');
       } finally {
@@ -1623,6 +1714,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   }
 
   void _applySearchQueryNow(String query) {
+    final stopwatch = Stopwatch()..start();
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       _releaseSearchJumpPersistenceHold(reason: 'search_cleared');
@@ -1646,6 +1738,15 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       'search_query_applied',
       offset: _lastKnownContentOffset,
       details: 'query=$trimmed matches=${results.length}',
+    );
+    DebugPerfLogger.log(
+      'ReaderPage',
+      'search_query_applied',
+      details: <String, Object?>{
+        'queryLength': trimmed.length,
+        'results': results.length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
     );
 
     setState(() {

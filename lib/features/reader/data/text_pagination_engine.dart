@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 
 class TextPageRange {
   const TextPageRange({required this.start, required this.end});
@@ -80,8 +81,14 @@ class TextPaginationEngine {
     int yieldEvery = 20,
     int? maxPages,
   }) async {
+    final stopwatch = Stopwatch()..start();
     final normalized = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     if (normalized.trim().isEmpty) {
+      DebugPerfLogger.log(
+        'TextPagination',
+        'paginate_empty',
+        details: <String, Object?>{'durationMs': stopwatch.elapsedMilliseconds},
+      );
       return const PaginatedText(
         source: '',
         ranges: [TextPageRange(start: 0, end: 0)],
@@ -136,11 +143,28 @@ class TextPaginationEngine {
     }
 
     if (ranges.isEmpty) {
+      DebugPerfLogger.log(
+        'TextPagination',
+        'paginate_empty_ranges',
+        details: <String, Object?>{'durationMs': stopwatch.elapsedMilliseconds},
+      );
       return const PaginatedText(
         source: '',
         ranges: [TextPageRange(start: 0, end: 0)],
       );
     }
+    DebugPerfLogger.log(
+      'TextPagination',
+      'paginate_done',
+      details: <String, Object?>{
+        'chars': normalized.length,
+        'pages': ranges.length,
+        'width': safeWidth.toStringAsFixed(1),
+        'height': safeHeight.toStringAsFixed(1),
+        'yieldEvery': yieldEvery,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
+    );
     return PaginatedText(source: normalized, ranges: ranges);
   }
 

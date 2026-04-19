@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
+import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
@@ -79,6 +80,7 @@ class LocalBookRepository implements BookRepository {
 
   @override
   Future<PreparedBookContent> readPreparedBookContent(Book book) async {
+    final stopwatch = Stopwatch()..start();
     String sourceStamp;
     String normalizedContent;
 
@@ -93,6 +95,17 @@ class LocalBookRepository implements BookRepository {
         sourceStamp: sourceStamp,
       );
       if (inMemory != null) {
+        DebugPerfLogger.log(
+          'BookRepository',
+          'prepared_content_loaded',
+          details: <String, Object?>{
+            'bookId': book.id,
+            'source': 'asset',
+            'cache': 'memory',
+            'chars': inMemory.content.length,
+            'durationMs': stopwatch.elapsedMilliseconds,
+          },
+        );
         return inMemory;
       }
       final cached = await _readNormalizedContentCache(
@@ -110,6 +123,17 @@ class LocalBookRepository implements BookRepository {
           sourceStamp: sourceStamp,
           prepared: cached,
         );
+        DebugPerfLogger.log(
+          'BookRepository',
+          'prepared_content_loaded',
+          details: <String, Object?>{
+            'bookId': book.id,
+            'source': 'asset',
+            'cache': 'disk',
+            'chars': cached.content.length,
+            'durationMs': stopwatch.elapsedMilliseconds,
+          },
+        );
         return cached;
       }
       normalizedContent = _normalizeContent(await rootBundle.loadString(path));
@@ -123,6 +147,17 @@ class LocalBookRepository implements BookRepository {
         bookId: book.id,
         sourceStamp: sourceStamp,
         prepared: prepared,
+      );
+      DebugPerfLogger.log(
+        'BookRepository',
+        'prepared_content_loaded',
+        details: <String, Object?>{
+          'bookId': book.id,
+          'source': 'asset',
+          'cache': 'miss',
+          'chars': prepared.content.length,
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
       );
       return prepared;
     }
@@ -153,6 +188,17 @@ class LocalBookRepository implements BookRepository {
       sourceStamp: sourceStamp,
     );
     if (inMemory != null) {
+      DebugPerfLogger.log(
+        'BookRepository',
+        'prepared_content_loaded',
+        details: <String, Object?>{
+          'bookId': book.id,
+          'source': isEpub ? 'epub' : 'text',
+          'cache': 'memory',
+          'chars': inMemory.content.length,
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
+      );
       return inMemory;
     }
     final cached = await _readNormalizedContentCache(
@@ -169,6 +215,17 @@ class LocalBookRepository implements BookRepository {
         bookId: book.id,
         sourceStamp: sourceStamp,
         prepared: cached,
+      );
+      DebugPerfLogger.log(
+        'BookRepository',
+        'prepared_content_loaded',
+        details: <String, Object?>{
+          'bookId': book.id,
+          'source': isEpub ? 'epub' : 'text',
+          'cache': 'disk',
+          'chars': cached.content.length,
+          'durationMs': stopwatch.elapsedMilliseconds,
+        },
       );
       return cached;
     }
@@ -188,6 +245,17 @@ class LocalBookRepository implements BookRepository {
       bookId: book.id,
       sourceStamp: sourceStamp,
       prepared: prepared,
+    );
+    DebugPerfLogger.log(
+      'BookRepository',
+      'prepared_content_loaded',
+      details: <String, Object?>{
+        'bookId': book.id,
+        'source': isEpub ? 'epub' : 'text',
+        'cache': 'miss',
+        'chars': prepared.content.length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
     );
     return prepared;
   }
@@ -298,8 +366,21 @@ class LocalBookRepository implements BookRepository {
   }
 
   Future<String> _readEpubContent(File file) async {
+    final stopwatch = Stopwatch()..start();
     final bytes = await file.readAsBytes();
-    return Isolate.run(() => _extractEpubContentFromBytes(bytes));
+    final content = await Isolate.run(
+      () => _extractEpubContentFromBytes(bytes),
+    );
+    DebugPerfLogger.log(
+      'BookRepository',
+      'epub_content_extracted',
+      details: <String, Object?>{
+        'bytes': bytes.length,
+        'chars': content.length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
+    );
+    return content;
   }
 
   Future<_EpubMetadata> _readEpubMetadata(File file) async {

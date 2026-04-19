@@ -1,5 +1,6 @@
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/features/reader/data/reader_repository.dart';
 import 'package:koofy_reader/features/reader/data/reader_settings_repository.dart';
 import 'package:koofy_reader/features/reader/domain/reader_settings.dart';
@@ -38,6 +39,7 @@ class ReaderSessionController {
   final BookRepository _bookRepository;
 
   Future<ReaderBootstrapData> bootstrap(Book book) async {
+    final stopwatch = Stopwatch()..start();
     final results = await Future.wait<dynamic>([
       _bookRepository.readPreparedBookContent(book),
       _settingsRepository.load(),
@@ -47,6 +49,18 @@ class ReaderSessionController {
     ]);
 
     final preparedContent = results[0] as PreparedBookContent;
+    DebugPerfLogger.log(
+      'ReaderSession',
+      'bootstrap_loaded',
+      details: <String, Object?>{
+        'bookId': book.id,
+        'chars': preparedContent.content.length,
+        'hasProgress': results[3] != null,
+        'bookmarks': (results[2] as Set<int>).length,
+        'searchHistory': (results[4] as List<String>).length,
+        'durationMs': stopwatch.elapsedMilliseconds,
+      },
+    );
 
     return ReaderBootstrapData(
       content: preparedContent.content,
