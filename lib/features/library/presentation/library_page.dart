@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
-import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dart';
@@ -60,12 +59,6 @@ class LibraryPage extends ConsumerWidget {
                   slivers: [
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      sliver: SliverToBoxAdapter(
-                        child: _LibraryHeader(bookCount: sortedBooks.length),
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       sliver: SliverGrid.builder(
                         itemCount: sortedBooks.length + 1,
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -88,6 +81,11 @@ class LibraryPage extends ConsumerWidget {
                           return BookTile(
                             book: book,
                             onTap: () => _openReader(context, ref, book),
+                            onLongPress: () =>
+                                _confirmRemoveBook(context, ref, book),
+                            showDeleteButton: true,
+                            onDeleteTap: () =>
+                                _confirmRemoveBook(context, ref, book),
                           );
                         },
                       ),
@@ -99,7 +97,6 @@ class LibraryPage extends ConsumerWidget {
           );
         },
       ),
-      bottomNavigationBar: const SafeArea(child: AdFooterWidget()),
     );
   }
 
@@ -122,6 +119,59 @@ class LibraryPage extends ConsumerWidget {
       ref.invalidate(allReadingProgressProvider);
       ref.invalidate(recentBookIdsProvider);
     });
+  }
+
+  Future<void> _confirmRemoveBook(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+  ) async {
+    final actionLabel = book.isLocalFile ? '삭제' : '숨김';
+    final actionVerb = book.isLocalFile ? '삭제할까요?' : '숨길까요?';
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('책 제거'),
+          content: Text('서재에서 "${book.title}" 을(를) $actionVerb'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(actionLabel),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldDelete != true) {
+      return;
+    }
+    final removed = await ref
+        .read(bookRepositoryProvider)
+        .removeBookFromLibrary(book.id);
+    if (!context.mounted) {
+      return;
+    }
+    if (!removed) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('제거할 책을 찾지 못했습니다.')));
+      return;
+    }
+    ref.invalidate(booksProvider);
+    ref.invalidate(allReadingProgressProvider);
+    ref.invalidate(recentBookIdsProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          book.isLocalFile ? '삭제 완료: ${book.title}' : '숨김 완료: ${book.title}',
+        ),
+      ),
+    );
   }
 
   Future<void> _importTextFile(BuildContext context, WidgetRef ref) async {
@@ -172,36 +222,5 @@ class LibraryPage extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text('파일 가져오기 실패: $error')));
     }
-  }
-}
-
-class _LibraryHeader extends StatelessWidget {
-  const _LibraryHeader({required this.bookCount});
-
-  final int bookCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFE8D7BE), Color(0xFFD9BE98)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x33A06E3B)),
-      ),
-      child: Text(
-        '표지 책장 · $bookCount권\n책 표지를 눌러 바로 이어읽기',
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: const Color(0xFF3B2B1F),
-          height: 1.3,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 }

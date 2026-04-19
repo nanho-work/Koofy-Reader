@@ -1,12 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
-import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
 import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
-import 'package:path_provider/path_provider.dart';
 
 final readerRepositoryProvider = Provider<ReaderRepository>(
   (ref) => LocalReaderRepository(ref.watch(localStorageProvider)),
@@ -29,21 +26,15 @@ abstract class ReaderRepository {
   Future<List<String>> loadRecentBookIds();
   Future<List<String>> loadSearchHistory();
   Future<void> saveSearchHistory(List<String> history);
-  Future<ReaderStructureIndex?> loadStructureIndex({
-    required String bookId,
-    required int contentLength,
-    required String contentHash,
-  });
-  Future<void> saveStructureIndex({
-    required String bookId,
-    required ReaderStructureIndex index,
-  });
 }
 
 class LocalReaderRepository implements ReaderRepository {
   LocalReaderRepository(this._storage);
 
   final LocalStorage _storage;
+  Map<String, ReadingProgress>? _allProgressCache;
+  bool _allProgressDirty = true;
+  List<String>? _recentBookIdsCache;
 
   String _keyFor(String bookId) =>
       '${AppConstants.readingProgressPrefix}$bookId';
@@ -63,11 +54,17 @@ class LocalReaderRepository implements ReaderRepository {
   @override
   Future<void> saveProgress(ReadingProgress progress) async {
     await _storage.setString(_keyFor(progress.bookId), progress.toRaw());
+    _allProgressCache ??= <String, ReadingProgress>{};
+    _allProgressCache![progress.bookId] = progress;
+    _allProgressDirty = false;
     await _touchRecentBook(progress.bookId);
   }
 
   @override
   Future<Map<String, ReadingProgress>> loadAllProgress() async {
+    if (!_allProgressDirty && _allProgressCache != null) {
+      return Map<String, ReadingProgress>.from(_allProgressCache!);
+    }
     final entries = await _storage.getStringEntriesByPrefix(
       AppConstants.readingProgressPrefix,
     );
@@ -78,6 +75,8 @@ class LocalReaderRepository implements ReaderRepository {
         progressMap[parsed.bookId] = parsed;
       }
     }
+    _allProgressCache = progressMap;
+    _allProgressDirty = false;
     return progressMap;
   }
 
@@ -110,17 +109,25 @@ class LocalReaderRepository implements ReaderRepository {
 
   @override
   Future<List<String>> loadRecentBookIds() async {
+    if (_recentBookIdsCache != null) {
+      return List<String>.from(_recentBookIdsCache!);
+    }
     final raw = await _storage.getString(AppConstants.recentBooksKey);
     if (raw == null) {
+      _recentBookIdsCache = const <String>[];
       return const [];
     }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
+        _recentBookIdsCache = const <String>[];
         return const [];
       }
-      return decoded.whereType<String>().toList();
+      final ids = decoded.whereType<String>().toList();
+      _recentBookIdsCache = ids;
+      return List<String>.from(ids);
     } catch (_) {
+      _recentBookIdsCache = const <String>[];
       return const [];
     }
   }
@@ -164,130 +171,15 @@ class LocalReaderRepository implements ReaderRepository {
     );
   }
 
-  @override
-  Future<ReaderStructureIndex?> loadStructureIndex({
-    required String bookId,
-    required int contentLength,
-    required String contentHash,
-  }) async {
-    final fromFile = await _loadStructureIndexFromFile(
-      bookId: bookId,
-      contentLength: contentLength,
-      contentHash: contentHash,
-    );
-    if (fromFile != null) {
-      return fromFile;
-    }
-
-    // Legacy fallback: previously persisted in SharedPreferences.
-    final key = _structureIndexKeyFor(bookId);
-    final raw = await _storage.getString(key);
-    final parsed = _parseStructureIndexIfValid(
-      raw: raw,
-      contentLength: contentLength,
-      contentHash: contentHash,
-    );
-    if (parsed == null) {
-      return null;
-    }
-    await saveStructureIndex(bookId: bookId, index: parsed);
-    return parsed;
-  }
-
-  @override
-  Future<void> saveStructureIndex({
-    required String bookId,
-    required ReaderStructureIndex index,
-  }) async {
-    final payload = index.toRaw();
-    // Guard against pathological payload sizes.
-    if (payload.length > 8 * 1024 * 1024) {
-      return;
-    }
-    try {
-      final file = await _structureIndexFileFor(bookId);
-      await file.parent.create(recursive: true);
-      await file.writeAsString(payload, flush: true);
-    } catch (_) {
-      // Ignore write failures and continue without cache.
-    }
-  }
-
   Future<void> _touchRecentBook(String bookId) async {
     final ids = await loadRecentBookIds();
+    if (ids.isNotEmpty && ids.first == bookId) {
+      return;
+    }
     final updated = ids.where((id) => id != bookId).toList();
     updated.insert(0, bookId);
     final limited = updated.take(30).toList();
+    _recentBookIdsCache = limited;
     await _storage.setString(AppConstants.recentBooksKey, jsonEncode(limited));
-  }
-
-  String _structureIndexKeyFor(String bookId) {
-    return '${AppConstants.readerStructureIndexPrefix}$bookId';
-  }
-
-  Future<ReaderStructureIndex?> _loadStructureIndexFromFile({
-    required String bookId,
-    required int contentLength,
-    required String contentHash,
-  }) async {
-    try {
-      final file = await _structureIndexFileFor(bookId);
-      if (!await file.exists()) {
-        return null;
-      }
-      final raw = await file.readAsString();
-      final parsed = _parseStructureIndexIfValid(
-        raw: raw,
-        contentLength: contentLength,
-        contentHash: contentHash,
-      );
-      if (parsed == null) {
-        await file.delete();
-      }
-      return parsed;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  ReaderStructureIndex? _parseStructureIndexIfValid({
-    required String? raw,
-    required int contentLength,
-    required String contentHash,
-  }) {
-    if (raw == null || raw.trim().isEmpty) {
-      return null;
-    }
-    final parsed = ReaderStructureIndex.fromRaw(raw);
-    if (parsed == null) {
-      return null;
-    }
-    if (parsed.schemaVersion != ReaderStructureIndex.currentSchemaVersion) {
-      return null;
-    }
-    if (parsed.contentLength != contentLength ||
-        parsed.contentHash != contentHash) {
-      return null;
-    }
-    return parsed;
-  }
-
-  Future<File> _structureIndexFileFor(String bookId) async {
-    final baseDir = await getApplicationSupportDirectory();
-    final cacheDir = Directory('${baseDir.path}/reader_index_cache');
-    final safeId = _stableHash(bookId);
-    return File('${cacheDir.path}/$safeId.json');
-  }
-
-  String _stableHash(String value) {
-    // FNV-1a 32-bit: deterministic across app restarts.
-    const int fnvOffsetBasis = 0x811C9DC5;
-    const int fnvPrime = 0x01000193;
-    int hash = fnvOffsetBasis;
-    for (final codeUnit in value.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
   }
 }

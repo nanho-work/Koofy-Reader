@@ -84,7 +84,10 @@ class ReaderSpreadPaginationService {
 
     final fallbackStartOffset =
         (requestedAnchor -
-                (ReaderSpreadWindowService.doubleWindowMinChars ~/ 2))
+                (ReaderSpreadWindowService.windowMinCharsForLength(
+                      document.length,
+                    ) ~/
+                    2))
             .clamp(0, document.length)
             .toInt();
     final fallbackWindow = ReaderSpreadWindowService.buildWindow(
@@ -176,7 +179,7 @@ class ReaderSpreadPaginationService {
       maxWidth: textArea.width,
       maxHeight: textArea.height,
       style: style,
-      yieldEvery: 12,
+      yieldEvery: 24,
     );
     final globalPages = ReaderSpreadWindowService.toGlobalPaginatedText(
       localPages: localPages,

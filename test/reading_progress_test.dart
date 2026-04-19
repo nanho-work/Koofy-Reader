@@ -82,4 +82,24 @@ void main() {
     expect(decoded!.anchor, isNull);
     expect(decoded.contentOffset, 50);
   });
+
+  test('ReadingProgress parses numeric offsets from legacy payloads', () {
+    final raw = jsonEncode({
+      'bookId': 'book_num',
+      'positionRatio': 0.3,
+      'contentOffset': 42.9,
+      'doublePageStartOffset': 40.2,
+      'pageIndex': 2.0,
+      'totalPages': 10.0,
+      'updatedAt': 1700000000000,
+    });
+
+    final decoded = ReadingProgress.fromRaw(raw);
+
+    expect(decoded, isNotNull);
+    expect(decoded!.contentOffset, 42);
+    expect(decoded.doublePageStartOffset, 40);
+    expect(decoded.pageIndex, 2);
+    expect(decoded.totalPages, 10);
+  });
 }

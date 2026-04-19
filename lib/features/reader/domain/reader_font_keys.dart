@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/utils/hash_utils.dart';
+
 class ReaderFontKeys {
   const ReaderFontKeys._();
 
@@ -31,7 +33,7 @@ class ReaderFontKeys {
         if (assetPath == null || assetPath.isEmpty) {
           return 'sans-serif';
         }
-        return 'koofy_asset_font_${_stableHash(assetPath)}';
+        return 'koofy_asset_font_${HashUtils.fnv1a32(assetPath)}';
     }
   }
 
@@ -40,16 +42,5 @@ class ReaderFontKeys {
     final fileName = normalized.split('/').last;
     final noExt = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
     return noExt.replaceAll(RegExp(r'[_-]+'), ' ').trim();
-  }
-
-  static String _stableHash(String value) {
-    const int fnvOffsetBasis = 0x811C9DC5;
-    const int fnvPrime = 0x01000193;
-    int hash = fnvOffsetBasis;
-    for (final codeUnit in value.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
   }
 }

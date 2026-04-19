@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/utils/hash_utils.dart';
 import 'package:koofy_reader/features/reader/core/models/reader_text_document.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
 import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
@@ -10,14 +11,7 @@ class ReaderDocumentEngine {
   }
 
   String stableHash(String value) {
-    const int fnvOffsetBasis = 0x811C9DC5;
-    const int fnvPrime = 0x01000193;
-    int hash = fnvOffsetBasis;
-    for (final codeUnit in value.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
+    return HashUtils.fnv1a32(value);
   }
 
   ReaderTextDocument buildDocument({

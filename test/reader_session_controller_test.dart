@@ -66,6 +66,12 @@ class _FakeBookRepository implements BookRepository {
   Future<Book?> importBookFile(String path) async => null;
 
   @override
+  Future<bool> removeBookFromLibrary(String bookId) async => false;
+
+  @override
+  Future<bool> deleteLocalBook(String bookId) async => false;
+
+  @override
   Future<String> readBookContent(Book book) async => prepared.content;
 
   @override
@@ -100,13 +106,6 @@ class _FakeReaderRepository implements ReaderRepository {
   Future<List<String>> loadSearchHistory() async => const <String>[];
 
   @override
-  Future<ReaderStructureIndex?> loadStructureIndex({
-    required String bookId,
-    required int contentLength,
-    required String contentHash,
-  }) async => null;
-
-  @override
   Future<void> saveBookmarks(String bookId, Set<int> pages) async {}
 
   @override
@@ -114,10 +113,4 @@ class _FakeReaderRepository implements ReaderRepository {
 
   @override
   Future<void> saveSearchHistory(List<String> history) async {}
-
-  @override
-  Future<void> saveStructureIndex({
-    required String bookId,
-    required ReaderStructureIndex index,
-  }) async {}
 }

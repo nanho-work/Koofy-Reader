@@ -30,36 +30,56 @@ void main() {
     expect(resolved, 5);
   });
 
-  test(
-    'resolveOffset prefers locator global offset over anchor and contentOffset',
-    () {
-      final progress = ReadingProgress(
-        bookId: 'book',
-        positionRatio: 0.1,
-        contentOffset: 1,
-        updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
-        anchor: const ReadingAnchor(
-          chapterId: 'root',
-          paragraphIndex: 0,
-          charOffset: 0,
-        ),
-        locator: const ReadingLocator(
-          chapterId: 'root',
-          paragraphIndex: 2,
-          charOffset: 3,
-          globalOffset: 20,
-          progression: 0.8,
-        ),
-      );
+  test('resolveOffset prefers anchor over locator global offset', () {
+    final progress = ReadingProgress(
+      bookId: 'book',
+      positionRatio: 0.1,
+      contentOffset: 1,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      anchor: const ReadingAnchor(
+        chapterId: 'root',
+        paragraphIndex: 0,
+        charOffset: 0,
+      ),
+      locator: const ReadingLocator(
+        chapterId: 'root',
+        paragraphIndex: 2,
+        charOffset: 3,
+        globalOffset: 20,
+        progression: 0.8,
+      ),
+    );
 
-      final resolved = service.resolveOffset(
-        document: document,
-        progress: progress,
-      );
+    final resolved = service.resolveOffset(
+      document: document,
+      progress: progress,
+    );
 
-      expect(resolved, 20);
-    },
-  );
+    expect(resolved, 0);
+  });
+
+  test('resolveOffset uses locator anchor when explicit anchor is missing', () {
+    final progress = ReadingProgress(
+      bookId: 'book',
+      positionRatio: 0.1,
+      contentOffset: 1,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      locator: const ReadingLocator(
+        chapterId: 'root',
+        paragraphIndex: 2,
+        charOffset: 3,
+        globalOffset: 20,
+        progression: 0.8,
+      ),
+    );
+
+    final resolved = service.resolveOffset(
+      document: document,
+      progress: progress,
+    );
+
+    expect(resolved, 19);
+  });
 
   test(
     'resolveOffset falls back to ratio when anchor and offset are unusable',

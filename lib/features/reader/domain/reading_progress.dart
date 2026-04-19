@@ -178,15 +178,19 @@ class ReadingProgress {
         return null;
       }
       final safeRatio = ratio.toDouble().clamp(0.0, 1.0);
-      final safeContentOffset = contentOffset is int ? contentOffset : 0;
-      final safeTotalPages = totalPages is int ? totalPages : 0;
-      final safePageIndex = pageIndex is int ? pageIndex : 0;
+      final safeContentOffset = contentOffset is num
+          ? contentOffset.toInt()
+          : 0;
+      final safeTotalPages = totalPages is num ? totalPages.toInt() : 0;
+      final safePageIndex = pageIndex is num ? pageIndex.toInt() : 0;
       return ReadingProgress(
         bookId: bookId,
         positionRatio: safeRatio,
         contentOffset: safeContentOffset < 0 ? 0 : safeContentOffset,
-        doublePageStartOffset: doublePageStartOffset is int
-            ? (doublePageStartOffset < 0 ? 0 : doublePageStartOffset)
+        doublePageStartOffset: doublePageStartOffset is num
+            ? (doublePageStartOffset.toInt() < 0
+                  ? 0
+                  : doublePageStartOffset.toInt())
             : null,
         pageIndex: safePageIndex,
         totalPages: safeTotalPages,

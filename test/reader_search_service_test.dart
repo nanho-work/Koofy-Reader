@@ -24,7 +24,10 @@ void main() {
     expect(results.first.offset, greaterThan(0));
     expect(results.first.anchor.chapterId, 'ch_1');
     expect(results.first.locator.globalOffset, results.first.offset);
-    expect(results.first.locator.paragraphIndex, results.first.anchor.paragraphIndex);
+    expect(
+      results.first.locator.paragraphIndex,
+      results.first.anchor.paragraphIndex,
+    );
   });
 
   test('search excerpt includes surrounding text and ellipsis when needed', () {
@@ -49,5 +52,17 @@ void main() {
     ]);
 
     expect(normalized, ['Quick', 'fox', 'locator']);
+  });
+
+  test('search respects non-positive limit', () {
+    final document = buildDocument();
+
+    final results = service.search(
+      document: document,
+      query: 'quick',
+      limit: 0,
+    );
+
+    expect(results, isEmpty);
   });
 }

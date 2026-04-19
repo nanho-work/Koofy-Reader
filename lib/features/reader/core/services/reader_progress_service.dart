@@ -13,9 +13,10 @@ class ReaderProgressService {
       return null;
     }
 
-    if (progress.locator != null) {
-      final resolved = progress.locator!.globalOffset.clamp(0, document.length);
-      onResolved?.call('locatorOffset', resolved);
+    final fromAnchor = document.offsetFromAnchor(progress.anchor);
+    if (fromAnchor != null) {
+      final resolved = fromAnchor.clamp(0, document.length);
+      onResolved?.call('anchor', resolved);
       return resolved;
     }
 
@@ -27,10 +28,9 @@ class ReaderProgressService {
       return resolved;
     }
 
-    final fromAnchor = document.offsetFromAnchor(progress.anchor);
-    if (fromAnchor != null) {
-      final resolved = fromAnchor.clamp(0, document.length);
-      onResolved?.call('anchor', resolved);
+    if (progress.locator != null) {
+      final resolved = progress.locator!.globalOffset.clamp(0, document.length);
+      onResolved?.call('locatorOffset', resolved);
       return resolved;
     }
 

@@ -8,6 +8,7 @@ class AppConstants {
   static const String readerStructureIndexPrefix = 'reader_structure_index_';
   static const String localBooksKey = 'library_local_books';
   static const String localBooksBackupKey = 'library_local_books_backup';
+  static const String hiddenBooksKey = 'library_hidden_books';
   static const String storageSchemaVersionKey = 'storage_schema_version';
 
   static const int maxTxtBytes = 20 * 1024 * 1024;

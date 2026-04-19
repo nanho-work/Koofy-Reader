@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
+import 'package:koofy_reader/core/utils/hash_utils.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
 import 'package:koofy_reader/features/reader/domain/reader_structure_index.dart';
@@ -27,6 +28,8 @@ abstract class BookRepository {
   Future<PreparedBookContent> readPreparedBookContent(Book book);
   Future<String> readBookContent(Book book);
   Future<Book?> importBookFile(String path);
+  Future<bool> removeBookFromLibrary(String bookId);
+  Future<bool> deleteLocalBook(String bookId);
 }
 
 class PreparedBookContent {
@@ -59,9 +62,9 @@ class LocalBookRepository implements BookRepository {
     ),
     Book.asset(
       id: 'sample_2',
-      title: '리더 빌드 노트',
+      title: '사용 방법 안내',
       author: 'Koofy Team',
-      description: '북리더 MVP 설계와 개발 메모',
+      description: '앱 기능을 빠르게 익히는 사용자 가이드',
       assetPath: 'assets/books/sample_2.txt',
     ),
   ];
@@ -69,7 +72,11 @@ class LocalBookRepository implements BookRepository {
   @override
   Future<List<Book>> getBooks() async {
     final local = await _loadLocalBooks();
-    return [...local, ..._books];
+    final hiddenIds = await _loadHiddenBookIds();
+    final visibleSamples = _books
+        .where((book) => !hiddenIds.contains(book.id))
+        .toList(growable: false);
+    return [...local, ...visibleSamples];
   }
 
   @override
@@ -113,11 +120,6 @@ class LocalBookRepository implements BookRepository {
         sourceStamp: sourceStamp,
       );
       if (cached != null) {
-        await _writeNormalizedContentCache(
-          bookId: book.id,
-          sourceStamp: sourceStamp,
-          prepared: cached,
-        );
         _writeInMemoryContentCache(
           bookId: book.id,
           sourceStamp: sourceStamp,
@@ -206,11 +208,6 @@ class LocalBookRepository implements BookRepository {
       sourceStamp: sourceStamp,
     );
     if (cached != null) {
-      await _writeNormalizedContentCache(
-        bookId: book.id,
-        sourceStamp: sourceStamp,
-        prepared: cached,
-      );
       _writeInMemoryContentCache(
         bookId: book.id,
         sourceStamp: sourceStamp,
@@ -311,6 +308,38 @@ class LocalBookRepository implements BookRepository {
     return imported;
   }
 
+  @override
+  Future<bool> removeBookFromLibrary(String bookId) async {
+    final localDeleted = await deleteLocalBook(bookId);
+    if (localDeleted) {
+      return true;
+    }
+    final sampleExists = _books.any((book) => book.id == bookId);
+    if (!sampleExists) {
+      return false;
+    }
+    final hiddenIds = await _loadHiddenBookIds();
+    if (hiddenIds.add(bookId)) {
+      await _saveHiddenBookIds(hiddenIds);
+    }
+    await _clearPreparedContentCache(bookId);
+    return true;
+  }
+
+  @override
+  Future<bool> deleteLocalBook(String bookId) async {
+    final localBooks = await _loadLocalBooks();
+    final exists = localBooks.any((book) => book.id == bookId);
+    if (!exists) {
+      return false;
+    }
+
+    final next = localBooks.where((book) => book.id != bookId).toList();
+    await _saveLocalBooks(next);
+    await _clearPreparedContentCache(bookId);
+    return true;
+  }
+
   String _fileNameFromPath(String path) {
     final parts = path.split(RegExp(r'[\\/]'));
     return parts.isEmpty ? path : parts.last;
@@ -345,6 +374,27 @@ class LocalBookRepository implements BookRepository {
     final raw = jsonEncode(jsonList);
     await _storage.setString(AppConstants.localBooksKey, raw);
     await _storage.setString(AppConstants.localBooksBackupKey, raw);
+  }
+
+  Future<Set<String>> _loadHiddenBookIds() async {
+    final raw = await _storage.getString(AppConstants.hiddenBooksKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return <String>{};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return <String>{};
+      }
+      return decoded.whereType<String>().toSet();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  Future<void> _saveHiddenBookIds(Set<String> ids) async {
+    final sorted = ids.toList()..sort();
+    await _storage.setString(AppConstants.hiddenBooksKey, jsonEncode(sorted));
   }
 
   List<Book>? _decodeLocalBooks(String raw) {
@@ -594,7 +644,7 @@ class LocalBookRepository implements BookRepository {
     String? existingHash,
     ReaderStructureIndex? existingStructureIndex,
   }) {
-    final contentHash = existingHash ?? _stableHash(normalizedContent);
+    final contentHash = existingHash ?? HashUtils.fnv1a32(normalizedContent);
     final structureIndex =
         _isCompatibleStructureIndex(
           existingStructureIndex,
@@ -656,19 +706,20 @@ class LocalBookRepository implements BookRepository {
   Future<File> _contentCacheFileFor(String bookId) async {
     final baseDir = await getApplicationSupportDirectory();
     final cacheDir = Directory('${baseDir.path}/reader_content_cache');
-    final fileId = _stableHash(bookId);
+    final fileId = HashUtils.fnv1a32(bookId);
     return File('${cacheDir.path}/$fileId.json');
   }
 
-  String _stableHash(String value) {
-    const int fnvOffsetBasis = 0x811C9DC5;
-    const int fnvPrime = 0x01000193;
-    int hash = fnvOffsetBasis;
-    for (final codeUnit in value.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+  Future<void> _clearPreparedContentCache(String bookId) async {
+    _inMemoryContentCache.remove(bookId);
+    try {
+      final file = await _contentCacheFileFor(bookId);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Ignore cache cleanup failures.
     }
-    return hash.toRadixString(16).padLeft(8, '0');
   }
 }
 

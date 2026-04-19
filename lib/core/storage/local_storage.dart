@@ -14,7 +14,10 @@ abstract class LocalStorage {
 }
 
 class SharedPrefsLocalStorage implements LocalStorage {
-  Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+  final Future<SharedPreferences> _prefsFuture =
+      SharedPreferences.getInstance();
+
+  Future<SharedPreferences> get _prefs async => _prefsFuture;
 
   @override
   Future<String?> getString(String key) async {

@@ -3,7 +3,7 @@ import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
 import 'package:koofy_reader/features/reader/core/services/reader_content_indexer.dart';
 
 class ReaderTextDocument {
-  const ReaderTextDocument({
+  ReaderTextDocument({
     required this.content,
     required this.paragraphRanges,
     required this.chapterRanges,
@@ -27,6 +27,7 @@ class ReaderTextDocument {
   final String content;
   final List<ReaderParagraphRange> paragraphRanges;
   final List<ReaderChapterRange> chapterRanges;
+  late final String _searchContent = content.toLowerCase();
 
   int get length => content.length;
 
@@ -58,17 +59,19 @@ class ReaderTextDocument {
     if (content.isEmpty) {
       return const <int>[];
     }
+    if (limit <= 0) {
+      return const <int>[];
+    }
 
     final needle = query.trim().toLowerCase();
     if (needle.isEmpty) {
       return const <int>[];
     }
 
-    final haystack = content.toLowerCase();
     final offsets = <int>[];
     int cursor = 0;
-    while (cursor < haystack.length) {
-      final found = haystack.indexOf(needle, cursor);
+    while (cursor < _searchContent.length) {
+      final found = _searchContent.indexOf(needle, cursor);
       if (found < 0) {
         break;
       }

@@ -18,8 +18,18 @@ class ReaderProjectionService {
     if (content.isEmpty) {
       return 0;
     }
-    if (painter == null || !hasScrollClients) {
+    if (!hasScrollClients) {
       return fallbackOffset.clamp(0, content.length);
+    }
+    if (painter == null) {
+      if (maxScrollExtent <= 0) {
+        return fallbackOffset.clamp(0, content.length);
+      }
+      final effectiveScrollOffset = (scrollOffset +
+              (singleViewportHeight * viewportBias))
+          .clamp(0.0, maxScrollExtent);
+      final ratio = (effectiveScrollOffset / maxScrollExtent).clamp(0.0, 1.0);
+      return (ratio * content.length).round().clamp(0, content.length);
     }
     final effectiveScrollOffset = maxScrollExtent <= 0
         ? 0.0
@@ -44,8 +54,21 @@ class ReaderProjectionService {
     required double maxScrollExtent,
     required double singleViewportHeight,
   }) {
-    if (painter == null || content.isEmpty) {
+    if (content.isEmpty) {
       return 0;
+    }
+    if (painter == null) {
+      if (!hasScrollClients || maxScrollExtent <= 0) {
+        return 0;
+      }
+      final normalizedOffset = preserveRawOffset
+          ? contentOffset.clamp(0, content.length)
+          : ReaderPositionService.normalizeToLineStartOffset(
+              content: content,
+              offset: contentOffset,
+            );
+      final ratio = (normalizedOffset / content.length).clamp(0.0, 1.0);
+      return (ratio * maxScrollExtent).clamp(0.0, maxScrollExtent);
     }
     final clampedOffset = preserveRawOffset
         ? contentOffset.clamp(0, content.length)

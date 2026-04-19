@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 import 'package:koofy_reader/core/debug/debug_perf_logger.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -40,6 +40,8 @@ import 'package:koofy_reader/features/reader/presentation/widgets/reader_setting
 import 'package:koofy_reader/features/reader/presentation/widgets/reader_visuals.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+part 'reader_page_diagnostics.dart';
+
 class ReaderPage extends ConsumerStatefulWidget {
   const ReaderPage({super.key, required this.book});
 
@@ -51,6 +53,12 @@ class ReaderPage extends ConsumerStatefulWidget {
 
 class _ReaderPageState extends ConsumerState<ReaderPage>
     with WidgetsBindingObserver {
+  static const int _singleFullLayoutCharLimit = 120000;
+  static const int _singleForcedPreciseLayoutCharLimit = 450000;
+  // Fast path: avoid building full-document TextPainter in single mode.
+  // Offset projection falls back to ratio/line-start mapping when painter is null.
+  static const bool _useLightweightSingleProjection = true;
+
   late final ReaderEngine _readerEngine;
   late final ReaderSessionController _sessionController;
   final ReaderLocationController _locationController =
@@ -111,6 +119,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   int _progressPersistenceHoldCount = 0;
   VoidCallback? _modeTransitionPersistenceRelease;
   VoidCallback? _searchJumpPersistenceRelease;
+  VoidCallback? _doubleRestorePersistenceRelease;
   int _singleRestoreVerificationToken = 0;
   String? _lastViewportLogSignature;
   String? _lastDoubleViewportSettleSignature;
@@ -156,6 +165,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _doubleViewportSettleTimer?.cancel();
     _modeTransitionPersistenceRelease = null;
     _searchJumpPersistenceRelease = null;
+    _doubleRestorePersistenceRelease = null;
     _progressPersistenceHoldCount = 0;
     _modeTransitionApplyQueued = false;
     unawaited(_persistProgressNow(force: true));
@@ -445,130 +455,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     );
   }
 
-  void _tracePosition(
-    String event, {
-    int? offset,
-    ReadingAnchor? anchor,
-    String? details,
-  }) {
-    if (!kDebugMode) {
-      return;
-    }
-    final safeOffset = (offset ?? _lastKnownContentOffset).clamp(
-      0,
-      _content.length,
-    );
-    final safeAnchor = anchor ?? _buildAnchorForOffset(safeOffset);
-    final currentSpreadIndex = _spreadPages == null || _spreadPages!.length == 0
-        ? _spreadIndex
-        : _currentSpreadStartIndex();
-    final spreadStart =
-        (_spreadPages != null && _spreadPages!.ranges.isNotEmpty)
-        ? _spreadPages!
-              .ranges[currentSpreadIndex.clamp(0, _spreadPages!.length - 1)]
-              .start
-        : -1;
-    final mode = _isDoubleActive ? 'double' : 'single';
-    final suffix = details == null ? '' : ' details=$details';
-    debugPrint(
-      '[ReaderPos][$event] '
-      'mode=$mode '
-      'offset=$safeOffset '
-      'anchor=${safeAnchor.chapterId}/${safeAnchor.paragraphIndex}/${safeAnchor.charOffset} '
-      'pending=$_pendingAnchorOffset restored=$_restoredContentOffset '
-      'last=$_lastKnownContentOffset spreadIndex=$currentSpreadIndex spreadStart=$spreadStart '
-      'jumping=$_isSpreadJumping modeEpoch=$_modeEpoch$suffix',
-    );
-  }
-
-  void _traceViewportState({
-    required Size viewport,
-    required MediaQueryData mediaQueryData,
-    required bool requestedDoubleMode,
-  }) {
-    if (!kDebugMode || _content.isEmpty) {
-      return;
-    }
-    final signature = [
-      viewport.width.toStringAsFixed(1),
-      viewport.height.toStringAsFixed(1),
-      requestedDoubleMode ? 'double' : 'single',
-      _isDoubleActive ? 'double' : 'single',
-      mediaQueryData.padding.top.toStringAsFixed(1),
-      mediaQueryData.padding.bottom.toStringAsFixed(1),
-      mediaQueryData.viewInsets.bottom.toStringAsFixed(1),
-    ].join('|');
-    if (signature == _lastViewportLogSignature) {
-      return;
-    }
-    _lastViewportLogSignature = signature;
-    _tracePosition(
-      'viewport_state',
-      offset: _resolveStableAnchorOffset(),
-      details:
-          'viewport=${viewport.width.toStringAsFixed(1)}x${viewport.height.toStringAsFixed(1)} requested=${requestedDoubleMode ? 'double' : 'single'} active=${_isDoubleActive ? 'double' : 'single'} paddingTop=${mediaQueryData.padding.top.toStringAsFixed(1)} paddingBottom=${mediaQueryData.padding.bottom.toStringAsFixed(1)} insetBottom=${mediaQueryData.viewInsets.bottom.toStringAsFixed(1)}',
-    );
-  }
-
-  void _trackDoubleViewportStability({
-    required Size viewport,
-    required MediaQueryData mediaQueryData,
-    required bool requestedDoubleMode,
-  }) {
-    double bucket(double value, double step) =>
-        ((value / step).round() * step).toDouble();
-    if (!requestedDoubleMode && !_isDoubleActive) {
-      _doubleViewportSettleTimer?.cancel();
-      _lastDoubleViewportSettleSignature = null;
-      _isDoubleViewportSettling = false;
-      return;
-    }
-
-    final signature = [
-      bucket(viewport.width, 12).toStringAsFixed(0),
-      bucket(viewport.height, 12).toStringAsFixed(0),
-      bucket(mediaQueryData.padding.bottom, 4).toStringAsFixed(0),
-      bucket(mediaQueryData.viewInsets.bottom, 4).toStringAsFixed(0),
-      (requestedDoubleMode || _isDoubleActive) ? 'double' : 'single',
-    ].join('|');
-    if (signature == _lastDoubleViewportSettleSignature) {
-      return;
-    }
-    _lastDoubleViewportSettleSignature = signature;
-    _isDoubleViewportSettling = true;
-    _doubleViewportSettleTimer?.cancel();
-    _doubleViewportSettleTimer = Timer(const Duration(milliseconds: 180), () {
-      _isDoubleViewportSettling = false;
-      if (!mounted) {
-        return;
-      }
-      _tracePosition(
-        'double_viewport_stable',
-        offset: _restoredContentOffset ?? _lastKnownContentOffset,
-        details: 'signature=$signature',
-      );
-      _flushPendingSearchQueryIfPossible();
-      _flushPendingSearchJumpIfPossible();
-      _flushProgressPersistenceHolds(reason: 'double_viewport_stable');
-      if (_isDoubleActive) {
-        _scheduleProgressSave();
-        final shouldRebuild =
-            _pendingAnchorOffset != null ||
-            _spreadPages == null ||
-            _pendingSearchQuery != null ||
-            _pendingSearchJumpOffset != null;
-        if (shouldRebuild) {
-          setState(() {});
-        }
-      }
-    });
-    _tracePosition(
-      'double_viewport_settling',
-      offset: _restoredContentOffset ?? _lastKnownContentOffset,
-      details: 'signature=$signature',
-    );
-  }
-
   TextStyle _readerTextStyle(ReaderPalette palette) {
     return TextStyle(
       color: palette.text,
@@ -652,6 +538,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   void _ensureSingleTextLayout({
     required Size viewport,
     required TextStyle style,
+    bool forcePrecise = false,
   }) {
     if (_content.isEmpty || viewport.width <= 0 || viewport.height <= 0) {
       return;
@@ -660,7 +547,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       80.0,
       10000.0,
     );
-    final signature = [
+    final baseSignature = [
       _content.length,
       maxWidth.toStringAsFixed(2),
       style.fontFamily ?? '',
@@ -668,6 +555,66 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       style.height?.toStringAsFixed(3) ?? '',
       _settings.horizontalPadding.toStringAsFixed(2),
     ].join('|');
+    if (_useLightweightSingleProjection && !forcePrecise) {
+      final ratioSignature = '$baseSignature|ratio_projection';
+      if (_singleLayoutSignature != ratioSignature ||
+          _singleTextPainter != null) {
+        _singleTextPainter = null;
+        _singleLayoutSignature = ratioSignature;
+        _singleViewportHeight = viewport.height;
+        _tracePosition(
+          'single_layout_lightweight',
+          offset: _resolveStableAnchorOffset(),
+          details:
+              'chars=${_content.length} maxWidth=${maxWidth.toStringAsFixed(1)}',
+        );
+        DebugPerfLogger.log(
+          'ReaderPage',
+          'single_layout_lightweight',
+          details: <String, Object?>{
+            'chars': _content.length,
+            'width': maxWidth.toStringAsFixed(1),
+            'height': viewport.height.toStringAsFixed(1),
+          },
+        );
+      } else {
+        _singleViewportHeight = viewport.height;
+      }
+      return;
+    }
+    final sizeLimit = forcePrecise
+        ? _singleForcedPreciseLayoutCharLimit
+        : _singleFullLayoutCharLimit;
+    if (_content.length > sizeLimit) {
+      final ratioSignature = '$baseSignature|ratio_projection';
+      if (_singleLayoutSignature != ratioSignature ||
+          _singleTextPainter != null) {
+        _singleTextPainter = null;
+        _singleLayoutSignature = ratioSignature;
+        _singleViewportHeight = viewport.height;
+        _tracePosition(
+          'single_layout_skipped_large',
+          offset: _resolveStableAnchorOffset(),
+          details:
+              'chars=${_content.length} maxWidth=${maxWidth.toStringAsFixed(1)} limit=$sizeLimit forcePrecise=$forcePrecise',
+        );
+        DebugPerfLogger.log(
+          'ReaderPage',
+          'single_layout_skipped_large',
+          details: <String, Object?>{
+            'chars': _content.length,
+            'width': maxWidth.toStringAsFixed(1),
+            'height': viewport.height.toStringAsFixed(1),
+            'limit': sizeLimit,
+            'forcePrecise': forcePrecise,
+          },
+        );
+      } else {
+        _singleViewportHeight = viewport.height;
+      }
+      return;
+    }
+    final signature = baseSignature;
     if (_singleLayoutSignature == signature && _singleTextPainter != null) {
       _singleViewportHeight = viewport.height;
       return;
@@ -704,6 +651,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     return _currentLocationState().singleContentOffset;
   }
 
+  void _requestRebuild() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
   double _singleScrollOffsetForContentOffset(
     int contentOffset, {
     bool preserveRawOffset = false,
@@ -730,139 +684,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
 
   bool get _isProgressPersistenceHeld => _progressPersistenceHoldCount > 0;
 
-  VoidCallback _holdProgressPersistence(String reason) {
-    var released = false;
-    _progressPersistenceHoldCount++;
-    _tracePosition(
-      'progress_persist_hold',
-      details: 'reason=$reason depth=$_progressPersistenceHoldCount',
-    );
-    return () {
-      if (released) {
-        return;
-      }
-      released = true;
-      if (_progressPersistenceHoldCount > 0) {
-        _progressPersistenceHoldCount--;
-      }
-      _tracePosition(
-        'progress_persist_release',
-        details: 'reason=$reason depth=$_progressPersistenceHoldCount',
-      );
-      if (_progressPersistenceHoldCount == 0) {
-        _scheduleProgressSave();
-      }
-    };
-  }
-
-  void _releaseModeTransitionPersistenceHold({required String reason}) {
-    final release = _modeTransitionPersistenceRelease;
-    if (release == null) {
-      return;
-    }
-    _modeTransitionPersistenceRelease = null;
-    release();
-    _tracePosition('progress_persist_mode_released', details: 'reason=$reason');
-  }
-
-  void _releaseSearchJumpPersistenceHold({required String reason}) {
-    final release = _searchJumpPersistenceRelease;
-    if (release == null) {
-      return;
-    }
-    _searchJumpPersistenceRelease = null;
-    release();
-    _tracePosition(
-      'progress_persist_search_released',
-      details: 'reason=$reason',
-    );
-  }
-
-  void _flushProgressPersistenceHolds({required String reason}) {
-    if (_modeTransitionPersistenceRelease != null &&
-        !_isModeTransitioning &&
-        !_isDoubleViewportSettling &&
-        !_isSpreadPaginating &&
-        !_isSpreadJumping &&
-        _pendingAnchorOffset == null) {
-      _releaseModeTransitionPersistenceHold(reason: reason);
-    }
-    if (_searchJumpPersistenceRelease != null &&
-        !_isSearchDialogOpen &&
-        _pendingSearchQuery == null &&
-        _pendingSearchJumpOffset == null &&
-        !_isDoubleViewportSettling &&
-        !_isSpreadPaginating &&
-        !_isSpreadJumping) {
-      _releaseSearchJumpPersistenceHold(reason: reason);
-    }
-  }
-
-  int _normalizeSearchJumpOffset(int offset) {
-    if (_content.isEmpty) {
-      return 0;
-    }
-    final raw = offset.clamp(0, _content.length);
-    return ReaderPositionService.normalizeToLineStartOffset(
-      content: _content,
-      offset: raw,
-    ).clamp(0, _content.length);
-  }
-
-  void _queueSearchJump(int offset) {
-    _searchJumpPersistenceRelease ??= _holdProgressPersistence('search_jump');
-    _pendingSearchJumpOffset = _normalizeSearchJumpOffset(offset);
-    _tracePosition(
-      'search_jump_queued',
-      offset: _pendingSearchJumpOffset,
-      details: 'raw=$offset',
-    );
-    _flushPendingSearchJumpIfPossible();
-  }
-
-  void _flushPendingSearchQueryIfPossible() {
-    final pending = _pendingSearchQuery;
-    if (pending == null) {
-      return;
-    }
-    if (_isSearchDialogOpen ||
-        _isModeTransitioning ||
-        _isDoubleViewportSettling ||
-        _isSpreadPaginating ||
-        _isSpreadJumping) {
-      return;
-    }
-    _pendingSearchQuery = null;
-    _applySearchQueryNow(pending);
-  }
-
-  void _flushPendingSearchJumpIfPossible() {
-    final pending = _pendingSearchJumpOffset;
-    if (pending == null) {
-      return;
-    }
-    if (_isSearchDialogOpen ||
-        _isModeTransitioning ||
-        _isDoubleViewportSettling ||
-        _isSpreadPaginating ||
-        _isSpreadJumping) {
-      return;
-    }
-    _pendingSearchJumpOffset = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        _jumpToContentOffset(
-          pending,
-          animate: false,
-          preserveRawSingleOffset: false,
-        ),
-      );
-    });
-  }
-
   void _scheduleSingleRestoreVerification(
     int targetOffset, {
     required String reason,
@@ -875,7 +696,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           verificationToken != _singleRestoreVerificationToken) {
         return;
       }
-      if (!_scrollController.hasClients || _singleTextPainter == null) {
+      if (!_scrollController.hasClients) {
         return;
       }
       final expected = _normalizeToSingleRestoreOffset(
@@ -957,6 +778,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (_isSpreadJumping) {
       return;
     }
+    final isLikelyUserScroll =
+        _spreadScrollController.hasClients &&
+        _spreadScrollController.position.userScrollDirection !=
+            ScrollDirection.idle;
+    if (isLikelyUserScroll) {
+      _releaseDoubleRestorePersistenceHold(reason: 'double_spread_scroll');
+    }
     final logicalSpreadIndex = _currentSpreadStartIndex();
     _spreadIndex = logicalSpreadIndex;
     final pinned = _pinnedDoubleContentOffset;
@@ -1029,22 +857,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           _restoredScrollApplied = true;
           return;
         }
-        if (_singleTextPainter == null) {
-          attempts += 1;
-          if (attempts == 1 || attempts == maxAttempts) {
-            _tracePosition(
-              'restore_single_wait_layout',
-              offset: restoredOffsetRaw,
-              details: 'attempt=$attempts max=$maxAttempts',
-            );
-          }
-          if (attempts < maxAttempts) {
-            attemptRestore();
-            return;
-          }
-          _restoredScrollApplied = true;
-          return;
-        }
         final restoredOffset = restoredOffsetRaw.clamp(0, _content.length);
         final target = _restoredSingleScrollRatio != null
             ? (_restoredSingleScrollRatio! *
@@ -1093,8 +905,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                 ? _stableProgressOffset()
                 : _currentContentOffset())
             .clamp(0, _content.length);
-    final contentOffset = rawOffset;
     final isSingleActive = !_isDoubleActive;
+    final doublePageStartOffset = isSingleActive
+        ? null
+        : _currentDoublePageStartOffset();
+    final contentOffset = isSingleActive
+        ? rawOffset
+        : (doublePageStartOffset ?? rawOffset).clamp(0, _content.length);
     final offsetPx = isSingleActive && _scrollController.hasClients
         ? _scrollController.offset
         : null;
@@ -1105,10 +922,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         ? (maxExtentPx <= 0 ? 0.0 : (offsetPx / maxExtentPx).clamp(0.0, 1.0))
         : (_content.isEmpty
               ? 0.0
-              : (rawOffset / _content.length).clamp(0.0, 1.0));
-    final doublePageStartOffset = isSingleActive
-        ? null
-        : _currentDoublePageStartOffset();
+              : (contentOffset / _content.length).clamp(0.0, 1.0));
     _tracePosition(
       'save_progress',
       offset: contentOffset,
@@ -1158,6 +972,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     _lastKnownContentOffset = targetOffset;
 
     if (_isDoubleActive) {
+      _releaseDoubleRestorePersistenceHold(reason: 'double_jump_request');
       _pinnedDoubleContentOffset = targetOffset;
       final pages = _spreadPages;
       if (pages != null &&
@@ -1182,7 +997,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       return;
     }
 
-    if (_singleTextPainter == null || !_scrollController.hasClients) {
+    if (!_scrollController.hasClients) {
       _coordinatorState = _progressCoordinator
           .deferSingleJump(
             state: _coordinatorState,
@@ -1193,7 +1008,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       _tracePosition(
         'jump_request_single_deferred',
         offset: targetOffset,
-        details: 'layoutNotReady=true',
+        details: 'scrollNotReady=true',
       );
       return;
     }
@@ -1246,6 +1061,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     if (_isSpreadPaginating || _isSpreadJumping) {
       return;
     }
+    _releaseDoubleRestorePersistenceHold(reason: 'double_tap_navigation');
     _pinnedDoubleContentOffset = null;
     final pages = _spreadPages;
     if (pages == null || pages.length == 0) {
@@ -1428,11 +1244,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     // cannot overwrite the position during mode transitions.
     _spreadToken++;
     _activeSpreadSignature = null;
-    _spreadSignature = null;
+    // Clear stale forced-window anchors from previous jumps.
+    // Mode transitions should repaginate around the current anchor.
+    _pendingSpreadForceStartOffset = null;
     if (request.targetDoubleMode) {
-      // Prevent stale spread pages from flashing while transitioning.
-      _spreadPages = null;
-      _spreadIndex = 0;
+      // Keep last rendered spread pages until repagination is ready.
       _isSpreadPaginating = false;
     }
 
@@ -1451,21 +1267,26 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _coordinatorState = transitionApply.state;
         final applyMode = transitionApply.targetDoubleMode;
         final applyAnchor = transitionApply.anchorOffset;
+        if (!applyMode) {
+          _releaseDoubleRestorePersistenceHold(
+            reason: 'mode_transition_to_single',
+          );
+        }
         setState(() {
           _isDoubleActive = applyMode;
           if (applyMode) {
             _pinnedDoubleContentOffset = applyAnchor;
-            _spreadPages = null;
-            _spreadIndex = 0;
-            _spreadSignature = null;
-            _activeSpreadSignature = null;
+            final pages = _spreadPages;
+            if (pages != null &&
+                pages.length > 0 &&
+                _containsOffset(pages, applyAnchor)) {
+              _spreadIndex = _mapSpreadIndexByOffset(pages, applyAnchor);
+            } else if (pages == null || pages.length == 0) {
+              _spreadIndex = 0;
+            }
           } else {
             _pinnedDoubleContentOffset = null;
             _isSpreadPaginating = false;
-            _spreadPages = null;
-            _spreadIndex = 0;
-            _spreadSignature = null;
-            _activeSpreadSignature = null;
           }
         });
         _tracePosition(
@@ -1631,6 +1452,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         _flushProgressPersistenceHolds(reason: 'spread_paginate_done');
       } catch (_) {
         if (!mounted || token != _spreadToken) return;
+        _coordinatorState = _progressCoordinator.clearConsumedPendingAnchor(
+          _coordinatorState,
+        );
         setState(() {
           _isSpreadPaginating = false;
           _pendingSpreadForceStartOffset = null;
@@ -1929,9 +1753,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           ],
         ),
         body: _buildBody(palette),
-        bottomNavigationBar: presentationState.shouldShowFooterAd
-            ? const SafeArea(child: AdFooterWidget())
-            : null,
       ),
     );
   }
@@ -1985,6 +1806,20 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           mediaQueryData: mediaQueryData,
           requestedDoubleMode: requestedDoubleMode,
         );
+        final doubleMode = _isDoubleActive;
+        final freezeOutgoingSingleLayout =
+            !doubleMode && requestedDoubleMode != _isDoubleActive;
+        if (!doubleMode && !freezeOutgoingSingleLayout) {
+          final needsPreciseSingleLayout =
+              requestedDoubleMode != _isDoubleActive ||
+              _pendingAnchorOffset != null ||
+              _pendingSearchJumpOffset != null;
+          _ensureSingleTextLayout(
+            viewport: viewport,
+            style: style,
+            forcePrecise: needsPreciseSingleLayout,
+          );
+        }
         final modeTransitionRequest = _modeTransitionService.buildRequest(
           requestedDoubleMode: requestedDoubleMode,
           activeDoubleMode: _isDoubleActive,
@@ -2022,13 +1857,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
             });
           }
         }
-        final doubleMode = _isDoubleActive;
-        final freezeOutgoingSingleLayout =
-            !doubleMode && requestedDoubleMode != _isDoubleActive;
-        if (!doubleMode && !freezeOutgoingSingleLayout) {
-          _ensureSingleTextLayout(viewport: viewport, style: style);
-        }
-
         if (doubleMode) {
           final doubleRestore = _progressCoordinator.beginDoubleRestore(
             state: _coordinatorState,
@@ -2038,6 +1866,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
           );
           _coordinatorState = doubleRestore.state;
           if (doubleRestore.targetOffset != null) {
+            _ensureDoubleRestorePersistenceHold(reason: 'double_restore');
             _pinnedDoubleContentOffset = doubleRestore.targetOffset;
             _tracePosition(
               'double_restore_pending_set',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/features/ads/presentation/app_footer_ad_shell.dart';
 import 'package:koofy_reader/app/router.dart';
 
 class KoofyReaderApp extends StatelessWidget {
@@ -14,6 +15,9 @@ class KoofyReaderApp extends StatelessWidget {
       ),
       initialRoute: AppRoutes.library,
       onGenerateRoute: AppRouter.onGenerateRoute,
+      builder: (context, child) {
+        return AppFooterAdShell(child: child ?? const SizedBox.shrink());
+      },
     );
   }
 }

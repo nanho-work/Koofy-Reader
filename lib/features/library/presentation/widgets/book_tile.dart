@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 
 class BookTile extends StatelessWidget {
-  const BookTile({super.key, required this.book, required this.onTap});
+  const BookTile({
+    super.key,
+    required this.book,
+    required this.onTap,
+    this.onLongPress,
+    this.showDeleteButton = false,
+    this.onDeleteTap,
+  });
 
   final Book book;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool showDeleteButton;
+  final VoidCallback? onDeleteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +30,7 @@ class BookTile extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: onTap,
+              onLongPress: onLongPress,
               child: Ink(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -37,42 +48,70 @@ class BookTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact =
-                        constraints.maxWidth < 96 ||
-                        constraints.maxHeight < 120;
-                    return Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        compact ? 8 : 12,
-                        compact ? 8 : 10,
-                        compact ? 8 : 12,
-                        compact ? 8 : 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Spacer(),
-                          Text(
-                            book.title,
-                            maxLines: compact ? 2 : 3,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                (compact
-                                        ? Theme.of(context).textTheme.labelLarge
-                                        : Theme.of(
-                                            context,
-                                          ).textTheme.titleMedium)
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.2,
-                                    ),
+                child: Stack(
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact =
+                            constraints.maxWidth < 96 ||
+                            constraints.maxHeight < 120;
+                        return Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            compact ? 8 : 12,
+                            compact ? 8 : 10,
+                            compact ? 8 : 12,
+                            compact ? 8 : 12,
                           ),
-                        ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Spacer(),
+                              Text(
+                                book.title,
+                                maxLines: compact ? 2 : 3,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    (compact
+                                            ? Theme.of(
+                                                context,
+                                              ).textTheme.labelLarge
+                                            : Theme.of(
+                                                context,
+                                              ).textTheme.titleMedium)
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.2,
+                                        ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    if (showDeleteButton && onDeleteTap != null)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Material(
+                          color: const Color(0xCC1F1F1F),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: onDeleteTap,
+                            child: const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                  ],
                 ),
               ),
             ),
