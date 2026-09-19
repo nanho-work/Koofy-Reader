@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 
 class AppFooterAdShell extends StatelessWidget {
@@ -16,11 +18,17 @@ class AppFooterAdShell extends StatelessWidget {
     if (!showFooterAd) {
       return child;
     }
-    return Column(
-      children: [
-        Expanded(child: child),
-        const SafeArea(top: false, child: AdFooterWidget()),
-      ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: KoofyTheme.systemStyle(Theme.of(context).brightness),
+      child: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: Column(
+          children: [
+            Expanded(child: child),
+            const SafeArea(top: false, child: AdFooterWidget()),
+          ],
+        ),
+      ),
     );
   }
 }

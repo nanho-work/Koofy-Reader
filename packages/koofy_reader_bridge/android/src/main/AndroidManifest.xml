@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="com.koofy.reader.bridge.ReaderActivity"
+            android:exported="false"
+            android:theme="@style/KoofyReaderTheme"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

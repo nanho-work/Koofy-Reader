@@ -1,6 +1,32 @@
 # Koofy-Reader
 
-Koofy Reader Flutter app (Android first, iOS later).
+현재 UI와 공통 테마 구현: [UI 디자인 적용 문서](docs/ui-design-implementation.md).
+
+Koofy Reader is a Flutter app targeting Android and iOS.
+
+## Architecture and refactoring
+
+The Flutter library opens the official native Readium reader on Android and iOS.
+All reading entry points use Readium. The former Flutter renderer and its engine
+selection/fallback paths have been removed. Prior reading positions and bookmarks
+are archived; verified TXT positions migrate to content locators, while ambiguous
+records require the user to review their previous context before opening.
+
+- [Readium 단일 리더 전환과 검증](docs/readium-cutover.md) — current implementation
+- [아키텍처와 기술 결정](docs/reader-architecture.md)
+- [구현 단계와 검증 기준](docs/reader-validation-plan.md)
+- [네이티브 리더 패치와 실행 방법](docs/reader-g1-implementation.md)
+- [메인 서재 UI와 이어 읽기 연결](docs/library-home-implementation.md)
+- [미사용 기존 코드 정리](docs/unused-code-cleanup.md)
+- [이전 자체 엔진 설계 기록](docs/reader-core-reference-plan.md) — historical reference
+
+Validate both platforms from the first reader integration milestone. Passing
+the existing unit tests does not establish that real-device reading works.
+
+Use Flutter 3.35.7 / Dart 3.9.2 (see `.fvmrc`). The native reader requires
+Android API 24+ or iOS 15+. Run `flutter pub get`, then `pod install` in `ios`
+for iOS. Regenerate the three bridge bindings together with
+`dart run pigeon --input pigeons/reader_api.dart` after changing the contract.
 
 ## AdMob policy in this repository
 

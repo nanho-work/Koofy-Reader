@@ -1,211 +1,192 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+
+class BookCover extends StatelessWidget {
+  const BookCover({
+    super.key,
+    required this.book,
+    this.compact = false,
+    this.bottomInset = 0,
+  });
+  final Book book;
+  final bool compact;
+  final double bottomInset;
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = [
+      Color(0xFF365347),
+      Color(0xFF665742),
+      Color(0xFF506176),
+      Color(0xFF835747),
+      Color(0xFF515B49),
+    ];
+    final index =
+        book.id.codeUnits.fold(0, (sum, unit) => sum + unit) % colors.length;
+    return Semantics(
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors[index],
+          borderRadius: const BorderRadius.horizontal(
+            right: Radius.circular(8),
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x16000000),
+              blurRadius: 8,
+              offset: Offset(3, 4),
+            ),
+          ],
+          border: const Border(
+            left: BorderSide(color: Color(0x22FFFFFF), width: 4),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            compact ? 8 : 16,
+            compact ? 10 : 16,
+            compact ? 8 : 16,
+            (compact ? 10 : 16) + bottomInset,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  book.title,
+                  maxLines: compact ? 3 : 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFFFFF5DF),
+                    fontSize: compact ? 15 : 20,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              if (!compact)
+                const Text(
+                  'KOOFY',
+                  style: TextStyle(
+                    color: Color(0xFFFFF5DF),
+                    fontSize: 10,
+                    letterSpacing: 2,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class BookTile extends StatelessWidget {
   const BookTile({
     super.key,
     required this.book,
     required this.onTap,
-    this.onLongPress,
-    this.showDeleteButton = false,
-    this.onDeleteTap,
+    required this.onMore,
+    required this.statusLabel,
   });
-
   final Book book;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final bool showDeleteButton;
-  final VoidCallback? onDeleteTap;
+  final VoidCallback? onTap;
+  final VoidCallback onMore;
+  final String statusLabel;
 
   @override
-  Widget build(BuildContext context) {
-    final gradient = _coverGradient(book.title);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: onTap,
-              onLongPress: onLongPress,
-              child: Ink(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: gradient,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 140;
+      final scaler = MediaQuery.textScalerOf(context);
+      final titleStyle = Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(height: 1.35);
+      final statusStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+        height: 1.4,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      );
+      final titleHeight = scaler.scale(titleStyle?.fontSize ?? 14) * 1.35 * 2;
+      final statusHeight = scaler.scale(statusStyle?.fontSize ?? 12) * 1.4 * 2;
+      final title = Text(
+        book.title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: titleStyle,
+      );
+      final more = SizedBox(
+        width: 44,
+        height: 48,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          tooltip: '${book.title} 더보기',
+          onPressed: onMore,
+          icon: Icon(
+            Icons.more_horiz,
+            size: 20,
+            color: compact ? const Color(0xFFFFF5DF) : null,
+          ),
+        ),
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Semantics(
+                  label: '${book.title}, ${book.author}, $statusLabel',
+                  button: true,
+                  child: InkWell(
+                    onTap: onTap,
+                    onLongPress: onMore,
+                    child: ExcludeSemantics(
+                      child: BookCover(
+                        book: book,
+                        compact: compact,
+                        bottomInset: compact ? 38 : 0,
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0x22000000)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x26000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
                 ),
-                child: Stack(
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact =
-                            constraints.maxWidth < 96 ||
-                            constraints.maxHeight < 120;
-                        return Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            compact ? 8 : 12,
-                            compact ? 8 : 10,
-                            compact ? 8 : 12,
-                            compact ? 8 : 12,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Spacer(),
-                              Text(
-                                book.title,
-                                maxLines: compact ? 2 : 3,
-                                overflow: TextOverflow.ellipsis,
-                                style:
-                                    (compact
-                                            ? Theme.of(
-                                                context,
-                                              ).textTheme.labelLarge
-                                            : Theme.of(
-                                                context,
-                                              ).textTheme.titleMedium)
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.2,
-                                        ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    if (showDeleteButton && onDeleteTap != null)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Material(
-                          color: const Color(0xCC1F1F1F),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: onDeleteTap,
-                            child: const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Icon(
-                                Icons.close,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                if (compact) Positioned(right: 0, bottom: 0, child: more),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: compact ? titleHeight : math.max(48, titleHeight + 8),
+            child: compact
+                ? title
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: title,
                         ),
                       ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Container(
-          width: double.infinity,
-          height: 12,
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFDAB98B), Color(0xFFBE9666)],
-            ),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Color> _coverGradient(String seed) {
-    final base = seed.codeUnits.fold<int>(0, (acc, c) => (acc + c) % 360);
-    final h = base.toDouble();
-    final a = HSVColor.fromAHSV(1, h, 0.62, 0.62).toColor();
-    final b = HSVColor.fromAHSV(1, (h + 24) % 360, 0.68, 0.42).toColor();
-    return [a, b];
-  }
-}
-
-class AddBookTile extends StatelessWidget {
-  const AddBookTile({super.key, required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: onTap,
-              child: Ink(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF6E5A47), Color(0xFF4D3E31)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0x33000000)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x26000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white,
-                        size: 34,
-                      ),
+                      more,
                     ],
                   ),
-                ),
-              ),
+          ),
+          if (compact) const SizedBox(height: 4),
+          SizedBox(
+            height: statusHeight,
+            child: Text(
+              '${book.author} · $statusLabel',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: statusStyle,
             ),
           ),
-        ),
-        Container(
-          width: double.infinity,
-          height: 12,
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFDAB98B), Color(0xFFBE9666)],
-            ),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      ],
-    );
-  }
+        ],
+      );
+    },
+  );
 }

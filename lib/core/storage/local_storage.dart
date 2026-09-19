@@ -28,7 +28,7 @@ class SharedPrefsLocalStorage implements LocalStorage {
   @override
   Future<void> setString(String key, String value) async {
     final prefs = await _prefs;
-    await prefs.setString(key, value);
+    if (!await prefs.setString(key, value)) throw StateError('기록을 저장하지 못했습니다.');
   }
 
   @override
@@ -40,7 +40,7 @@ class SharedPrefsLocalStorage implements LocalStorage {
   @override
   Future<void> setInt(String key, int value) async {
     final prefs = await _prefs;
-    await prefs.setInt(key, value);
+    if (!await prefs.setInt(key, value)) throw StateError('설정을 저장하지 못했습니다.');
   }
 
   @override

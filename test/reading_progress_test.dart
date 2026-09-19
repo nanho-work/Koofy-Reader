@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:koofy_reader/features/reader/domain/reading_progress.dart';
+import 'package:koofy_reader/features/native_reader/migration/legacy_reading_progress.dart';
 
 void main() {
   test('ReadingProgress persists anchor and locator fields', () {

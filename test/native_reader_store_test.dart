@@ -1,0 +1,261 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart' show MigrationStrategy;
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
+import 'package:koofy_reader_bridge/koofy_reader_bridge.dart';
+
+ReaderEvent checkpoint(
+  ReaderSessionIdentity session, {
+  int sequence = 1,
+  String revision = 'r1',
+  String href = 'chapter.xhtml',
+}) => ReaderEvent(
+  protocolVersion: 1,
+  sessionId: session.id,
+  sessionGeneration: session.generation,
+  publicationId: 'book',
+  contentRevision: revision,
+  sequence: sequence,
+  kind: 'locationChanged',
+  locatorJson:
+      '{"href":"$href","type":"application/xhtml+xml","locations":{"progression":0.4}}',
+  preferences: defaultReaderPreferences(),
+);
+
+void main() {
+  test(
+    'v1 database upgrades without rewriting positions or inventing read dates',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'koofy-v1-upgrade-',
+      );
+      final file = File('${directory.path}/reader.sqlite');
+      final old = _V1ReaderStore(NativeDatabase(file));
+      await old.customStatement('INSERT INTO reader_counter VALUES (1, 1)');
+      await old.customStatement(
+        "INSERT INTO reader_sessions VALUES ('old', 1, 'book', 'r1')",
+      );
+      await old.customStatement(
+        'INSERT INTO reader_positions VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          'book',
+          'r1',
+          'old',
+          1,
+          4,
+          '{"href":"saved.xhtml"}',
+          preferencesToJson(defaultReaderPreferences()),
+        ],
+      );
+      await old.close();
+      final upgraded = NativeReaderStore(NativeDatabase(file));
+      try {
+        expect(
+          (await upgraded.loadPosition('book', 'r1')).locatorJson,
+          contains('saved.xhtml'),
+        );
+        final summary = (await upgraded.loadLibraryPositions()).single;
+        expect(summary.lastOpenedAt, isNull);
+        final session = await upgraded.beginSession('book', 'r1');
+        expect(session.generation, 2);
+        await upgraded.acceptCheckpoint(checkpoint(session));
+        expect(
+          (await upgraded.loadLibraryPositions()).single.lastOpenedAt,
+          isNotNull,
+        );
+      } finally {
+        await upgraded.close();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+  group('checkpoint commits', () {
+    late NativeReaderStore store;
+    setUp(() => store = NativeReaderStore(NativeDatabase.memory()));
+    tearDown(() => store.close());
+
+    test(
+      'library summary chooses newest committed revision and excludes failed opens',
+      () async {
+        final first = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(checkpoint(first));
+        final second = await store.beginSession('book', 'r2');
+        await store.acceptCheckpoint(
+          checkpoint(second, revision: 'r2', href: 'second.xhtml'),
+        );
+        await store.beginSession('book', 'r3');
+        await store.beginSession('failed-book', 'r1');
+        final summaries = await store.loadLibraryPositions();
+        expect(summaries, hasLength(1));
+        expect(summaries.single.locatorJson, contains('second.xhtml'));
+      },
+    );
+
+    test(
+      'late recovery uses original session time, not receipt time',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        await store.customStatement(
+          'UPDATE reader_sessions SET started_at=1234 WHERE session_id=?',
+          [session.id],
+        );
+        await store.acceptCheckpoint(checkpoint(session));
+        final first = (await store.loadLibraryPositions()).single;
+        expect(first.lastOpenedAt!.millisecondsSinceEpoch, 1234);
+        await store.acceptCheckpoint(checkpoint(session, sequence: 2));
+        expect(
+          (await store.loadLibraryPositions()).single.lastOpenedAt,
+          first.lastOpenedAt,
+        );
+      },
+    );
+
+    test(
+      'duplicate and delayed locations cannot replace a newer committed location',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(
+          checkpoint(session, sequence: 2, href: 'new.xhtml'),
+        );
+        await store.acceptCheckpoint(
+          checkpoint(session, sequence: 1, href: 'old.xhtml'),
+        );
+        await store.acceptCheckpoint(
+          checkpoint(session, sequence: 2, href: 'duplicate.xhtml'),
+        );
+        expect(
+          (await store.loadPosition('book', 'r1')).locatorJson,
+          contains('new.xhtml'),
+        );
+      },
+    );
+
+    test(
+      'a new session invalidates older location events even before first new event',
+      () async {
+        final oldSession = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(
+          checkpoint(oldSession, href: 'saved.xhtml'),
+        );
+        final newSession = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(
+          checkpoint(oldSession, sequence: 999, href: 'late.xhtml'),
+        );
+        expect(
+          (await store.loadPosition('book', 'r1')).locatorJson,
+          contains('saved.xhtml'),
+        );
+        await store.acceptCheckpoint(
+          checkpoint(newSession, href: 'current.xhtml'),
+        );
+        expect(
+          (await store.loadPosition('book', 'r1')).locatorJson,
+          contains('current.xhtml'),
+        );
+      },
+    );
+
+    test(
+      'revision mismatch and unknown sessions do not mutate stored state',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(checkpoint(session));
+        await expectLater(
+          store.acceptCheckpoint(checkpoint(session, revision: 'r2')),
+          throwsFormatException,
+        );
+        await expectLater(
+          store.acceptCheckpoint(
+            checkpoint(
+              const ReaderSessionIdentity(id: 'unknown', generation: 9),
+            ),
+          ),
+          throwsFormatException,
+        );
+        expect((await store.loadPosition('book', 'r2')).locatorJson, isNull);
+      },
+    );
+
+    test(
+      'preferences-only event retains the locator and close does not erase it',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(checkpoint(session));
+        final event = checkpoint(session, sequence: 2)
+          ..kind = 'preferencesChanged'
+          ..locatorJson = null
+          ..preferences = ReaderPreferences(
+            fontScale: 1.4,
+            columnCount: 2,
+            scroll: false,
+            theme: 'sepia',
+          );
+        await store.acceptCheckpoint(event);
+        final saved = await store.loadPosition('book', 'r1');
+        expect(saved.locatorJson, contains('chapter.xhtml'));
+        expect(saved.preferences.fontScale, 1.4);
+      },
+    );
+
+    test(
+      'malformed locator and invalid preferences fail transactionally',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        final bad = checkpoint(session)..locatorJson = '{}';
+        await expectLater(store.acceptCheckpoint(bad), throwsFormatException);
+        bad.locatorJson = '{"href":"chapter.xhtml"}';
+        bad.preferences!.fontScale = double.nan;
+        await expectLater(store.acceptCheckpoint(bad), throwsFormatException);
+        expect((await store.loadPosition('book', 'r1')).locatorJson, isNull);
+      },
+    );
+  });
+
+  test('session generation survives reopening the database file', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'koofy-reader-db-test-',
+    );
+    final path = File('${directory.path}/reader.sqlite');
+    try {
+      final first = NativeReaderStore(NativeDatabase(path));
+      final oldSession = await first.beginSession('book', 'r1');
+      await first.acceptCheckpoint(checkpoint(oldSession));
+      await first.close();
+      final reopened = NativeReaderStore(NativeDatabase(path));
+      try {
+        final newSession = await reopened.beginSession('book', 'r1');
+        expect(newSession.generation, greaterThan(oldSession.generation));
+        expect(
+          (await reopened.loadPosition('book', 'r1')).locatorJson,
+          contains('chapter.xhtml'),
+        );
+      } finally {
+        await reopened.close();
+      }
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+}
+
+class _V1ReaderStore extends NativeReaderStore {
+  _V1ReaderStore(super.executor);
+  @override
+  int get schemaVersion => 1;
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (_) async {
+      await customStatement(
+        'CREATE TABLE reader_counter (id INTEGER PRIMARY KEY, generation INTEGER NOT NULL)',
+      );
+      await customStatement(
+        'CREATE TABLE reader_sessions (session_id TEXT PRIMARY KEY, generation INTEGER NOT NULL UNIQUE, publication_id TEXT NOT NULL, content_revision TEXT NOT NULL)',
+      );
+      await customStatement(
+        'CREATE TABLE reader_positions (publication_id TEXT NOT NULL, content_revision TEXT NOT NULL, session_id TEXT NOT NULL, generation INTEGER NOT NULL, sequence INTEGER NOT NULL, locator_json TEXT, preferences_json TEXT NOT NULL, PRIMARY KEY(publication_id, content_revision))',
+      );
+    },
+  );
+}

@@ -15,12 +15,12 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: KoofyReaderApp()));
     for (int i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.text('쿠피 리더').evaluate().isNotEmpty) {
+      if (find.text('내 서재').evaluate().isNotEmpty) {
         break;
       }
     }
 
-    expect(find.text('쿠피 리더'), findsOneWidget);
+    expect(find.text('내 서재'), findsOneWidget);
     expect(find.byType(AppBar), findsOneWidget);
   });
 }

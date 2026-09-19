@@ -75,11 +75,14 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Text(
+        _errorText ?? '광고 불러오는 중…',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
-      child: Text(_errorText ?? '광고 로딩중...', textAlign: TextAlign.center),
     );
   }
 }

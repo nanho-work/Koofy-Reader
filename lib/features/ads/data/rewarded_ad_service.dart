@@ -14,8 +14,6 @@ class RewardedAdService {
   RewardedAd? _rewardedAd;
   bool _isLoading = false;
 
-  bool get isReady => _rewardedAd != null;
-
   Future<void> load() async {
     if (_isLoading || _rewardedAd != null) return;
 

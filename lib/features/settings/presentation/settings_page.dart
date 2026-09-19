@@ -25,11 +25,11 @@ class SettingsPage extends ConsumerWidget {
             data: (state) {
               final hiddenUntil = state.hiddenUntil;
               final hiddenText = hiddenUntil == null
-                  ? '비활성'
+                  ? '사용 안 함'
                   : DateFormat(
                       'yyyy-MM-dd HH:mm',
                     ).format(hiddenUntil.toLocal());
-              return Text('상단 광고 숨김 만료: $hiddenText');
+              return Text('광고 숨김: $hiddenText');
             },
           ),
           const SizedBox(height: 16),
@@ -38,7 +38,7 @@ class SettingsPage extends ConsumerWidget {
             runSpacing: 8,
             children: AppConstants.adRewardHourOptions
                 .map((hours) {
-                  final label = Text('보상형 $hours시간');
+                  final label = Text('광고 보고 $hours시간 숨기기');
                   if (hours == AppConstants.adRewardHourOptions.first) {
                     return FilledButton(
                       onPressed: () => _runRewardedFlow(context, ref, hours),
@@ -74,7 +74,7 @@ class SettingsPage extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('보상 적용 완료: $hours시간')));
+      ).showSnackBar(SnackBar(content: Text('광고를 $hours시간 동안 숨깁니다.')));
       return;
     }
 

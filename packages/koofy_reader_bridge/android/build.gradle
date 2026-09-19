@@ -1,0 +1,35 @@
+group = 'com.koofy.reader.bridge'
+version = '1.0'
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace = 'com.koofy.reader.bridge'
+    sourceSets.main.assets.srcDirs += ['../ios/Resources']
+    compileSdk = 36
+    defaultConfig {
+        minSdk = 23
+        targetSdk = 36
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    compileOptions {
+        coreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions { jvmTarget = '11' }
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    // Use the stable Fragment navigator; do not silently upgrade to Compose previews.
+    implementation 'org.readium.kotlin-toolkit:readium-shared:3.1.2'
+    implementation 'org.readium.kotlin-toolkit:readium-streamer:3.1.2'
+    implementation 'org.readium.kotlin-toolkit:readium-navigator:3.1.2'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.window:window:1.4.0'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

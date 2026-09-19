@@ -1,0 +1,5 @@
+{
+  "light": {"background": "FFFDF8", "foreground": "26382D", "secondary": "657060", "panel": "EEEFE7", "accent": "345641"},
+  "sepia": {"background": "F7F4ED", "foreground": "26382D", "secondary": "687265", "panel": "EAECE2", "accent": "345641"},
+  "dark": {"background": "202520", "foreground": "EDECE3", "secondary": "B3BBAE", "panel": "2C332D", "accent": "AECAB1"}
+}

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/presentation/library_page.dart';
-import 'package:koofy_reader/features/reader/presentation/reader_page.dart';
+import 'package:koofy_reader/features/native_reader/presentation/native_reader_launch_page.dart';
 import 'package:koofy_reader/features/settings/presentation/settings_page.dart';
 
 class AppRoutes {
   static const String library = '/';
   static const String reader = '/reader';
+  static const String nativeReader = '/reader/native';
   static const String settings = '/settings';
 }
 
@@ -19,10 +20,11 @@ class AppRouter {
           settings: settings,
         );
       case AppRoutes.reader:
-        final argument = settings.arguments;
-        if (argument is Book) {
+      case AppRoutes.nativeReader:
+        final book = settings.arguments;
+        if (book is Book) {
           return MaterialPageRoute<void>(
-            builder: (_) => ReaderPage(book: argument),
+            builder: (_) => NativeReaderLaunchPage(book: book),
             settings: settings,
           );
         }

@@ -19,39 +19,21 @@ class AdFooterWidget extends ConsumerWidget {
     final connectivityAsync = ref.watch(connectivityResultsProvider);
 
     return adStateAsync.when(
-      loading: () => _AdBox(
-        message: '광고 상태 확인중...',
-        backgroundColor: Colors.grey.shade100,
-      ),
-      error: (_, _) => _AdBox(
-        message: '광고 정보를 불러오지 못했습니다.',
-        backgroundColor: Colors.red.shade50,
-      ),
+      loading: () => _AdBox(message: '광고 상태 확인중...'),
+      error: (_, _) => _AdBox(message: '광고 정보를 불러오지 못했습니다.'),
       data: (adState) {
         if (adState.isBannerHidden) {
-          return _AdBox(
-            message: '보상 적용중: 상단 광고 숨김',
-            backgroundColor: Colors.green.shade50,
-          );
+          return _AdBox(message: '광고 숨김 적용 중');
         }
         return connectivityAsync.when(
-          loading: () => _AdBox(
-            message: '광고 로딩중...',
-            backgroundColor: Colors.blue.shade50,
-          ),
-          error: (_, _) => _AdBox(
-            message: '네트워크 상태 확인 실패',
-            backgroundColor: Colors.grey.shade100,
-          ),
+          loading: () => _AdBox(message: '광고 로딩중...'),
+          error: (_, _) => _AdBox(message: '네트워크 상태 확인 실패'),
           data: (results) {
             final connected = results.any((e) => e != ConnectivityResult.none);
             if (connected) {
               return const BannerAdWidget();
             }
-            return _AdBox(
-              message: '네트워크 연결 필요',
-              backgroundColor: Colors.grey.shade100,
-            );
+            return _AdBox(message: '네트워크 연결 필요');
           },
         );
       },
@@ -60,25 +42,22 @@ class AdFooterWidget extends ConsumerWidget {
 }
 
 class _AdBox extends StatelessWidget {
-  const _AdBox({required this.message, required this.backgroundColor});
+  const _AdBox({required this.message});
 
   final String message;
-  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Text(
         message,
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }

@@ -1,11 +1,18 @@
 # Reader Core Reference Plan
 
+> Historical reference — superseded on 2026-09-19 by
+> [Koofy Reader Architecture](reader-architecture.md) and
+> [Reader Validation Plan](reader-validation-plan.md).
+> This document describes the earlier custom Flutter text-engine refactor.
+> Some items listed as future work already exist in the code. Its preservation
+> and implementation priorities are not the current migration instructions.
+
 ## Goal
 
 Rebuild the reader core around patterns that are already proven in stable reader
 projects, instead of continuing with ad-hoc state fixes.
 
-This document is the implementation baseline for the next reader refactor.
+This document was the implementation baseline for the earlier reader refactor.
 
 ## Reference Repositories
 
