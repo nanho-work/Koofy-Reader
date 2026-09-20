@@ -9,8 +9,9 @@
     "build": "tsc",
     "test": "npm run build && node --test lib/test/*.test.js",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,storage",
-    "deploy": "npm run build && firebase deploy --only functions,firestore,storage --project koofy-reader",
-    "test:emulator": "npm run build && cd .. && firebase emulators:exec --project demo-koofy-reader --only auth,firestore,storage \"node --test functions/test/emulator-runner.cjs\""
+    "deploy": "npm run build && firebase deploy --only functions:reader,firestore,storage --project koofy-reader",
+    "test:emulator": "npm run build && cd .. && firebase emulators:exec --project demo-koofy-reader --only auth,firestore,storage \"node --test functions/test/emulator-runner.cjs\"",
+    "verify:live": "node ../tool/verify_reader_backend.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^5.5.8",
