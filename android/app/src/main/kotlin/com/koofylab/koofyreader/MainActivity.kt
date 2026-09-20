@@ -1,4 +1,4 @@
-package com.example.koofy_reader
+package com.koofylab.koofyreader
 
 import io.flutter.embedding.android.FlutterActivity
 

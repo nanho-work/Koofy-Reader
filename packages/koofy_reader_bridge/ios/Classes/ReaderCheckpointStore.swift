@@ -90,6 +90,8 @@ private struct Checkpoint: Codable {
     let columnCount: Int64?
     let scroll: Bool?
     let theme: String?
+    let pageTurnStyle: String?
+    let fontId: String?
     let errorCode: String?
     let message: String?
 
@@ -106,6 +108,8 @@ private struct Checkpoint: Codable {
         columnCount = event.preferences?.columnCount
         scroll = event.preferences?.scroll
         theme = event.preferences?.theme
+        pageTurnStyle = event.preferences?.pageTurnStyle
+        fontId = event.preferences?.fontId
         errorCode = event.errorCode
         message = event.message
     }
@@ -113,7 +117,8 @@ private struct Checkpoint: Codable {
     var event: ReaderEvent {
         var preferences: ReaderPreferences?
         if let fontScale, let columnCount, let scroll, let theme {
-            preferences = ReaderPreferences(fontScale: fontScale, columnCount: columnCount, scroll: scroll, theme: theme)
+            preferences = ReaderPreferences(fontScale: fontScale, columnCount: columnCount, scroll: scroll,
+                theme: theme, pageTurnStyle: pageTurnStyle, fontId: fontId)
         }
         return ReaderEvent(protocolVersion: protocolVersion, sessionId: sessionId,
             sessionGeneration: sessionGeneration, publicationId: publicationId,

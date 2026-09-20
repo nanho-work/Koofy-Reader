@@ -78,6 +78,85 @@ class ReaderRenderingTest {
         assertNotNull(ReaderRuntime.session?.locatorJson)
     }
 
+    @Test fun localFontsLoadRealFacesPreserveAnchorAndRefreshCurl() {
+        createFixture(fixture, fontFaces = true)
+        launch(preferences = ReaderPreferences(1.0, 0, false, "sepia", "curl", "maplestory"))
+        val original = ReaderRuntime.session!!.locatorJson!!
+        val faces = snapshot("""JSON.stringify((function(){
+            document.fonts.load('700 16px "KoofyMaplestory"', '한글 Bold');
+            return {family:getComputedStyle(document.querySelector('p')).fontFamily};
+        })())""")
+        assertTrue(faces.getString("family").contains("KoofyMaplestory"))
+        awaitCondition("Maple Light and Bold must load real local OTFs") {
+            snapshot("""JSON.stringify({loaded:Array.from(document.fonts).filter(f=>f.family.includes('KoofyMaplestory')&&f.status==='loaded').map(f=>f.weight).sort().join(',')})""")
+                .optString("loaded") == "300,700"
+        }
+        var prior = 0L
+        awaitCondition("Initial custom-font curl not prepared") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.next != null; prior = it.pageTurns!!.generation }
+            ready
+        }
+        scenario!!.onActivity {
+            it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(fontId = "hakgyoansim-siganpyo"))
+            assertNull(it.pageTurns!!.surfaces)
+        }
+        awaitCondition("School font did not load") {
+            snapshot("""JSON.stringify({family:getComputedStyle(document.querySelector('p')).fontFamily,loaded:Array.from(document.fonts).some(f=>f.family.includes('KoofySiganpyo')&&f.status==='loaded')})""")
+                .let { it.optString("family").contains("KoofySiganpyo") && it.optBoolean("loaded") }
+        }
+        awaitCondition("Changed font images did not replace old images") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns!!.surfaces?.let { f -> f.generation > prior && f.next != null } == true }
+            ready
+        }
+        assertEquals(original, ReaderRuntime.session!!.locatorJson)
+        assertTrue(anchorVisible(original))
+        assertCurlMatchesBaseline()
+        val resume = ReaderRuntime.session!!.locatorJson!!
+        val savedPreferences = ReaderRuntime.session!!.preferences
+        scenario!!.close()
+        launch(initial = resume, preferences = savedPreferences)
+        assertEquals(resume, ReaderRuntime.session!!.locatorJson)
+        assertTrue(anchorVisible(resume))
+        assertTrue(snapshot("JSON.stringify({family:getComputedStyle(document.querySelector('p')).fontFamily})").getString("family").contains("KoofySiganpyo"))
+        scenario!!.onActivity { it.applyReaderPreferences(savedPreferences.copy(fontId = "default", pageTurnStyle = "instant", fontScale = 1.4, scroll = true)) }
+        awaitCondition("Default must restore the publication font") {
+            runCatching { !snapshot("JSON.stringify({family:getComputedStyle(document.querySelector('p')).fontFamily})").getString("family").contains("Koofy") }.getOrDefault(false)
+        }
+        assertTrue(anchorVisible(resume))
+    }
+
+    @Test fun downloadedFontCatalogLoadsVerifiedFacesAndSkipsCorruptOnes() {
+        val directory = File(context.cacheDir, "downloaded-font-test-${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            val bundled = ReaderFonts(context).families.first().faces.first()
+            val target = File(directory, bundled.file.name)
+            bundled.file.copyTo(target)
+            val id = "remote_" + "a".repeat(32)
+            File(directory, "catalog.json").writeText("""{"version":1,"families":[{"id":"$id","label":"다운로드 글꼴","cssFamily":"KoofyRemote_${"a".repeat(32)}","faces":[{"file":"${target.name}","weight":300,"sha256":"${target.nameWithoutExtension}"}]}]}""")
+            val loaded = ReaderFonts(context, directory)
+            assertTrue(loaded.optionIds.contains(id))
+            assertEquals("다운로드 글꼴", loaded.optionLabels[loaded.optionIds.indexOf(id)])
+            assertNotNull(loaded.family(id))
+            target.writeText("corrupted downloaded font")
+            val repaired = ReaderFonts(context, directory)
+            assertFalse(repaired.optionIds.contains(id))
+            assertTrue(repaired.optionIds.contains("maplestory"))
+            assertTrue(ReaderFonts.isValidId(id))
+            assertFalse(ReaderFonts.isValidId("remote_../escape"))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun corruptLocalFontIsRepairedFromVerifiedBundle() {
+        val installed = ReaderFonts(context)
+        val file = installed.families.first().faces.first().file
+        val original = file.readBytes()
+        file.writeText("interrupted download")
+        ReaderFonts(context)
+        assertArrayEquals(original, file.readBytes())
+    }
+
     @Test fun themeColorsMatchCanvasAndChromeWithoutMovingAnchor() {
         launch()
         val anchor = ReaderRuntime.session!!.locatorJson
@@ -165,7 +244,10 @@ class ReaderRenderingTest {
         for (cycle in 0 until 4) {
             val columns = if (cycle % 2 == 0) 2L else 1L
             scenario!!.onActivity { it.applyReaderPreferences(ReaderPreferences(1.0 + cycle * 0.1, columns, false, "light")) }
-            awaitCondition("Column reflow did not settle") { snapshot().getString("columns") == columns.toString() }
+            awaitCondition("Column reflow did not settle") {
+                val state = snapshot()
+                state.getString("columns") == (if (state.getInt("width") < 700) "1" else columns.toString())
+            }
             Thread.sleep(1200) // Include duplicate/late pagination notifications.
             assertEquals("Reflow rewrote the reading anchor", canonical, ReaderRuntime.session?.locatorJson)
             val session = requireNotNull(ReaderRuntime.session)
@@ -192,6 +274,198 @@ class ReaderRenderingTest {
         launch(anchor)
         assertTrue("Repeated text quote must not displace the DOM point", anchorVisible(anchor))
         assertEquals(anchor, ReaderRuntime.session?.locatorJson)
+    }
+
+    @Test fun curlUsesActualPagesCancelsWithoutCheckpointAndCommitsExactlyOnePage() {
+        launch(preferences = ReaderPreferences(1.0, 1, false, "light", "curl"))
+        awaitCondition("Independent page image provider did not prepare a next page") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.next != null }
+            ready
+        }
+        var target: String? = null
+        var sourceImage: android.graphics.Bitmap? = null
+        scenario!!.onActivity {
+            val frames = requireNotNull(it.pageTurns!!.surfaces)
+            sourceImage = frames.source.image
+            target = frames.next!!.locator.toJSON().toString()
+            assertNotEquals(frames.source.locator.toJSON().toString(), target)
+            val pixels = IntArray(frames.source.image.width * frames.source.image.height)
+            frames.source.image.getPixels(pixels, 0, frames.source.image.width, 0, 0,
+                frames.source.image.width, frames.source.image.height)
+            assertTrue("Source capture contains no rendered text", pixels.count {
+                android.graphics.Color.red(it) < 180 && android.graphics.Color.alpha(it) > 200
+            } > 100)
+            assertFalse("Adjacent image duplicates current page", frames.source.image.sameAs(frames.next!!.image))
+        }
+        val before = ReaderRuntime.session!!.locatorJson
+        val sequence = ReaderRuntime.session!!.sequence
+        dragPage(.87f, .34f, cancel = true, capture = true)
+        awaitCondition("Cancelled curl did not become idle") {
+            var idle = false
+            scenario!!.onActivity { idle = it.pageTurns?.state == "idle" }
+            idle
+        }
+        assertEquals(before, ReaderRuntime.session!!.locatorJson)
+        assertEquals("Preview/cancel emitted a persisted reader event", sequence, ReaderRuntime.session!!.sequence)
+        scenario!!.onActivity {
+            assertEquals("Prepared gestures must use curl, not fallback", 0, it.pageTurns!!.fallbackCount)
+            android.util.Log.i("KoofyCurlTest", "captureMillis=${it.pageTurns!!.captureMillis} capturedBytes=${it.pageTurns!!.capturedBytes}")
+        }
+        dragPage(.87f, .18f, cancel = false)
+        awaitCondition("Curl did not commit the prepared destination") {
+            ReaderRuntime.session!!.locatorJson == target
+        }
+        assertTrue("Committed page must contain the prepared anchor", anchorVisible(target!!))
+    }
+
+    @Test fun changingOnlyTurnStyleKeepsNavigatorAndFontChangeInvalidatesImages() {
+        launch()
+        var original: EpubNavigatorFragment? = null
+        val anchor = ReaderRuntime.session!!.locatorJson
+        scenario!!.onActivity {
+            original = navigator(it)
+            it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(pageTurnStyle = "curl"))
+            assertSame(original, navigator(it))
+        }
+        awaitCondition("Curl preparation failed after enabling style") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.next != null }
+            ready
+        }
+        assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
+        var previousGeneration = 0L
+        scenario!!.onActivity {
+            previousGeneration = it.pageTurns!!.generation
+            it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(fontScale = 1.4))
+            assertNull(it.pageTurns!!.surfaces)
+        }
+        awaitCondition("New font pages were not prepared") {
+            var ready = false
+            scenario!!.onActivity {
+                ready = it.pageTurns!!.surfaces?.let { frames ->
+                    frames.generation > previousGeneration && frames.next != null
+                } == true
+            }
+            ready
+        }
+        assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
+        assertTrue(anchorVisible(anchor!!))
+    }
+
+    @Test fun spreadCurlMatchesOneRealReadiumAdvanceInsideLongParagraph() {
+        createFixture(fixture, longParagraph = true)
+        launch(preferences = ReaderPreferences(1.0, 2, false, "light"))
+        val point = exactVisiblePoint()
+        val sequence = ReaderRuntime.session!!.sequence
+        scenario!!.onActivity { navigator(it).goForward(false) }
+        awaitCondition("Long paragraph did not advance") {
+            ReaderRuntime.session!!.sequence > sequence && exactVisiblePoint() != point
+        }
+        assertCurlMatchesBaseline()
+    }
+
+    @Test fun curlCrossesChapterBoundaryExactlyLikeReadium() {
+        createFixture(fixture, secondChapter = true)
+        launch(initial = JSONObject(targetLocator()).put("locations", JSONObject().put("progression", 1.0)).toString())
+        assertCurlMatchesBaseline()
+        assertTrue(ReaderRuntime.session!!.locatorJson!!.contains("second.xhtml"))
+    }
+
+    @Test fun backwardCurlMatchesReadiumAndSupportsHoldingPageEdge() {
+        launch()
+        assertCurlMatchesBaseline(forward = false)
+    }
+
+    @Test fun cornerTapCommitsExactlyOnePage() {
+        launch()
+        assertCurlMatchesBaseline(tap = true)
+    }
+
+    private fun exactVisiblePoint(): String {
+        val script = context.assets.open("reader_anchor.js").bufferedReader().use { it.readText() }
+            .replace("__KOOFY_RESTORE__", "false").replace("__KOOFY_ANCHOR__", "null")
+        val state = snapshot(script)
+        var href = ""
+        scenario!!.onActivity { href = navigator(it).currentLocator.value.href.toString() }
+        return href + ":" + state.optJSONObject("locations")?.optJSONObject("koofyText")?.toString()
+    }
+
+    private fun assertCurlMatchesBaseline(forward: Boolean = true, tap: Boolean = false) {
+        val sourcePoint = exactVisiblePoint()
+        val saved = ReaderRuntime.session!!.locatorJson!!
+        val before = ReaderRuntime.session!!.sequence
+        scenario!!.onActivity { if (forward) navigator(it).goForward(false) else navigator(it).goBackward(false) }
+        awaitCondition("Baseline next page did not advance") {
+            ReaderRuntime.session!!.sequence > before && exactVisiblePoint() != sourcePoint
+        }
+        val expected = exactVisiblePoint()
+        val beforeRestore = ReaderRuntime.session!!.sequence
+        scenario!!.onActivity { it.goToLocator(saved) }
+        awaitCondition("Source page was not restored") {
+            ReaderRuntime.session!!.sequence > beforeRestore && exactVisiblePoint() == sourcePoint
+        }
+        scenario!!.onActivity {
+            it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(pageTurnStyle = "curl"))
+        }
+        awaitCondition("Baseline comparison could not prepare real next page") {
+            var ready = false
+            scenario!!.onActivity {
+                ready = if (forward) it.pageTurns!!.surfaces?.next != null else it.pageTurns!!.surfaces?.previous != null
+            }
+            ready
+        }
+        dragPage(if (forward) .94f else .06f, if (tap) .94f else if (forward) .18f else .82f,
+            cancel = false, capture = !tap, holdMillis = if (forward) 0 else 650,
+            steps = if (tap) 0 else 12)
+        awaitCondition("Curl destination differs from one Readium advance") {
+            var idle = false
+            scenario!!.onActivity { idle = it.pageTurns!!.state == "idle" }
+            idle && exactVisiblePoint() == expected
+        }
+        scenario!!.onActivity { assertEquals(0, it.pageTurns!!.fallbackCount) }
+    }
+
+    private fun dragPage(from: Float, to: Float, cancel: Boolean, capture: Boolean = false, holdMillis: Long = 0, steps: Int = 12) {
+        val location = IntArray(2)
+        var width = 0
+        var height = 0
+        scenario!!.onActivity {
+            val view = navigator(it).publicationView
+            view.getLocationOnScreen(location)
+            width = view.width
+            height = view.height
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val now = android.os.SystemClock.uptimeMillis()
+        fun send(action: Int, portion: Float) {
+            val event = android.view.MotionEvent.obtain(now, android.os.SystemClock.uptimeMillis(), action,
+                location[0] + width * portion, location[1] + height * .8f, 0)
+            instrumentation.sendPointerSync(event)
+            event.recycle()
+        }
+        send(android.view.MotionEvent.ACTION_DOWN, from)
+        if (holdMillis > 0) Thread.sleep(holdMillis)
+        for (step in 1..steps) {
+            Thread.sleep(18)
+            send(android.view.MotionEvent.ACTION_MOVE, from + (to - from) * step / steps)
+        }
+        if (capture) {
+            scenario!!.onActivity {
+                assertEquals("dragging", it.pageTurns!!.state)
+                assertTrue("Native WebView swallowed the page gesture", it.pageTurns!!.showingCurl)
+            }
+            val screenshot = instrumentation.uiAutomation.takeScreenshot()
+            File(context.getExternalFilesDir(null), "curl-mid.png").outputStream().use {
+                screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            screenshot.recycle()
+            val fileName = if (ReaderRuntime.session!!.preferences.columnCount == 2L) "koofy-curl-mid-spread.png"
+                else if (from < to) "koofy-curl-mid-backward.png" else "koofy-curl-mid.png"
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
+                .executeShellCommand("screencap -p /sdcard/Download/$fileName")).use { it.readBytes() }
+        }
+        send(if (cancel) android.view.MotionEvent.ACTION_CANCEL else android.view.MotionEvent.ACTION_UP, to)
     }
 
     private fun anchorVisible(locator: String): Boolean {
@@ -259,11 +533,12 @@ class ReaderRenderingTest {
 
     private fun targetLocator() = """{"href":"EPUB/chapter.xhtml","type":"application/xhtml+xml","locations":{"fragments":["p-060"]}}"""
 
-    private fun createFixture(file: File, longParagraph: Boolean = false) {
+    private fun createFixture(file: File, longParagraph: Boolean = false, secondChapter: Boolean = false, fontFaces: Boolean = false) {
         val paragraphs = (1..120).joinToString("\n") { index ->
             val id = index.toString().padStart(3, '0')
+            val bold = if (fontFaces) "<strong>굵은 글씨 Bold</strong>" else ""
             val repeated = if (longParagraph && index == 60) (1..160).joinToString(" ") { "긴 문단의 $it 번째 문장입니다. 페이지 시작은 문단 시작과 다릅니다." } else ""
-            "<p id=\"p-$id\">$repeated $id 단락. 한글 전자책의 페이지 경계와 읽던 문장을 검증합니다. 화면 크기와 글꼴 설정이 달라져도 이 본문 위치를 다시 찾을 수 있어야 합니다.</p>"
+            "<p id=\"p-$id\">$repeated $id 단락. 한글 전자책의 페이지 경계와 읽던 문장을 검증합니다. 화면 크기와 글꼴 설정이 달라져도 이 본문 위치를 다시 찾을 수 있어야 합니다.$bold</p>"
         }
         val files = linkedMapOf(
             "mimetype" to "application/epub+zip",
@@ -272,6 +547,12 @@ class ReaderRenderingTest {
             "EPUB/nav.xhtml" to """<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="ko"><head><title>목차</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml">본문</a></li></ol></nav></body></html>""",
             "EPUB/chapter.xhtml" to """<html xmlns="http://www.w3.org/1999/xhtml" lang="ko"><head><title>한글 독서 엔진 검증</title><style>body{font-family:serif}p{line-height:1.6;margin:0 0 1em}</style></head><body>$paragraphs</body></html>""",
         )
+        if (secondChapter) {
+            files["EPUB/package.opf"] = files.getValue("EPUB/package.opf")
+                .replace("</manifest>", "<item id=\"second\" href=\"second.xhtml\" media-type=\"application/xhtml+xml\"/></manifest>")
+                .replace("</spine>", "<itemref idref=\"second\"/></spine>")
+            files["EPUB/second.xhtml"] = """<html xmlns="http://www.w3.org/1999/xhtml" lang="ko"><head><title>두 번째 장</title></head><body><h1 id="second-start">두 번째 장 시작</h1>$paragraphs</body></html>"""
+        }
         ZipOutputStream(file.outputStream()).use { zip ->
             files.forEach { (name, text) ->
                 val bytes = text.toByteArray(Charsets.UTF_8)

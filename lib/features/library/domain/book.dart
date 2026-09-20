@@ -9,6 +9,7 @@ class Book {
     required this.sourceType,
     this.assetPath,
     this.localPath,
+    this.coverPath,
   });
 
   factory Book.asset({
@@ -34,6 +35,7 @@ class Book {
     required String author,
     required String description,
     required String localPath,
+    String? coverPath,
   }) {
     return Book(
       id: id,
@@ -42,6 +44,7 @@ class Book {
       description: description,
       sourceType: BookSourceType.localFile,
       localPath: localPath,
+      coverPath: coverPath,
     );
   }
 
@@ -52,6 +55,7 @@ class Book {
   final BookSourceType sourceType;
   final String? assetPath;
   final String? localPath;
+  final String? coverPath;
 
   bool get isLocalFile => sourceType == BookSourceType.localFile;
 
@@ -64,6 +68,7 @@ class Book {
       'sourceType': sourceType.name,
       'assetPath': assetPath,
       'localPath': localPath,
+      'coverPath': coverPath,
     };
   }
 
@@ -94,6 +99,9 @@ class Book {
       sourceType: sourceType,
       assetPath: assetPath is String ? assetPath : null,
       localPath: localPath is String ? localPath : null,
+      coverPath: json['coverPath'] is String
+          ? json['coverPath'] as String
+          : null,
     );
   }
 }

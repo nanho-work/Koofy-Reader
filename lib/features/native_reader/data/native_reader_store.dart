@@ -39,6 +39,8 @@ ReaderPreferences defaultReaderPreferences() => ReaderPreferences(
   columnCount: 0,
   scroll: false,
   theme: 'light',
+  pageTurnStyle: 'instant',
+  fontId: 'default',
 );
 
 /// G1's small, explicit SQL schema. No streams depend on generated table metadata.
@@ -256,7 +258,14 @@ String preferencesToJson(ReaderPreferences value) {
       value.fontScale < 0.5 ||
       value.fontScale > 4 ||
       !const [0, 1, 2].contains(value.columnCount) ||
-      !const ['light', 'sepia', 'dark'].contains(value.theme)) {
+      !const ['light', 'sepia', 'dark'].contains(value.theme) ||
+      !const ['instant', 'curl'].contains(value.pageTurnStyle ?? 'instant') ||
+      (!const [
+            'default',
+            'maplestory',
+            'hakgyoansim-siganpyo',
+          ].contains(value.fontId ?? 'default') &&
+          !RegExp(r'^remote_[a-f0-9]{32}$').hasMatch(value.fontId ?? ''))) {
     throw const FormatException('지원하지 않는 독서 설정입니다.');
   }
   return jsonEncode({
@@ -264,6 +273,8 @@ String preferencesToJson(ReaderPreferences value) {
     'columnCount': value.columnCount,
     'scroll': value.scroll,
     'theme': value.theme,
+    'pageTurnStyle': value.pageTurnStyle ?? 'instant',
+    'fontId': value.fontId ?? 'default',
   });
 }
 
@@ -274,6 +285,8 @@ ReaderPreferences preferencesFromJson(String source) {
     columnCount: json['columnCount'] as int,
     scroll: json['scroll'] as bool,
     theme: json['theme'] as String,
+    pageTurnStyle: json['pageTurnStyle'] as String? ?? 'instant',
+    fontId: json['fontId'] as String? ?? 'default',
   );
   preferencesToJson(preferences);
   return preferences;

@@ -4,12 +4,13 @@ import ReadiumStreamer
 import UIKit
 
 /// Full-screen UIKit host. The EPUB navigator owns all pagination and selection.
-final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
+final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, UIGestureRecognizerDelegate {
     let request: ReaderLaunchRequest
     var onClosed: (() -> Void)?
     private let journal: ReaderCheckpointStore
     private let sendEvent: (ReaderEvent) -> Void
     private var publication: Publication?
+    private var readerFonts: ReaderFonts?
     private var navigator: EPUBNavigatorViewController?
     private var preferences: ReaderPreferences
     private var lastLocator: Locator?
@@ -29,7 +30,16 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
     private var navigationCompletion: ((Result<Void, Error>) -> Void)?
     private var readyTimeout: Task<Void, Never>?
     private var settingsCompletion: ((Result<Void, Error>) -> Void)?
-    private var navigationAdapter: DirectionalNavigationAdapter?
+    private let frameProvider = ReaderPageFrameProvider()
+    private var frameTask: Task<Void, Never>?
+    private var frameGeneration = 0
+    private var pageTurnController: ReaderPageTurnController?
+    private var turnBusy = false
+    private var turnCommitInFlight = false
+    private var needsTurnRestoration = false
+    private var programmaticMovePending = false
+    private var moveOperation = 0
+    private lazy var pagePan = UIPanGestureRecognizer(target: self, action: #selector(pageDragged(_:)))
     private let spinner = UIActivityIndicatorView(style: .large)
     private let statusLabel = UILabel()
     private let body = UIView()
@@ -51,7 +61,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
     static func validate(_ preferences: ReaderPreferences) throws {
         guard preferences.fontScale.isFinite, (0.5...3.0).contains(preferences.fontScale),
               (0...2).contains(preferences.columnCount),
-              ["light", "sepia", "dark"].contains(preferences.theme) else {
+              ["light", "sepia", "dark"].contains(preferences.theme),
+              ["instant", "curl"].contains(preferences.pageTurnStyle ?? "instant"),
+              ReaderFonts.isValidId(preferences.fontId) else {
             throw failure("invalid_preferences", "지원하지 않는 독서 설정입니다.")
         }
     }
@@ -67,6 +79,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
         toolbar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(body)
         view.addSubview(toolbar)
+        pagePan.delegate = self
+        pagePan.maximumNumberOfTouches = 1
+        body.addGestureRecognizer(pagePan)
         progress.font = .preferredFont(forTextStyle: .caption1)
         progress.adjustsFontForContentSizeCategory = true
         progress.textAlignment = .center
@@ -101,6 +116,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
         ])
         spinner.startAnimating()
         NotificationCenter.default.addObserver(self, selector: #selector(flushBackground), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(resumeForeground), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(motionPreferenceChanged), name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(motionPreferenceChanged), name: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil)
         openingTask = Task { [weak self] in await self?.openPublication() }
     }
 
@@ -108,12 +126,15 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
         openingTask?.cancel()
         captureTask?.cancel()
         moveTask?.cancel()
+        frameTask?.cancel()
         readyTimeout?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 
     private func openPublication() async {
         do {
+            readerFonts = try await Task.detached(priority: .userInitiated) { try ReaderFonts() }.value
+            guard !Task.isCancelled, !isClosing else { return }
             let retriever = AssetRetriever(httpClient: OfflineHTTPClient())
             let opener = PublicationOpener(parser: EPUBParser())
             guard let file = FileURL(url: URL(fileURLWithPath: request.filePath)) else {
@@ -138,6 +159,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     private func mountNavigator(at locator: Locator?, kind: String) throws {
         guard let publication else { throw failure("reader_not_ready", "책을 여는 중입니다.") }
+        moveOperation += 1
+        moveTask?.cancel()
+        programmaticMovePending = false
+        invalidatePageTurns()
+        needsTurnRestoration = false
         isReady = false
         captureGeneration += 1
         renderGeneration += 1
@@ -151,17 +177,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
             old.view.removeFromSuperview()
             old.removeFromParent()
         }
-        let next = try EPUBNavigatorViewController(publication: publication,
-            initialLocation: locator, config: .init(
-                preferences: epubPreferences(), disablePageTurnsWhileScrolling: true,
-                contentInset: [.compact: (16, 16), .regular: (24, 24)],
-                // ReadiumCSS's bundled media query otherwise ignores an explicit
-                // two-column preference below 60em (including portrait iPads).
-                // Use its public reading-system configuration after our own
-                // available-width check, preserving the engine's pagination.
-                readiumCSSRSProperties: .init(
-                    colCount: !preferences.scroll && preferences.columnCount != 1 && canShowSpread ? .two : .one,
-                    overrides: ["--RS__colWidth": "auto"])) )
+        let next = try makeNavigator(publication: publication, at: locator)
         next.delegate = self
         navigator = next
         addChild(next)
@@ -174,8 +190,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
             next.view.trailingAnchor.constraint(equalTo: body.trailingAnchor),
         ])
         next.didMove(toParent: self)
-        navigationAdapter = DirectionalNavigationAdapter()
-        navigationAdapter?.bind(to: next)
+        pagePan.isEnabled = !preferences.scroll
         statusLabel.text = nil
         spinner.startAnimating()
         configureMenu()
@@ -188,12 +203,29 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
         }
     }
 
+    private func makeNavigator(publication: Publication, at locator: Locator?, preview: Bool = false) throws -> EPUBNavigatorViewController {
+        try EPUBNavigatorViewController(publication: publication,
+            initialLocation: locator, config: .init(
+                preferences: epubPreferences(), disablePageTurnsWhileScrolling: true,
+                contentInset: [.compact: (16, 16), .regular: (24, 24)],
+                preloadPreviousPositionCount: preview ? 0 : 2,
+                preloadNextPositionCount: preview ? 0 : 6,
+                fontFamilyDeclarations: readerFonts?.declarations ?? [],
+                // ReadiumCSS's bundled media query otherwise ignores an explicit
+                // two-column preference below 60em (including portrait iPads).
+                // Use its public reading-system configuration after our own
+                // available-width check, preserving the engine's pagination.
+                readiumCSSRSProperties: .init(
+                    colCount: !preferences.scroll && preferences.columnCount != 1 && canShowSpread ? .two : .one,
+                    overrides: ["--RS__colWidth": "auto"])) )
+    }
+
     private func epubPreferences() -> EPUBPreferences {
         let columns: ColumnCount = preferences.scroll || preferences.columnCount == 1 || !canShowSpread
             ? .one : .two
         let palette = ReaderPalette.forTheme(preferences.theme)
         return EPUBPreferences(backgroundColor: Color(uiColor: palette.background),
-            columnCount: columns, fontSize: preferences.fontScale,
+            columnCount: columns, fontFamily: readerFonts?.family(preferences.fontId), fontSize: preferences.fontScale,
             publisherStyles: true, scroll: preferences.scroll,
             textColor: Color(uiColor: palette.foreground),
             theme: Theme(rawValue: preferences.theme) ?? .light)
@@ -205,8 +237,19 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
     }
 
     func apply(_ value: ReaderPreferences, completion: @escaping (Result<Void, Error>) -> Void) throws {
-        guard isReady, !isClosing else { throw failure("reader_not_ready", "본문 표시가 완료된 뒤 변경해 주세요.") }
+        guard isReady, !isClosing, !turnBusy else { throw failure("reader_not_ready", "본문 표시가 완료된 뒤 변경해 주세요.") }
         try Self.validate(value)
+        let sameLayout = value.fontScale == preferences.fontScale && value.columnCount == preferences.columnCount &&
+            value.scroll == preferences.scroll && value.theme == preferences.theme &&
+            (value.fontId ?? "default") == (preferences.fontId ?? "default")
+        if sameLayout {
+            invalidatePageTurns()
+            preferences = value
+            try persist(kind: "preferencesChanged")
+            completion(.success(()))
+            preparePageTurns()
+            return
+        }
         // Recreate at an exact content anchor. This avoids saving transient page
         // starts while Readium's CSS layout is changing asynchronously.
         settingsCompletion?(.failure(failure("superseded", "새 설정으로 대체되었습니다.")))
@@ -222,23 +265,46 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
     func go(to locator: Locator, completion: @escaping (Result<Void, Error>) -> Void) throws {
         guard isReady, !isClosing, let navigator else { throw failure("reader_not_ready", "본문 표시가 완료된 뒤 이동해 주세요.") }
         try validateLocation(locator)
+        if !turnCommitInFlight { invalidatePageTurns() }
         isReady = false
         captureGeneration += 1
         captureTask?.cancel()
         restorationAnchor = locator
         pendingKind = "locationChanged"
         navigationCompletion = completion
+        programmaticMovePending = true
+        moveOperation += 1
+        let operation = moveOperation
+        readyTimeout?.cancel()
+        let navigationGeneration = renderGeneration
+        readyTimeout = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled, let self, self.renderGeneration == navigationGeneration,
+                  self.navigationCompletion != nil, !self.isClosing else { return }
+            self.moveTask?.cancel()
+            self.moveOperation += 1
+            self.captureTask?.cancel()
+            self.captureGeneration += 1
+            self.programmaticMovePending = false
+            self.needsTurnRestoration = true
+            self.finishNavigation(.failure(failure("navigation_timeout", "본문 이동을 완료하지 못했습니다.")))
+            self.turnCommitInFlight = false
+            self.turnBusy = false
+            if UIApplication.shared.applicationState == .active { self.resumeForeground() }
+        }
         moveTask = Task { [weak self, weak navigator] in
             guard let self, let navigator else { return }
             let success = await navigator.go(to: locator)
+            guard self.moveOperation == operation else { return }
             guard !Task.isCancelled, self.navigator === navigator, !self.isClosing else {
                 self.finishNavigation(.failure(failure("navigation_cancelled", "본문 이동이 취소되었습니다.")))
                 return
             }
             if success {
-                self.capture(navigator.currentLocation ?? locator, from: navigator)
-                self.finishNavigation(.success(()))
+                self.programmaticMovePending = false
+                self.capture(locator, from: navigator)
             } else {
+                self.programmaticMovePending = false
                 self.restorationAnchor = nil
                 self.isReady = true
                 self.finishNavigation(.failure(failure("navigation_failed", "요청한 본문 위치로 이동할 수 없습니다.")))
@@ -261,11 +327,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
         guard let current = self.navigator, current === navigator, !isClosing, !isRotating,
-              current.viewport != nil else { return }
+              !programmaticMovePending, current.viewport != nil else { return }
         capture(locator, from: current)
     }
 
     private func capture(_ fallback: Locator, from current: EPUBNavigatorViewController) {
+        if !turnCommitInFlight { invalidatePageTurns() }
         captureGeneration += 1
         let token = captureGeneration
         let rendering = renderGeneration
@@ -276,6 +343,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
             let sameResource = anchor?.href == fallback.href
             var snapshot: [String: Any] = [:]
             do {
+                if self.readerFonts?.family(self.preferences.fontId) != nil {
+                    try await ReaderWebViewport.waitUntilStable(current)
+                }
                 let bundle = Bundle(for: KoofyReaderViewController.self)
                 guard let resourceURL = bundle.url(forResource: "KoofyReaderAssets", withExtension: "bundle"),
                       let resources = Bundle(url: resourceURL),
@@ -293,6 +363,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
                 snapshot = result
             } catch {
                 guard !Task.isCancelled else { return }
+                self.finishNavigation(.failure(error))
                 self.report(error, code: "anchor_capture_failed", fatal: !self.hasSentReady)
                 return
             }
@@ -312,6 +383,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
             guard !Task.isCancelled, self.captureGeneration == token,
                   self.renderGeneration == rendering, self.navigator === current else { return }
             let wasReady = self.isReady
+            let previousLocator = self.lastLocator
             // Keep the requested anchor through relayout rather than repeatedly
             // moving it backwards to each newly calculated page start.
             if self.restorationAnchor != nil, snapshot["anchorVisible"] as? Bool == false { return }
@@ -324,16 +396,29 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
             self.progress.sizeToFit()
             do {
                 let kind = self.hasSentReady ? (wasReady ? "locationChanged" : self.pendingKind) : "ready"
-                try self.persist(kind: kind)
+                // A delayed Readium location callback can describe the same
+                // viewport already committed by an explicit jump. Do not turn
+                // that no-op notification into another recovery checkpoint.
+                if !wasReady || !self.hasSentReady || previousLocator != self.lastLocator ||
+                    self.navigationCompletion != nil || self.settingsCompletion != nil {
+                    try self.persist(kind: kind)
+                }
                 self.hasSentReady = true
                 let completion = self.settingsCompletion
                 self.settingsCompletion = nil
                 completion?(.success(()))
-            } catch { self.report(error, code: "checkpoint_failed", fatal: false) }
+                ReaderWebViewport.setPagingEnabled(self.preferences.scroll, in: current.view)
+                self.finishNavigation(.success(()))
+                if !self.turnCommitInFlight { self.preparePageTurns() }
+            } catch {
+                self.finishNavigation(.failure(error))
+                self.report(error, code: "checkpoint_failed", fatal: false)
+            }
         }
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        cancelUncommittedTurn()
         layoutGeneration += 1
         let layout = layoutGeneration
         isRotating = true
@@ -355,6 +440,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     func close(completion: @escaping (Result<Void, Error>) -> Void) {
         guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
+        cancelUncommittedTurn()
         isClosing = true
         moveTask?.cancel()
         finishNavigation(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
@@ -431,17 +517,206 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     @objc private func flushBackground() {
         guard hasSentReady, !isClosing else { return }
+        cancelUncommittedTurn()
         do { try persist(kind: "locationChanged") }
         catch { report(error, code: "checkpoint_failed", fatal: false) }
     }
     @objc private func closeTapped() { close { _ in } }
     @objc private func previousTapped() {
-        guard isReady, !isClosing else { return }
-        Task { await navigator?.goBackward(options: .animated) }
+        requestPageTurn(forward: false)
     }
     @objc private func nextTapped() {
-        guard isReady, !isClosing else { return }
-        Task { await navigator?.goForward(options: .animated) }
+        requestPageTurn(forward: true)
+    }
+
+    private var usesPageCurl: Bool {
+        preferences.pageTurnStyle == "curl" && !preferences.scroll && !UIAccessibility.isReduceMotionEnabled &&
+            !UIAccessibility.isVoiceOverRunning
+    }
+
+    private func invalidatePageTurns() {
+        frameGeneration += 1
+        frameTask?.cancel()
+        frameTask = nil
+        frameProvider.removePreview()
+        if let controller = pageTurnController {
+            controller.invalidate()
+            controller.willMove(toParent: nil)
+            controller.view.removeFromSuperview()
+            controller.removeFromParent()
+        }
+        pageTurnController = nil
+        if !turnCommitInFlight { turnBusy = false }
+    }
+
+    private func preparePageTurns() {
+        guard usesPageCurl, isReady, !isClosing, !isRotating, !turnBusy,
+              UIApplication.shared.applicationState == .active,
+              let current = navigator, let publication else { return }
+        frameTask?.cancel()
+        frameGeneration += 1
+        let generation = frameGeneration
+        let palette = ReaderPalette.forTheme(preferences.theme)
+        frameTask = Task { [weak self, weak current] in
+            guard let self, let current else { return }
+            do {
+                let frames = try await self.frameProvider.prepare(current: current, parent: self,
+                    container: self.body, generation: generation, background: palette.background) { [weak self] locator in
+                        guard let self else { throw CancellationError() }
+                        return try self.makeNavigator(publication: publication, at: locator, preview: true)
+                    }
+                guard !Task.isCancelled, self.frameGeneration == generation, self.navigator === current,
+                      self.isReady, !self.isClosing, !self.turnBusy else { return }
+                let controller = ReaderPageTurnController(frames: frames, background: palette.background)
+                controller.onBegin = { [weak self] in self?.turnBusy = true }
+                controller.onCancel = { [weak self] in self?.turnBusy = false }
+                controller.onCommit = { [weak self, weak controller] frame in
+                    guard let self, let controller, self.pageTurnController === controller,
+                          self.frameGeneration == frame.generation, !self.isClosing,
+                          !self.turnCommitInFlight else { return }
+                    self.turnCommitInFlight = true
+                    do {
+                        try self.go(to: frame.locator) { [weak self] result in
+                            guard let self else { return }
+                            self.turnCommitInFlight = false
+                            self.turnBusy = false
+                            self.invalidatePageTurns()
+                            if case let .failure(error) = result, !self.isClosing, !self.needsTurnRestoration {
+                                if !self.isReady {
+                                    self.needsTurnRestoration = true
+                                    self.resumeForeground()
+                                }
+                                self.report(error, code: "navigation_failed", fatal: false)
+                            }
+                            self.preparePageTurns()
+                        }
+                    } catch {
+                        self.turnCommitInFlight = false
+                        self.turnBusy = false
+                        controller.cancel()
+                        self.report(error, code: "navigation_failed", fatal: false)
+                    }
+                }
+                self.pageTurnController = controller
+                self.addChild(controller)
+                controller.view.frame = self.body.bounds
+                controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                self.body.insertSubview(controller.view, aboveSubview: current.view)
+                controller.didMove(toParent: self)
+            } catch {
+                // A failed/obsolete preview is not a reading failure. The
+                // existing immediate path remains usable for this viewport.
+                #if DEBUG
+                if !Task.isCancelled { NSLog("Koofy page frame preparation unavailable: %@", String(describing: error)) }
+                #endif
+            }
+        }
+    }
+
+    /// All app-owned taps, buttons, keys and swipes use this policy. UIKit's
+    /// edge drag commits through the same exact-locator navigation path.
+    func requestPageTurn(forward: Bool) {
+        guard isReady, !isClosing, !isRotating, !turnBusy, presentedViewController == nil,
+              let current = navigator else { return }
+        if usesPageCurl, pageTurnController?.turn(forward: forward) == true { return }
+        invalidatePageTurns()
+        turnBusy = true
+        isReady = false
+        programmaticMovePending = true
+        moveOperation += 1
+        let operation = moveOperation
+        moveTask = Task { [weak self, weak current] in
+            guard let self, let current else { return }
+            let source = current.currentLocation
+            let moved = forward ? await current.goForward(options: .init(animated: false))
+                : await current.goBackward(options: .init(animated: false))
+            if moved {
+                // Readium updates currentLocation asynchronously after its go
+                // operation. Wait for that update rather than combine a new
+                // DOM anchor with the previous chapter's HREF/progression.
+                for _ in 0..<100 where current.currentLocation == source {
+                    if Task.isCancelled { return }
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                }
+            }
+            guard !Task.isCancelled, self.moveOperation == operation, self.navigator === current, !self.isClosing else { return }
+            self.programmaticMovePending = false
+            self.turnBusy = false
+            if moved, let locator = current.currentLocation, locator != source { self.capture(locator, from: current) }
+            else { self.isReady = true; self.preparePageTurns() }
+        }
+    }
+
+    private func cancelUncommittedTurn() {
+        if turnCommitInFlight {
+            needsTurnRestoration = true
+            turnCommitInFlight = false
+            moveTask?.cancel()
+            moveOperation += 1
+            programmaticMovePending = false
+            captureTask?.cancel()
+            captureGeneration += 1
+            restorationAnchor = lastLocator
+            isReady = false
+            finishNavigation(.failure(failure("navigation_cancelled", "본문 이동이 취소되었습니다.")))
+        }
+        invalidatePageTurns()
+        turnBusy = false
+    }
+
+    @objc private func resumeForeground() {
+        guard !isClosing else { return }
+        if needsTurnRestoration {
+            needsTurnRestoration = false
+            do { try mountNavigator(at: lastLocator, kind: "locationChanged") }
+            catch { report(error, code: "relayout_failed", fatal: true) }
+        } else { preparePageTurns() }
+    }
+
+    @objc private func motionPreferenceChanged() {
+        cancelUncommittedTurn()
+        if needsTurnRestoration { resumeForeground() }
+        else { preparePageTurns() }
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        cancelUncommittedTurn()
+        if needsTurnRestoration, UIApplication.shared.applicationState == .active { resumeForeground() }
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === pagePan, !preferences.scroll, isReady, !turnBusy,
+              !isClosing, navigator?.currentSelection == nil, presentedViewController == nil else { return false }
+        let velocity = pagePan.velocity(in: body)
+        guard abs(velocity.x) > abs(velocity.y) else { return false }
+        let x = pagePan.location(in: body).x - pagePan.translation(in: body).x
+        let edge = min(80, body.bounds.width * 0.2)
+        if usesPageCurl, let controller = pageTurnController, x < edge || x > body.bounds.width - edge {
+            let forward = controller.frames.rightToLeft ? x < edge : x > body.bounds.width - edge
+            if controller.canTurn(forward: forward) { return false }
+        }
+        return true
+    }
+
+    @objc private func pageDragged(_ recognizer: UIPanGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        let distance = recognizer.translation(in: body).x
+        let velocity = recognizer.velocity(in: body).x
+        guard abs(distance) > min(80, body.bounds.width * 0.18) || abs(velocity) > 500 else { return }
+        let physicalForward = distance < 0
+        requestPageTurn(forward: navigator?.presentation.readingProgression == .rtl ? !physicalForward : physicalForward)
+    }
+
+    func navigator(_ navigator: VisualNavigator, didPressKey event: KeyEvent) {
+        guard event.phase == .down, event.modifiers.isEmpty else { return }
+        switch event.key {
+        case .arrowRight: requestPageTurn(forward: navigator.presentation.readingProgression != .rtl)
+        case .arrowLeft: requestPageTurn(forward: navigator.presentation.readingProgression == .rtl)
+        case .space, .pageDown: requestPageTurn(forward: true)
+        case .pageUp: requestPageTurn(forward: false)
+        default: break
+        }
     }
 
     private func configureMenu() {
@@ -461,7 +736,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     @objc private func preferencesTapped(_ sender: UIBarButtonItem) {
         guard isReady, !isClosing, presentedViewController == nil else { return }
-        let settings = ReaderSettingsViewController(preferences: preferences) { [weak self] value, completion in
+        let settings = ReaderSettingsViewController(preferences: preferences,
+            fontIds: readerFonts?.optionIds ?? ReaderFonts.ids, fontLabels: readerFonts?.optionLabels ?? ReaderFonts.labels) { [weak self] value, completion in
             guard let self else { return }
             do { try self.apply(value, completion: completion) }
             catch { completion(.failure(error)) }
@@ -514,8 +790,13 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate {
 
     func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
         let edge = max(80, navigator.view.bounds.width * 0.3)
-        guard point.x > edge, point.x < navigator.view.bounds.width - edge,
-              presentedViewController == nil else { return }
+        guard presentedViewController == nil, !turnBusy else { return }
+        if point.x <= edge || point.x >= navigator.view.bounds.width - edge {
+            guard !preferences.scroll, self.navigator?.currentSelection == nil else { return }
+            let physicalForward = point.x >= navigator.view.bounds.width - edge
+            requestPageTurn(forward: navigator.presentation.readingProgression == .rtl ? !physicalForward : physicalForward)
+            return
+        }
         chromeVisible.toggle()
         // Preserve layout/safe-area geometry; visibility cannot change pagination.
         navigationController?.navigationBar.alpha = chromeVisible ? 1 : 0

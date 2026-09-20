@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "573216627685",
+    "project_id": "koofy-reader",
+    "storage_bucket": "koofy-reader.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:573216627685:android:6232369a4ed4009eb72d0c",
+        "android_client_info": {
+          "package_name": "com.koofylab.koofyreader"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOsARbPg3YEJmR1jR3RuHRspuUABNQnKI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

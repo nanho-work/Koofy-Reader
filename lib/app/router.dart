@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/presentation/library_page.dart';
 import 'package:koofy_reader/features/native_reader/presentation/native_reader_launch_page.dart';
@@ -9,6 +10,7 @@ class AppRoutes {
   static const String reader = '/reader';
   static const String nativeReader = '/reader/native';
   static const String settings = '/settings';
+  static const String catalog = '/catalog';
 }
 
 class AppRouter {
@@ -29,6 +31,11 @@ class AppRouter {
           );
         }
         return _errorRoute('책 정보를 불러오지 못했습니다.');
+      case AppRoutes.catalog:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ReaderCatalogPage(),
+          settings: settings,
+        );
       case AppRoutes.settings:
         return MaterialPageRoute<void>(
           builder: (_) => const SettingsPage(),

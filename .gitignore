@@ -53,3 +53,9 @@ app.*.map.json
 ios/Flutter/AdMob.local.xcconfig
 android/key.properties
 android/upload-keystore.jks
+
+# Firebase backend
+/functions/node_modules/
+/functions/lib/
+.firebase/
+!/functions/.env.example

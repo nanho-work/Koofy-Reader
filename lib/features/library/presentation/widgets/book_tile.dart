@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -16,6 +17,42 @@ class BookCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (book.coverPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.file(
+              File(book.coverPath!),
+              fit: BoxFit.cover,
+              cacheWidth: compact ? 360 : 900,
+              errorBuilder: (context, error, stack) => _fallback(context),
+            ),
+            if (compact && bottomInset > 0)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: bottomInset + 12,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0x99000000)],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    return _fallback(context);
+  }
+
+  Widget _fallback(BuildContext context) {
     const colors = [
       Color(0xFF365347),
       Color(0xFF665742),

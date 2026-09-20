@@ -29,7 +29,7 @@ if (isReleaseTask && !hasReleaseSigning) {
 }
 
 android {
-    namespace = "com.example.koofy_reader"
+    namespace = "com.koofylab.koofyreader"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,8 +44,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.koofy_reader"
+        applicationId = "com.koofylab.koofyreader"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

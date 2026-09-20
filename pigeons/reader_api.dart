@@ -16,11 +16,19 @@ class ReaderPreferences {
     required this.columnCount,
     required this.scroll,
     required this.theme,
+    this.pageTurnStyle,
+    this.fontId,
   });
   double fontScale;
   int columnCount;
   bool scroll;
   String theme;
+
+  /// Null is the legacy default, equivalent to 'instant'.
+  String? pageTurnStyle;
+
+  /// Null or 'default' preserves the publication's original font selection.
+  String? fontId;
 }
 
 class ReaderLaunchRequest {

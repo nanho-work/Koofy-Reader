@@ -17,6 +17,10 @@ records require the user to review their previous context before opening.
 - [구현 단계와 검증 기준](docs/reader-validation-plan.md)
 - [네이티브 리더 패치와 실행 방법](docs/reader-g1-implementation.md)
 - [메인 서재 UI와 이어 읽기 연결](docs/library-home-implementation.md)
+- [페이지 전환 효과 구현과 검증](docs/page-turn-implementation.md)
+- [리더 글꼴 적용과 기기 테스트](docs/reader-fonts.md)
+- [Firebase 기본 설정](docs/firebase-setup.md)
+- [책·표지·글꼴 관리자와 다운로드 배포 절차](docs/reader-content-admin.md)
 - [미사용 기존 코드 정리](docs/unused-code-cleanup.md)
 - [이전 자체 엔진 설계 기록](docs/reader-core-reference-plan.md) — historical reference
 

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "families": [
+    {
+      "id": "maplestory",
+      "label": "메이플스토리",
+      "cssFamily": "KoofyMaplestory",
+      "faces": [
+        {
+          "file": "Maplestory OTF Light.otf",
+          "weight": 300,
+          "sha256": "0a10e5e4c5f4ab03e86d53aed2c363a472e30aba87c412955ce5a8ce8a161e87"
+        },
+        {
+          "file": "Maplestory OTF Bold.otf",
+          "weight": 700,
+          "sha256": "b1eb822fec7963a34689bf6381e4c4bf0fcfde1ad5c90125d800345cbcfd9ced"
+        }
+      ]
+    },
+    {
+      "id": "hakgyoansim-siganpyo",
+      "label": "학교안심 시간표",
+      "cssFamily": "KoofySiganpyo",
+      "faces": [
+        {
+          "file": "Hakgyoansim_SiganpyoOTFR.otf",
+          "weight": 400,
+          "sha256": "7c8c01c198c82d621ca73e148cbcf97a0e6ab986be76b77d316cc435c92a004d"
+        }
+      ]
+    }
+  ]
+}

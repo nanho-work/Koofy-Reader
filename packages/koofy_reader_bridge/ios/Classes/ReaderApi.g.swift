@@ -138,6 +138,10 @@ struct ReaderPreferences: Hashable {
   var columnCount: Int64
   var scroll: Bool
   var theme: String
+  /// Null is the legacy default, equivalent to 'instant'.
+  var pageTurnStyle: String? = nil
+  /// Null or 'default' preserves the publication's original font selection.
+  var fontId: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -146,12 +150,16 @@ struct ReaderPreferences: Hashable {
     let columnCount = pigeonVar_list[1] as! Int64
     let scroll = pigeonVar_list[2] as! Bool
     let theme = pigeonVar_list[3] as! String
+    let pageTurnStyle: String? = nilOrValue(pigeonVar_list[4])
+    let fontId: String? = nilOrValue(pigeonVar_list[5])
 
     return ReaderPreferences(
       fontScale: fontScale,
       columnCount: columnCount,
       scroll: scroll,
-      theme: theme
+      theme: theme,
+      pageTurnStyle: pageTurnStyle,
+      fontId: fontId
     )
   }
   func toList() -> [Any?] {
@@ -160,6 +168,8 @@ struct ReaderPreferences: Hashable {
       columnCount,
       scroll,
       theme,
+      pageTurnStyle,
+      fontId,
     ]
   }
   static func == (lhs: ReaderPreferences, rhs: ReaderPreferences) -> Bool {

@@ -45,6 +45,8 @@ class ReaderPreferences {
     required this.columnCount,
     required this.scroll,
     required this.theme,
+    this.pageTurnStyle,
+    this.fontId,
   });
 
   double fontScale;
@@ -55,12 +57,20 @@ class ReaderPreferences {
 
   String theme;
 
+  /// Null is the legacy default, equivalent to 'instant'.
+  String? pageTurnStyle;
+
+  /// Null or 'default' preserves the publication's original font selection.
+  String? fontId;
+
   List<Object?> _toList() {
     return <Object?>[
       fontScale,
       columnCount,
       scroll,
       theme,
+      pageTurnStyle,
+      fontId,
     ];
   }
 
@@ -74,6 +84,8 @@ class ReaderPreferences {
       columnCount: result[1]! as int,
       scroll: result[2]! as bool,
       theme: result[3]! as String,
+      pageTurnStyle: result[4] as String?,
+      fontId: result[5] as String?,
     );
   }
 

@@ -16,6 +16,8 @@ internal class ReaderSettingsDialog(
     private val context: Context,
     private val current: () -> ReaderPreferences,
     private val change: (ReaderPreferences) -> Unit,
+    private val fontIds: List<String> = ReaderFonts.ids,
+    private val fontLabels: List<String> = ReaderFonts.labels,
 ) {
     private val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val scroll = ScrollView(context).apply { addView(column) }
@@ -95,6 +97,22 @@ internal class ReaderSettingsDialog(
         choices("페이지 배치", listOf("자동", "한 페이지", "두 페이지"), p.columnCount.toInt()) {
             update(current().copy(columnCount = it.toLong(), scroll = false))
         }
+        if (!p.scroll) {
+            choices("페이지 전환 효과", listOf("바로 넘기기", "책장 넘기기"), if (p.pageTurnStyle == "curl") 1 else 0) {
+                update(current().copy(pageTurnStyle = if (it == 1) "curl" else "instant"))
+            }
+        } else {
+            column.addView(label("페이지 전환 효과 · 연속 스크롤에서는 사용하지 않습니다.", 12f)
+                .apply { setTextColor(colors.secondary) })
+        }
         column.addView(label("두 페이지는 화면 너비가 충분할 때 적용됩니다.", 12f).apply { setTextColor(colors.secondary) })
+        column.addView(label("글꼴"))
+        val selectedFont = (p.fontId ?: "default").takeIf { it in fontIds } ?: "default"
+        fontIds.forEachIndexed { index, id ->
+            val selected = id == selectedFont
+            column.addView(button(if (selected) "✓ ${fontLabels[index]}" else fontLabels[index], selected) {
+                update(current().copy(fontId = id))
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
     }
 }

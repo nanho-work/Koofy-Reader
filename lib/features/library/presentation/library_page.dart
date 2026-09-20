@@ -109,6 +109,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 toolbarHeight: 76,
                 actions: [
                   IconButton(
+                    tooltip: '책 · 글꼴 다운로드',
+                    icon: const Icon(Icons.cloud_download_outlined),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.catalog),
+                  ),
+                  IconButton(
                     tooltip: '서재 검색',
                     icon: Icon(_searching ? Icons.search_off : Icons.search),
                     onPressed: () => setState(() {

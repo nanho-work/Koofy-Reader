@@ -1,0 +1,7 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only the verified server API may access reader content and audit records.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

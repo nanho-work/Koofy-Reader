@@ -84,8 +84,15 @@ void main() {
     'pending checkpoint commits before acknowledgement and before new session opens',
     () async {
       final old = await store.beginSession('book', 'r1');
-      gateway.pending.add(checkpoint(old, href: 'recovered.xhtml'));
+      gateway.pending.add(
+        checkpoint(old, href: 'recovered.xhtml')
+          ..preferences!.pageTurnStyle = 'curl',
+      );
       gateway.beforeAcknowledge = () async {
+        expect(
+          (await store.loadPosition('book', 'r1')).preferences.pageTurnStyle,
+          'curl',
+        );
         expect(
           (await store.loadPosition('book', 'r1')).locatorJson,
           contains('recovered.xhtml'),
@@ -99,6 +106,7 @@ void main() {
         title: 'Book',
       );
       expect(gateway.request!.initialLocatorJson, contains('recovered.xhtml'));
+      expect(gateway.request!.preferences.pageTurnStyle, 'curl');
       expect(gateway.request!.sessionGeneration, greaterThan(old.generation));
       expect(gateway.acknowledged, hasLength(1));
     },

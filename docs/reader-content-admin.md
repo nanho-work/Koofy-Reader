@@ -1,0 +1,94 @@
+# 쿠피리더 책·표지·글꼴 배포
+
+## 구현 범위와 현재 상태
+
+2026-09-20 로컬 패치. 운영 Firebase 함수·규칙과 관리자 사이트는 아직 배포하지 않았다.
+
+- 서버: Koofy-Reader의 `functions/` (TypeScript, Node.js 22, Firebase Functions 2세대).
+- 운영 화면: 기존 Quiz_Site 관리자 → 쿠피리더 → 책·표지 / 글꼴.
+- 사용자 앱: 내 서재 상단 다운로드 아이콘 → 책 / 글꼴 목록 → 다운로드.
+- 책과 표지는 내 서재에 추가된다. 글꼴은 Android/iOS 네이티브 Readium 보기 설정의 마지막 목록에서 선택한다.
+- 기존 관리자 로그인 1회만 사용한다. 쿠피리더용 로그인 또는 사용자 앱 로그인을 추가하지 않았다.
+- 공개한 콘텐츠는 누구나 내려받는 모델이다. 유료 판매, 구매 권한, DRM, 개인 독서 기록의 서버 동기화는 이번 범위가 아니다.
+
+리소스는 읽기 전용 조회로 확인했다: 프로젝트 `koofy-reader`, Firestore `(default)` / `asia-northeast3`, Storage `koofy-reader.firebasestorage.app` / `US-EAST1`. 함수는 DB와 같은 서울에 둔다. 업로드 처리와 미국 버킷 간에는 지역 간 전송이 발생할 수 있다.
+
+## 관리자 사용 순서
+
+1. 기존 총괄 관리자 계정으로 로그인하고 쿠피리더를 선택한다.
+2. 책 또는 글꼴 이름, 제작자, 설명, 배포 권한·이용 조건을 작성하고 **초안 만들기**를 누른다.
+3. 책은 EPUB와 표지를 올린다. 글꼴은 실제 파일에 맞는 굵기(예: Light 300, Regular 400, Bold 700)를 선택하고 OTF/TTF를 각각 올린다.
+4. 등록 파일과 정보를 확인한 뒤 **앱에 공개**를 누른다.
+5. 앱의 다운로드 목록을 새로고침하고 받는다. 글꼴은 책을 열어 보기 설정에서 선택한다.
+6. 이미 공개한 항목을 수정하면 기존 공개 버전은 그대로 유지된다. **수정 내용 공개**를 누를 때 새 스냅샷으로 교체한다.
+
+비공개 전환은 신규 목록 조회와 신규 다운로드 주소 발급을 막는다. 이미 받은 파일은 기기에 남고, 이미 발급한 서명 URL은 최대 5분간 유효하다.
+
+초안에서 파일 제외는 공개 중인 스냅샷을 바로 바꾸지 않는다. 여러 관리자가 같은 버전을 수정하면 서버가 409 충돌을 반환한다. 새로고침 후 최신 상태에서 다시 작업한다.
+
+## 데이터와 접근 경계
+
+Firestore:
+
+- `readerContent/{id}`: kind, 제목·제작자·설명·이용 조건, revision, 초안 assets, published, publishedContent, updatedAt.
+- `publishedContent`: 공개 시점 메타데이터·파일 목록·version을 함께 저장한 불변 스냅샷.
+- `readerAudit/{id}`: 관리자 UID, 작업, 대상 ID, 변경 revision, 시각. 서버 전용 기록이며 조회 UI는 아직 없다.
+
+Storage: `readerContent/{id}/{uploadUUID}/{slot}.{extension}`. 파일은 덮어쓰지 않는다. SHA-256, 크기, 확장자, 콘텐츠 유형을 함께 저장한다.
+
+`readerAdmin`은 Authorization Bearer의 Firebase ID 토큰을 **기존 프로젝트 `slimestrikeforce`**의 Admin Auth 인스턴스로 검증하고 `superAdmin === true`를 요구한다. 화면의 로그인 여부만 믿지 않으며 요청에서 신뢰할 프로젝트 ID를 받지 않는다. 토큰의 서명·발급자·대상·만료를 SDK로 검증한다. 매 요청 계정 조회를 하는 토큰 폐기 확인은 사용하지 않으므로, 권한을 회수해도 이미 발급된 토큰의 잔여 수명(통상 최대 1시간) 동안 권한이 남을 수 있다. 즉시 폐기가 필요하면 기존 인증 프로젝트에서의 최소 조회 권한과 `checkRevoked`를 별도로 적용해야 한다.
+
+`readerCatalog`는 공개 스냅샷만 읽는다. 파일 요청 시 공개 상태, 공개 버전과 슬롯을 다시 확인하고 5분 유효 GCS 서명 URL을 발급한다. 초안 경로와 임의 Storage 경로는 서명하지 않는다.
+
+Firestore/Storage SDK의 클라이언트 직접 읽기·쓰기는 모두 거부한다. 서버는 서비스 계정으로 처리한다. 관리자 브라우저나 앱에 서비스 계정 비공개 키를 넣지 않는다.
+
+CORS 허용 주소는 `READER_ADMIN_ORIGINS`에 쉼표로 지정한다. 기본은 `https://admin.koofy.co.kr,http://localhost:3000`. 실제 관리자 호스트가 다르면 정확한 origin을 추가해야 한다. CORS는 관리자 권한 검증을 대체하지 않는다.
+
+## 파일 제한과 기기 저장
+
+- EPUB: 최대 20MiB, 암호화되지 않은 가변 레이아웃 EPUB. ZIP 경로·중복·암호화 플래그·팽창 크기, container/OPF 구조를 검사한다. 메타데이터 읽기는 개별 2MiB/합계 8MiB로 제한한다. EPUBCheck의 전체 규격 검증을 대체하지 않는다. `encryption.xml`이 있는 EPUB는 글꼴 난독화만 있는 경우도 현재 제외한다.
+- 표지: 최대 5MiB, 정지 PNG/JPEG/WebP, 최대 2,500만 픽셀. 서버에서 최대 900×1200 WebP로 재인코딩한다.
+- 글꼴: 파일당 최대 10MiB, 정적 OTF/TTF, 100~900의 100 단위 굵기. SFNT 서명·테이블 경계·필수 테이블을 검사한다. 가변 글꼴·WOFF는 지원하지 않는다.
+- 목록: 40개씩 페이지 조회. 앱은 스크롤 아래의 더 보기로 다음 목록을 읽는다.
+
+앱은 비공개 앱 저장소 `cloud_reader/books`와 `cloud_reader/fonts`에 저장한다. 다운로드 중에는 `.part` 파일을 사용하고 크기와 SHA-256이 일치한 후 이름을 바꾼다. 모든 글꼴 굵기의 다운로드가 끝나야 `fonts/catalog.json`을 원자적으로 교체한다. 네이티브 리더도 해시·경로·파일 헤더를 다시 검사하고 잘못된 글꼴은 제외한다.
+
+글꼴 ID는 `remote_<32자리 ID>`, CSS 이름은 안전한 고정 접두어와 ID로 만든다. Android와 iOS는 동일한 다운로드 manifest를 읽으며 WebView의 기존 로컬 파일 공급 방식을 사용한다. 기존 폰트 변경 시 위치 복원·책장 넘김 처리 경로는 유지한다.
+
+책 공개 버전은 별도 로컬 책 ID를 갖는다. 새 버전을 받더라도 이전 책과 읽던 위치는 덮어쓰지 않는다. 동일 버전을 다시 받으면 중복 등록하지 않는다. 내려받은 파일은 오프라인에서 쓴다.
+
+이번 패치에는 삭제·자동 정리 작업을 추가하지 않았다. 이전 공개 파일과 미참조 파일은 복구/기존 다운로드를 위해 보존한다. 저장량이 커지면 참조·보존 기간을 기준으로 별도 정리 작업을 추가해야 하며, 버킷 전체에 단순 기간 삭제 정책을 적용하면 현재 공개 파일도 지워질 수 있다.
+
+## 운영 반영 순서 (아직 실행하지 않음)
+
+로컬 구현과 배포는 구분한다. 다음 절차를 완료하기 전에는 앱에서 공개 목록을 불러올 수 없다.
+
+1. 배포 환경에 Node.js 22와 Functions SDK 7을 지원하는 최신 Firebase CLI를 준비한다. 전체 Functions 에뮬레이터를 사용할 때는 최신 CLI에 맞는 Java 21 이상도 준비한다. 로컬의 기존 CLI 14는 Functions SDK 7 실행에 호환 문제가 있어 아래 통합 테스트에서는 HTTP 핸들러를 별도 테스트 서버로 실행했다.
+2. `koofy-reader`에 `koofy-reader-api` 런타임 서비스 계정을 만든다. 함수 설정의 serviceAccount는 `koofy-reader-api@koofy-reader.iam.gserviceaccount.com`이다.
+3. 이 계정에 프로젝트의 `roles/datastore.user`, 해당 버킷에 한정한 `roles/storage.objectAdmin`, 자기 서비스 계정 리소스에 한정한 `roles/iam.serviceAccountTokenCreator`를 부여한다. 마지막 권한은 서명 URL 생성의 `signBlob`에 필요하다. IAM Service Account Credentials API를 활성화한다. 배포 주체에는 해당 서비스 계정을 사용하는 권한이 필요하다. 기존 Slime 프로젝트 IAM 권한은 이 토큰 검증 방식에 추가할 필요 없다.
+4. `functions/.env.example`을 `functions/.env.koofy-reader`로 복사해 실제 관리자 origin을 지정한다. 에뮬레이터 전용 환경변수를 운영에 설정하지 않는다.
+5. `npm --prefix functions ci`, `npm --prefix functions test`를 실행한다.
+6. Koofy-Reader 루트에서 `firebase deploy --project koofy-reader --only functions:reader,firestore,storage`를 실행한다. 인덱스가 준비될 때까지 기다린다. 규칙은 기존 기본 규칙을 모두 거부 정책으로 교체한다.
+7. Quiz_Site 기존 호스팅에 변경분을 배포한다. `NEXT_PUBLIC_READER_ADMIN_URL` 기본값은 `https://asia-northeast3-koofy-reader.cloudfunctions.net/readerAdmin`이며 다른 URL이면 빌드 전에 설정한다. 관리자 로그인 환경변수는 기존 Slime 설정을 유지한다.
+8. 테스트용 글꼴 1개와 EPUB·표지를 초안 등록 → 공개 → 실기기 다운로드 → 오프라인 재실행 → 글꼴 적용을 확인한다. 이 단계에서 실제 서비스 계정의 서명 권한과 Storage 다운로드를 검증한다.
+
+최소 인스턴스는 0, 함수별 최대 인스턴스는 3이다. 관리자 함수는 이미지/ZIP 처리 메모리를 위해 동시 처리 1·512MiB, 공개 API는 동시 처리 20·256MiB다. 최대 인스턴스는 비용 상한선이 아니며 다운로드 트래픽과 파일 보관에도 사용량 비용이 발생한다.
+
+## 검증
+
+- Flutter 분석: 문제 없음. 테스트 89개 통과(다운로드/무결성/원자적 글꼴 설치/버전 분리 신규 5개 포함).
+- Android debug APK, iOS Simulator 앱 빌드 성공.
+- Android/iOS 실제 네이티브 글꼴 manifest 테스트 각각 1개 통과: 검증된 글꼴 등록, 손상 글꼴 제외, 번들 글꼴 유지.
+- Quiz_Site TypeScript 검사 및 Next.js 프로덕션 빌드 성공.
+- 서버 단위 테스트: 인증 입력, 메타데이터·revision, 공개 스냅샷, EPUB·표지·글꼴 검증.
+- 서버 통합 테스트: 실제 HTTP 핸들러 + Auth/Firestore/Storage 에뮬레이터. 발급 프로젝트·권한 거부, 업로드·공개·초안 분리·동시 수정 충돌·비공개, 클라이언트 직접 읽기/쓰기 거부. 서명 URL 생성만 테스트용 signer로 대체한다.
+- 운영 클라우드 배포, 실제 GCS 서명/IAM, 관리자 로그인 후 실기기 전체 흐름은 미검증이다.
+
+서버 통합 테스트는 루트에서 빌드한 뒤 다음처럼 실행한다:
+
+```sh
+npm --prefix functions run build
+firebase emulators:exec --project demo-koofy-reader --only auth,firestore,storage 'node --test functions/test/emulator-runner.cjs'
+```
+
+이 명령은 운영 데이터에 쓰지 않는다. 테스트가 다른 프로젝트의 인증을 다루므로 에뮬레이터 singleProjectMode는 false다.

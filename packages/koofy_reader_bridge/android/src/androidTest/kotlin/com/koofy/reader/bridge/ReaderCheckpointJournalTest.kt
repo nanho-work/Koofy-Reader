@@ -65,6 +65,22 @@ class ReaderCheckpointJournalTest {
         assertEquals(1L, journal.pending().single().sequence)
     }
 
+    @Test fun curlPreferenceRoundTripsAndLegacyMissingFieldMeansInstant() {
+        val state = event("style", 1)
+        journal.write(state.copy(preferences = state.preferences!!.copy(pageTurnStyle = "curl", fontId = "maplestory")))
+        assertEquals("curl", ReaderCheckpointJournal(root).pending().single().preferences!!.pageTurnStyle)
+        assertEquals("maplestory", ReaderCheckpointJournal(root).pending().single().preferences!!.fontId)
+        val file = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single()
+        val legacy = org.json.JSONObject(file.readText())
+        legacy.getJSONObject("preferences").remove("pageTurnStyle")
+        legacy.getJSONObject("preferences").remove("fontId")
+        file.writeText(legacy.toString())
+        val recovered = ReaderCheckpointJournal(root).pending().single()
+        assertEquals("instant", recovered.preferences!!.pageTurnStyle ?: "instant")
+        assertEquals("default", recovered.preferences!!.fontId ?: "default")
+        assertEquals(state.locatorJson, recovered.locatorJson)
+    }
+
     private fun event(id: String, sequence: Long) = ReaderEvent(
         protocolVersion = 1,
         sessionId = id,

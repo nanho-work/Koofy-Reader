@@ -103,6 +103,8 @@ internal fun validatePreferences(value: ReaderPreferences) {
     require(value.fontScale.isFinite() && value.fontScale in 0.5..3.0) { "Invalid font scale" }
     require(value.columnCount in 0L..2L) { "Invalid column count" }
     require(value.theme in listOf("light", "sepia", "dark")) { "Invalid reader theme" }
+    require(ReaderFonts.isValidId(value.fontId)) { "Invalid reader font" }
+    require(value.pageTurnStyle == null || value.pageTurnStyle in listOf("instant", "curl")) { "Invalid page turn style" }
 }
 
 internal class ReaderSession(val request: ReaderLaunchRequest) {

@@ -26,6 +26,51 @@ ReaderEvent checkpoint(
 
 void main() {
   test(
+    'legacy preference JSON defaults to instant without changing layout',
+    () {
+      final preferences = preferencesFromJson(
+        '{"fontScale":1.4,"columnCount":2,"scroll":false,"theme":"sepia"}',
+      );
+      expect(preferences.pageTurnStyle, 'instant');
+      expect(preferences.fontId, 'default');
+      expect(preferences.fontScale, 1.4);
+      expect(preferences.columnCount, 2);
+      expect(preferences.theme, 'sepia');
+    },
+  );
+
+  test('curl preference survives JSON and the generated bridge codec', () {
+    final preferences = ReaderPreferences(
+      fontScale: 1.2,
+      columnCount: 2,
+      scroll: true,
+      theme: 'dark',
+      pageTurnStyle: 'curl',
+    );
+    final decoded = ReaderPreferences.decode(preferences.encode());
+    final restored = preferencesFromJson(preferencesToJson(decoded));
+    expect(restored.pageTurnStyle, 'curl');
+    expect(
+      restored.scroll,
+      isTrue,
+    ); // Scrolling suspends, not erases, the choice.
+    expect(restored.fontScale, 1.2);
+  });
+
+  test('font families survive the bridge codec and JSON round trip', () {
+    for (final id in ['default', 'maplestory', 'hakgyoansim-siganpyo']) {
+      final preferences = defaultReaderPreferences()..fontId = id;
+      final decoded = ReaderPreferences.decode(preferences.encode());
+      expect(preferencesFromJson(preferencesToJson(decoded)).fontId, id);
+    }
+    expect(
+      () =>
+          preferencesToJson(defaultReaderPreferences()..fontId = '../font.otf'),
+      throwsFormatException,
+    );
+  });
+
+  test(
     'v1 database upgrades without rewriting positions or inventing read dates',
     () async {
       final directory = await Directory.systemTemp.createTemp(
@@ -46,7 +91,7 @@ void main() {
           1,
           4,
           '{"href":"saved.xhtml"}',
-          preferencesToJson(defaultReaderPreferences()),
+          '{"fontScale":1.0,"columnCount":0,"scroll":false,"theme":"light"}',
         ],
       );
       await old.close();
@@ -55,6 +100,10 @@ void main() {
         expect(
           (await upgraded.loadPosition('book', 'r1')).locatorJson,
           contains('saved.xhtml'),
+        );
+        expect(
+          (await upgraded.loadPosition('book', 'r1')).preferences.pageTurnStyle,
+          'instant',
         );
         final summary = (await upgraded.loadLibraryPositions()).single;
         expect(summary.lastOpenedAt, isNull);
@@ -191,11 +240,67 @@ void main() {
             columnCount: 2,
             scroll: false,
             theme: 'sepia',
+            fontId: 'maplestory',
           );
         await store.acceptCheckpoint(event);
+        expect(
+          (await store.loadPosition('book', 'r1')).preferences.fontId,
+          'maplestory',
+        );
         final saved = await store.loadPosition('book', 'r1');
         expect(saved.locatorJson, contains('chapter.xhtml'));
         expect(saved.preferences.fontScale, 1.4);
+      },
+    );
+
+    test(
+      'turn style change keeps exact anchor and survives a new session',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        const anchor =
+            '{"href":"chapter.xhtml","locations":{"koofyText":'
+            '{"cssSelector":"#p60","textNodeIndex":0,"charOffset":17}},'
+            '"text":{"highlight":"읽던 문장"}}';
+        await store.acceptCheckpoint(checkpoint(session)..locatorJson = anchor);
+        await store.acceptCheckpoint(
+          checkpoint(session, sequence: 2)
+            ..kind = 'preferencesChanged'
+            ..locatorJson = null
+            ..preferences!.pageTurnStyle = 'curl',
+        );
+        final saved = await store.loadPosition('book', 'r1');
+        expect(saved.locatorJson, anchor);
+        expect(saved.preferences.pageTurnStyle, 'curl');
+        await store.beginSession('book', 'r1');
+        // An unacknowledged checkpoint from the older session cannot reset style.
+        await store.acceptCheckpoint(checkpoint(session, sequence: 999));
+        final reopened = await store.loadPosition('book', 'r1');
+        expect(reopened.locatorJson, anchor);
+        expect(reopened.preferences.pageTurnStyle, 'curl');
+        expect(
+          (await store.loadPosition(
+            'other-book',
+            'r1',
+          )).preferences.pageTurnStyle,
+          'instant',
+        );
+      },
+    );
+
+    test(
+      'invalid turn style cannot replace a committed reading record',
+      () async {
+        final session = await store.beginSession('book', 'r1');
+        await store.acceptCheckpoint(checkpoint(session));
+        final invalid = checkpoint(session, sequence: 2, href: 'wrong.xhtml')
+          ..preferences!.pageTurnStyle = 'unknown';
+        await expectLater(
+          store.acceptCheckpoint(invalid),
+          throwsFormatException,
+        );
+        final saved = await store.loadPosition('book', 'r1');
+        expect(saved.locatorJson, contains('chapter.xhtml'));
+        expect(saved.preferences.pageTurnStyle, 'instant');
       },
     );
 

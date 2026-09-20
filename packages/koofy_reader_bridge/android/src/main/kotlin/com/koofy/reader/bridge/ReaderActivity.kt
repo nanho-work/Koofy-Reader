@@ -37,13 +37,13 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
+import org.readium.r2.navigator.input.Key
+import org.readium.r2.navigator.input.KeyEvent
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubPreferences
-import org.readium.r2.navigator.epub.css.RsProperties
 import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.Theme
-import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.epub.EpubLayout
@@ -78,6 +78,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var navigation: LinearLayout
     private var chromeVisible = true
     private lateinit var container: FragmentContainerView
+    private lateinit var turnHost: ReaderTurnHost
+    private lateinit var previewContainer: FragmentContainerView
+    private lateinit var curlView: ReaderPageCurlView
+    internal var pageTurns: ReaderPageTurns? = null
+        private set
+    private lateinit var readerFonts: ReaderFonts
     private var publication: Publication? = null
     private var navigator: EpubNavigatorFragment? = null
     private var lastLocator: Locator? = null
@@ -144,9 +150,18 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         toolbar.addView(button("보기") { showSettings() })
         page.addView(toolbar, LinearLayout.LayoutParams(-1, dp(52)))
         container = FragmentContainerView(this).apply { id = View.generateViewId() }
-        page.addView(container, LinearLayout.LayoutParams(-1, 0, 1f))
+        previewContainer = FragmentContainerView(this).apply {
+            id = View.generateViewId()
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        turnHost = ReaderTurnHost(this)
+        curlView = ReaderPageCurlView(this)
+        turnHost.addView(previewContainer, FrameLayout.LayoutParams(-1, -1))
+        turnHost.addView(container, FrameLayout.LayoutParams(-1, -1))
+        turnHost.addView(curlView, FrameLayout.LayoutParams(-1, -1))
+        page.addView(turnHost, LinearLayout.LayoutParams(-1, 0, 1f))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        navigation.addView(button("이전") { if (session.ready) navigator?.goBackward(true) })
+        navigation.addView(button("이전") { pageTurns?.request(false) })
         status = TextView(this).apply {
             text = "책을 여는 중…"
             gravity = Gravity.CENTER
@@ -154,7 +169,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setTextColor(Color.rgb(60, 50, 40))
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-        navigation.addView(button("다음") { if (session.ready) navigator?.goForward(true) })
+        navigation.addView(button("다음") { pageTurns?.request(true) })
         page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
         ViewCompat.setOnApplyWindowInsetsListener(outer) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
@@ -190,6 +205,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private suspend fun openPublication() {
         try {
             val opened = withContext(Dispatchers.IO) {
+                readerFonts = ReaderFonts(this@ReaderActivity)
                 val http = object : HttpClient {
                     override suspend fun stream(request: HttpRequest): Try<HttpStreamResponse, HttpError> =
                         Try.failure(HttpError.IO(IOException("Remote publication resources are disabled")))
@@ -201,7 +217,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 opener.open(asset, allowUserInteraction = false, onCreatePublication = {
                     // Readium's own scripts are required for layout. Publication scripts,
                     // event handlers, remote fetches and nested frames are denied by CSP.
-                    container = TransformingContainer(container) { url, resource ->
+                    container = TransformingContainer(org.readium.r2.shared.util.data.CompositeContainer(readerFonts.container(), container)) { url, resource ->
                         if (url.toString().substringBefore('?').substringBefore('#')
                                 .endsWithHtml()) {
                             TransformingResource(resource) { bytes ->
@@ -234,30 +250,52 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 initialPreferences = epubPreferences(),
                 listener = this,
                 paginationListener = this,
-                configuration = EpubNavigatorFragment.Configuration(
-                    shouldApplyInsetsPadding = false,
-                    readiumCssRsProperties = RsProperties(overrides = mapOf(
-                        // Readium CSS otherwise gates USER column count behind a 60em
-                        // media query, silently ignoring two pages on many foldables.
-                        "--RS__colWidth" to "auto",
-                        "--RS__colCount" to "var(--USER__colCount, 1)",
-                    )),
-                ),
+                configuration = readerNavigatorConfiguration(readerFonts),
             )
             supportFragmentManager.fragmentFactory = factory
             val reader = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name) as EpubNavigatorFragment
             navigator = reader
             supportFragmentManager.beginTransaction().replace(container.id, reader, "koofy.epub").commitNow()
+            pageTurns = ReaderPageTurns(this, turnHost, curlView,
+                ReaderPageSurfaces(supportFragmentManager, previewContainer, opened, anchorScript, readerFonts),
+                { navigator }, { epubPreferences() },
+                { session.preferences.pageTurnStyle == "curl" && !session.preferences.scroll },
+                { session.ready && !session.closing && !loadingFailed && !layoutPending &&
+                    restoreTarget == null && captureJob?.isActive != true },
+                { target ->
+                    beginRestore(target)
+                    restoreIssued = true
+                    navigator?.go(target, false) == true
+                })
+            turnHost.pageMode = !session.preferences.scroll
             reader.addInputListener(object : InputListener {
                 override fun onTap(event: TapEvent): Boolean {
                     val width = reader.publicationView.width.toDouble()
                     val edge = maxOf(80.0, width * .3)
-                    if (event.point.x <= edge || event.point.x >= width - edge) return false
+                    if (event.point.x <= edge || event.point.x >= width - edge) {
+                        if (session.preferences.scroll) return false
+                        val right = event.point.x >= width - edge
+                        val rtl = reader.settings.value.readingProgression == org.readium.r2.navigator.preferences.ReadingProgression.RTL
+                        pageTurns?.request(if (rtl) !right else right)
+                        return true
+                    }
                     toggleChrome()
                     return true
                 }
+                override fun onKey(event: KeyEvent): Boolean {
+                    if (event.type != KeyEvent.Type.Down || event.modifiers.isNotEmpty()) return false
+                    val rtl = reader.settings.value.readingProgression == org.readium.r2.navigator.preferences.ReadingProgression.RTL
+                    val next = when (event.key) {
+                        Key.ArrowRight -> !rtl
+                        Key.ArrowLeft -> rtl
+                        Key.ArrowDown, Key.Space -> true
+                        Key.ArrowUp -> false
+                        else -> return false
+                    }
+                    pageTurns?.request(next)
+                    return true
+                }
             })
-            reader.addInputListener(DirectionalNavigationAdapter(reader))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -286,6 +324,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         captureJob?.cancel()
         captureJob = lifecycleScope.launch {
             try {
+                if (readerFonts.family(session.preferences.fontId) != null) readerFonts.waitUntilStable(reader)
                 // Readium emits page-rounded positions. Inspect text only after this
                 // callback, and discard work belonging to an older viewport.
                 val anchor = target ?: lastLocator
@@ -312,7 +351,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     json.put("text", snapshot.getJSONObject("text"))
                     parseLocator(json.toString())
                 }
-                val saved = if (visible) anchor!! else exact ?: target ?: lastLocator ?: locator
+                val saved = if (visible) anchor!! else exact ?: target ?: locator
                 restoreTimeout?.cancel()
                 restoreTarget = null
                 lastLocator = saved
@@ -326,6 +365,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     if (hingeFallback) append(" · 한쪽 화면")
                 }
                 emit(kind)
+                pageTurns?.mainSettled()
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -346,6 +386,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         check(session.ready && !session.closing) { "The reader is not ready" }
         val locator = parseLocator(json)
         require(publication?.linkWithHref(locator.href) != null) { "Unknown publication location" }
+        pageTurns?.invalidate()
         beginRestore(locator)
         restoreIssued = true
         check(navigator?.go(locator, false) == true) { "Could not navigate to the location" }
@@ -354,9 +395,15 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     fun applyReaderPreferences(preferences: ReaderPreferences) {
         check(session.ready && !session.closing) { "The reader is not ready" }
         validatePreferences(preferences)
+        val previous = session.preferences
         session.preferences = preferences
-        applyChromeTheme()
-        scheduleRelayout()
+        turnHost.pageMode = !preferences.scroll
+        if (previous.copy(pageTurnStyle = preferences.pageTurnStyle) == preferences) {
+            pageTurns?.refresh()
+        } else {
+            applyChromeTheme()
+            scheduleRelayout()
+        }
         emit("preferencesChanged")
     }
 
@@ -373,6 +420,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     private fun scheduleRelayout() {
+        pageTurns?.invalidate()
         val generation = ++layoutGeneration
         val anchor = restoreTarget ?: lastLocator ?: return
         beginRestore(anchor)
@@ -410,6 +458,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             backgroundColor = org.readium.r2.navigator.preferences.Color(palette.background),
             textColor = org.readium.r2.navigator.preferences.Color(palette.foreground),
             fontSize = p.fontScale,
+            fontFamily = readerFonts.family(p.fontId),
             columnCount = columns,
             scroll = p.scroll,
             theme = when (p.theme) { "dark" -> Theme.DARK; "light" -> Theme.LIGHT; else -> Theme.SEPIA },
@@ -419,7 +468,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     private fun showSettings() {
         if (!session.ready || session.closing) return
-        ReaderSettingsDialog(this, { session.preferences }, { applyReaderPreferences(it) }).show()
+        ReaderSettingsDialog(this, { session.preferences }, { applyReaderPreferences(it) },
+            readerFonts.optionIds, readerFonts.optionLabels).show()
     }
 
     private fun toggleChrome() {
@@ -464,6 +514,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         add(links)
         AlertDialog.Builder(this).setTitle("목차")
             .setItems(flattened.mapIndexed { index, link -> link.title ?: "${index + 1}장" }.toTypedArray()) { _, index ->
+                pageTurns?.invalidate()
                 restoreTarget = null
                 restoreTimeout?.cancel()
                 navigator?.go(flattened[index], false)
@@ -517,13 +568,35 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onPause() {
+        pageTurns?.suspendPreparation()
         if (::session.isInitialized && session.ready && !session.closing && !loadingFailed) emit("locationChanged")
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::session.isInitialized && session.ready) pageTurns?.resumePreparation()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) pageTurns?.dispose()
+    }
+
+    override fun onActionModeStarted(mode: android.view.ActionMode) {
+        super.onActionModeStarted(mode)
+        if (::turnHost.isInitialized) turnHost.selecting = true
+    }
+
+    override fun onActionModeFinished(mode: android.view.ActionMode) {
+        super.onActionModeFinished(mode)
+        if (::turnHost.isInitialized) turnHost.selecting = false
     }
 
     fun closeReader() {
         if (!::session.isInitialized || session.closing) return
         session.closing = true
+        pageTurns?.invalidate()
         restoreTimeout?.cancel()
         openingTimeout?.cancel()
         layoutJob?.cancel()
@@ -567,6 +640,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onDestroy() {
+        pageTurns?.dispose()
         if (ReaderRuntime.reader === this) ReaderRuntime.reader = null
         super.onDestroy()
         publication?.close()

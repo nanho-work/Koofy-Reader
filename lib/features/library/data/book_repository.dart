@@ -19,6 +19,7 @@ final booksProvider = FutureProvider<List<Book>>(
 abstract class BookRepository {
   Future<List<Book>> getBooks();
   Future<Book?> importBookFile(String path);
+  Future<void> saveDownloadedBook(Book book);
   Future<bool> removeBookFromLibrary(String bookId);
   Future<bool> deleteLocalBook(String bookId);
 }
@@ -103,6 +104,20 @@ class LocalBookRepository implements BookRepository {
     final next = [imported, ...localBooks];
     await _saveLocalBooks(next);
     return imported;
+  }
+
+  @override
+  Future<void> saveDownloadedBook(Book book) async {
+    if (!book.isLocalFile ||
+        book.localPath == null ||
+        !await File(book.localPath!).exists()) {
+      throw StateError('다운로드한 책 파일을 찾을 수 없습니다.');
+    }
+    final current = await _loadLocalBooks();
+    await _saveLocalBooks([
+      book,
+      ...current.where((existing) => existing.id != book.id),
+    ]);
   }
 
   @override

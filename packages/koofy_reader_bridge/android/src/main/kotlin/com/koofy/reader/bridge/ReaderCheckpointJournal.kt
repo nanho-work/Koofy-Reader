@@ -65,6 +65,8 @@ internal class ReaderCheckpointJournal(filesDir: File) {
                 put("columnCount", preferences.columnCount)
                 put("scroll", preferences.scroll)
                 put("theme", preferences.theme)
+                put("pageTurnStyle", preferences.pageTurnStyle ?: "instant")
+                put("fontId", preferences.fontId ?: "default")
             })
         }
     }
@@ -82,7 +84,7 @@ internal class ReaderCheckpointJournal(filesDir: File) {
             locatorJson = json.optionalString("locatorJson"),
             preferences = json.optJSONObject("preferences")?.let {
                 ReaderPreferences(it.getDouble("fontScale"), it.getLong("columnCount"),
-                    it.getBoolean("scroll"), it.getString("theme"))
+                    it.getBoolean("scroll"), it.getString("theme"), it.optionalString("pageTurnStyle"), it.optionalString("fontId"))
             },
             errorCode = json.optionalString("errorCode"),
             message = json.optionalString("message"),
