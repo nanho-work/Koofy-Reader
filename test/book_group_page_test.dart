@@ -22,12 +22,17 @@ void main() {
     await tester.scrollUntilVisible(
       tile,
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('library-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.ensureVisible(tile);
-    await tester.tap(
-      find.descendant(of: tile, matching: find.byType(BookCover)),
-    );
+    final cover = find.descendant(of: tile, matching: find.byType(BookCover));
+    await tester.ensureVisible(cover);
+    await tester.pumpAndSettle();
+    await tester.tap(cover);
     await tester.pumpAndSettle();
   }
 

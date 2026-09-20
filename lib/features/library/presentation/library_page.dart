@@ -32,6 +32,9 @@ class LibraryPage extends ConsumerStatefulWidget {
 class _LibraryPageState extends ConsumerState<LibraryPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  final _sidebarScroll = ScrollController();
+  bool _downloadsExpanded = false;
+  bool _catalogVisited = false;
   LibraryBookStatus? _filter;
   bool _titleSort = false;
   bool _importing = false;
@@ -59,6 +62,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   void dispose() {
     _search.dispose();
     _scroll.dispose();
+    _sidebarScroll.dispose();
     super.dispose();
   }
 
@@ -113,23 +117,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           child: Builder(
             builder: (context) => Scaffold(
               appBar: AppBar(
-                title: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'KOOFY',
-                      style: TextStyle(fontSize: 11, letterSpacing: 2),
-                    ),
-                    Text(
-                      '내 서재',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                toolbarHeight: 76,
+                toolbarHeight: 48,
                 actions: [
                   IconButton(
                     tooltip: '책 묶음 만들기',
@@ -370,23 +358,71 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           children: [
             SizedBox(
               width: leftWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: constraints.maxHeight * .48,
-                    ),
-                    child: SingleChildScrollView(primary: false, child: intro),
+              child: CustomScrollView(
+                key: const PageStorageKey('library-sidebar-scroll'),
+                controller: _sidebarScroll,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _downloadsExpanded
+                        ? Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                            child: OutlinedButton.icon(
+                              key: const ValueKey('expand-reading'),
+                              onPressed: () => _showDownloads(false),
+                              icon: const Icon(Icons.expand_more),
+                              label: Text(
+                                recent.isNotEmpty
+                                    ? '읽던 책: ${recent.first.title}'
+                                    : '책 읽기',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                        : intro,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      '다운로드',
-                      style: Theme.of(context).textTheme.titleMedium,
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      child: Semantics(
+                        expanded: _downloadsExpanded,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('toggle-downloads'),
+                          onPressed: () => _showDownloads(!_downloadsExpanded),
+                          icon: Icon(
+                            _downloadsExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                          ),
+                          label: const Text('도서·글꼴 다운로드'),
+                        ),
+                      ),
                     ),
                   ),
-                  const Expanded(child: ReaderCatalogBrowser()),
+                  SliverLayoutBuilder(
+                    builder: (context, constraints) => SliverToBoxAdapter(
+                      child: Visibility(
+                        visible: _downloadsExpanded,
+                        maintainState: true,
+                        child: SizedBox(
+                          // Use the space below the actual menu heights. On very
+                          // short screens, the entire sidebar can scroll instead
+                          // of clipping the reader card or squeezing the catalog.
+                          height: math.max(
+                            280,
+                            constraints.viewportMainAxisExtent -
+                                constraints.precedingScrollExtent,
+                          ),
+                          child: _catalogVisited
+                              ? const ReaderCatalogBrowser()
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -396,6 +432,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         );
       },
     );
+  }
+
+  void _showDownloads(bool expanded) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_sidebarScroll.hasClients) _sidebarScroll.jumpTo(0);
+    setState(() {
+      _downloadsExpanded = expanded;
+      if (expanded) _catalogVisited = true;
+    });
   }
 
   int _compareRecent(Book a, Book b, Map<String, LibraryReadingState> states) {
@@ -444,13 +489,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '이어 읽기',
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: colors.onSurfaceVariant),
-        ),
-        const SizedBox(height: 12),
         Container(
           key: const ValueKey('continue-reading-card'),
           padding: const EdgeInsets.all(18),
@@ -476,8 +514,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       children: [
                         Text(
                           book.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 6),
@@ -489,8 +525,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           const SizedBox(height: 6),
                           Text(
                             state.chapterTitle!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],

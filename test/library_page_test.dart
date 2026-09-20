@@ -85,6 +85,8 @@ Future<void> pumpLibrary(
       overrides: [
         catalogItemsProvider('book').overrideWith((ref) async => catalog),
         catalogInstalledProvider('book').overrideWith((ref) async => {}),
+        catalogItemsProvider('font').overrideWith((ref) async => []),
+        catalogInstalledProvider('font').overrideWith((ref) async => {}),
         booksProvider.overrideWith((ref) async => books ?? demoBooks),
         if (nativePositions == null)
           libraryReadingStateProvider.overrideWith(
@@ -162,33 +164,149 @@ void main() {
     await tester.pumpAndSettle();
     expect(routes.single.name, AppRoutes.catalog);
   });
-  testWidgets('wide catalog scrolls independently below the continuation', (
-    tester,
-  ) async {
-    await pumpLibrary(
-      tester,
-      size: const Size(840, 900),
-      catalog: [for (var i = 0; i < 12; i++) catalogFixture(i)],
-    );
-    await tester.pumpAndSettle();
-    final shelf = tester
-        .widget<CustomScrollView>(find.byType(CustomScrollView))
-        .controller!;
-    final before = tester.getRect(
-      find.byKey(const ValueKey('continue-reading-card')),
-    );
-    final list = find.byKey(const PageStorageKey('catalog-list-book'));
-    await tester.drag(list, const Offset(0, -350));
-    await tester.pumpAndSettle();
-    expect(tester.widget<ListView>(list).controller!.offset, greaterThan(0));
-    expect(shelf.offset, 0);
-    expect(
-      tester.getRect(find.byKey(const ValueKey('continue-reading-card'))),
-      before,
-    );
-    expect(tester.takeException(), isNull);
-    await capture(tester, 'catalog-sidebar');
-  });
+  testWidgets(
+    'wide menus are exclusive and preserve catalog tab query and scroll',
+    (tester) async {
+      await pumpLibrary(
+        tester,
+        size: const Size(840, 900),
+        catalog: [for (var i = 0; i < 12; i++) catalogFixture(i)],
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('continue-reading-card')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('catalog-search-book')), findsNothing);
+      expect(find.text('내 서재'), findsNothing);
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('KOOFY')),
+        findsNothing,
+      );
+      expect(find.text('이어 읽기'), findsOneWidget);
+      expect(tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight, 48);
+      await capture(tester, 'reading-expanded');
+      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
+      final header = find.byKey(const ValueKey('expand-reading'));
+      final before = tester.getRect(header);
+      final shelf = tester
+          .widget<CustomScrollView>(
+            find.byKey(const PageStorageKey('library-scroll')),
+          )
+          .controller!;
+      await tester.enterText(
+        find.byKey(const ValueKey('catalog-search-book')),
+        '도서',
+      );
+      await tester.pumpAndSettle();
+      final list = find.byKey(const PageStorageKey('catalog-list-book'));
+      await tester.drag(list, const Offset(0, -350));
+      await tester.pumpAndSettle();
+      final controller = tester.widget<ListView>(list).controller!;
+      final offset = controller.offset;
+      expect(offset, greaterThan(0));
+      expect(shelf.offset, 0);
+      expect(tester.getRect(header), before);
+      await capture(tester, 'downloads-expanded');
+      await tester.tap(find.text('글꼴'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('catalog-search-font')),
+        '학교',
+      );
+      await tester.tap(header);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('continue-reading-card')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('catalog-search-font')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('catalog-search-font')),
+            )
+            .controller!
+            .text,
+        '학교',
+      );
+      await tester.tap(find.text('도서'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('catalog-search-book')),
+            )
+            .controller!
+            .text,
+        '도서',
+      );
+      expect(tester.widget<ListView>(list).controller, same(controller));
+      expect(controller.offset, closeTo(offset, 1));
+      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('continue-reading-card')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'long reading card grows with content and sidebar scrolls as a whole',
+    (tester) async {
+      final book = Book.asset(
+        id: 'long',
+        title: '긴 제목을 생략하지 않고 자연스럽게 보여 주는 책입니다 ' * 3,
+        author: '쿠피 작가',
+        description: '',
+        assetPath: 'sample.txt',
+      );
+      final chapter = '장 이름도 내용에 맞게 자연스럽게 표시합니다 ' * 3;
+      await pumpLibrary(
+        tester,
+        size: const Size(840, 450),
+        scale: 2,
+        books: [book],
+        states: () async => {
+          'long': LibraryReadingState(
+            progression: .3,
+            lastReadAt: DateTime.now(),
+            chapterTitle: chapter,
+          ),
+        },
+      );
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('continue-reading-card'));
+      final title = find.descendant(of: card, matching: find.text(book.title));
+      expect(tester.widget<Text>(title.last).maxLines, isNull);
+      expect(tester.widget<Text>(find.text(chapter)).maxLines, isNull);
+      final button = find.widgetWithText(FilledButton, '이어 읽기');
+      expect(
+        tester.getRect(button).bottom,
+        lessThan(tester.getRect(card).bottom),
+      );
+      expect(tester.getSize(card).height, greaterThan(450));
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      expect(button.hitTestable(), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('toggle-downloads')),
+      );
+      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('catalog-search-book')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('expand-reading')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('returning from reader refreshes committed native progress', (
     tester,
   ) async {
@@ -378,7 +496,10 @@ void main() {
       await pumpLibrary(tester, size: size, scale: 2);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -600));
+      await tester.drag(
+        find.byKey(const PageStorageKey('library-scroll')),
+        const Offset(0, -600),
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
@@ -398,7 +519,7 @@ void main() {
         200,
         scrollable: find
             .descendant(
-              of: find.byType(CustomScrollView),
+              of: find.byKey(const PageStorageKey('library-scroll')),
               matching: find.byType(Scrollable),
             )
             .first,
@@ -476,15 +597,24 @@ void main() {
     await tester.ensureVisible(find.widgetWithText(ChoiceChip, '읽을 책'));
     await tester.tap(find.widgetWithText(ChoiceChip, '읽을 책'));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.drag(
+      find.byKey(const PageStorageKey('library-scroll')),
+      const Offset(0, -300),
+    );
     await tester.pumpAndSettle();
     final controller = tester
-        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .widget<CustomScrollView>(
+          find.byKey(const PageStorageKey('library-scroll')),
+        )
         .controller;
     tester.view.physicalSize = const Size(840, 900);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<CustomScrollView>(find.byType(CustomScrollView)).controller,
+      tester
+          .widget<CustomScrollView>(
+            find.byKey(const PageStorageKey('library-scroll')),
+          )
+          .controller,
       same(controller),
     );
     expect(tester.takeException(), isNull);
@@ -563,12 +693,16 @@ void main() {
     await pumpLibrary(tester, books: manyBooks, states: () async => {});
     await tester.pumpAndSettle();
     final controller = tester
-        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .widget<CustomScrollView>(
+          find.byKey(const PageStorageKey('library-scroll')),
+        )
         .controller!;
     controller.jumpTo(1800);
     await tester.pumpAndSettle();
     String topBook() {
-      final viewport = tester.getRect(find.byType(CustomScrollView));
+      final viewport = tester.getRect(
+        find.byKey(const PageStorageKey('library-scroll')),
+      );
       final tiles =
           find.byType(BookTile).evaluate().where((e) {
             final rect = tester.getRect(find.byWidget(e.widget));
@@ -589,7 +723,9 @@ void main() {
     expect(original, findsOneWidget);
     expect(
       tester.getRect(original).bottom,
-      greaterThan(tester.getRect(find.byType(CustomScrollView)).top),
+      greaterThan(
+        tester.getRect(find.byKey(const PageStorageKey('library-scroll'))).top,
+      ),
     );
     expect(tester.getRect(original).top, lessThan(350));
     expect(tester.takeException(), isNull);
