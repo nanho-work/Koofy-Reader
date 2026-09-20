@@ -4,10 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 import 'package:koofy_reader/app/app.dart';
 import 'package:koofy_reader/firebase_options.dart';
-import 'package:koofy_reader/features/ads/config/admob_ids.dart';
+import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
 import 'package:koofy_reader/core/storage/storage_migration_runner.dart';
 
 Future<void> main() async {
@@ -20,8 +20,6 @@ Future<void> main() async {
       options: ReaderFirebaseOptions.currentPlatform,
     );
   }
-  if (!kIsWeb && AdMobIds.isSupportedPlatform) {
-    unawaited(MobileAds.instance.initialize());
-  }
+  unawaited(LevelPlayService.instance.initialize());
   runApp(const ProviderScope(child: KoofyReaderApp()));
 }

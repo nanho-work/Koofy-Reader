@@ -319,6 +319,59 @@ class ReaderRenderingTest {
         assertTrue("Committed page must contain the prepared anchor", anchorVisible(target!!))
     }
 
+    @Test fun consecutiveCurlsReuseImagesAndNeverFallBackDuringPreparation() {
+        createFixture(fixture, paragraphCount = 600)
+        launch(preferences = ReaderPreferences(1.0, 1, false, "light", "curl"))
+        awaitCondition("Lookahead not prepared") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.at(2) != null }
+            ready
+        }
+        var generation = 0L
+        scenario!!.onActivity { generation = it.pageTurns!!.generation }
+        repeat(10) { step ->
+            val before = ReaderRuntime.session!!.locatorJson
+            var prepared: PageSurface? = null
+            scenario!!.onActivity {
+                prepared = it.pageTurns!!.surfaces?.next
+                it.pageTurns!!.request(true)
+            }
+            awaitCondition("Continuous turn $step was lost") {
+                var idle = false
+                scenario!!.onActivity { idle = it.pageTurns!!.state == "idle" }
+                idle && ReaderRuntime.session!!.locatorJson != before
+            }
+            scenario!!.onActivity {
+                val turns = it.pageTurns!!
+                assertEquals("Continuous turns must retain the layout generation", generation, turns.generation)
+                assertEquals("No instant fallback during normal curl preparation", 0, turns.fallbackCount)
+                prepared?.let { frame -> assertSame("Destination bitmap must become current without recapture", frame.image, turns.surfaces!!.source.image) }
+                assertNotNull("Reverse page must remain cached", turns.surfaces!!.previous)
+            }
+        }
+    }
+
+    @Test fun slowReleaseUsesHalfViewportAndCancelPreservesCheckpoint() {
+        launch(preferences = ReaderPreferences(1.0, 1, false, "light", "curl"))
+        awaitCondition("Curl not prepared") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.next != null }
+            ready
+        }
+        val before = ReaderRuntime.session!!.locatorJson
+        dragPage(.95f, .46f, cancel = false, releaseHold = 350)
+        awaitCondition("Under-half release did not settle") {
+            var idle = false
+            scenario!!.onActivity { idle = it.pageTurns!!.state == "idle" }
+            idle
+        }
+        assertEquals("Under half must return without moving the reading position", before, ReaderRuntime.session!!.locatorJson)
+        var target: String? = null
+        scenario!!.onActivity { target = it.pageTurns!!.surfaces!!.next!!.locator.toJSON().toString() }
+        dragPage(.95f, .44f, cancel = false, releaseHold = 350)
+        awaitCondition("Over-half release did not complete") { ReaderRuntime.session!!.locatorJson == target }
+    }
+
     @Test fun changingOnlyTurnStyleKeepsNavigatorAndFontChangeInvalidatesImages() {
         launch()
         var original: EpubNavigatorFragment? = null
@@ -426,7 +479,7 @@ class ReaderRenderingTest {
         scenario!!.onActivity { assertEquals(0, it.pageTurns!!.fallbackCount) }
     }
 
-    private fun dragPage(from: Float, to: Float, cancel: Boolean, capture: Boolean = false, holdMillis: Long = 0, steps: Int = 12) {
+    private fun dragPage(from: Float, to: Float, cancel: Boolean, capture: Boolean = false, holdMillis: Long = 0, steps: Int = 12, releaseHold: Long = 0) {
         val location = IntArray(2)
         var width = 0
         var height = 0
@@ -465,6 +518,7 @@ class ReaderRenderingTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
                 .executeShellCommand("screencap -p /sdcard/Download/$fileName")).use { it.readBytes() }
         }
+        if (releaseHold > 0) Thread.sleep(releaseHold)
         send(if (cancel) android.view.MotionEvent.ACTION_CANCEL else android.view.MotionEvent.ACTION_UP, to)
     }
 
@@ -533,8 +587,8 @@ class ReaderRenderingTest {
 
     private fun targetLocator() = """{"href":"EPUB/chapter.xhtml","type":"application/xhtml+xml","locations":{"fragments":["p-060"]}}"""
 
-    private fun createFixture(file: File, longParagraph: Boolean = false, secondChapter: Boolean = false, fontFaces: Boolean = false) {
-        val paragraphs = (1..120).joinToString("\n") { index ->
+    private fun createFixture(file: File, longParagraph: Boolean = false, secondChapter: Boolean = false, fontFaces: Boolean = false, paragraphCount: Int = 120) {
+        val paragraphs = (1..paragraphCount).joinToString("\n") { index ->
             val id = index.toString().padStart(3, '0')
             val bold = if (fontFaces) "<strong>굵은 글씨 Bold</strong>" else ""
             val repeated = if (longParagraph && index == 60) (1..160).joinToString(" ") { "긴 문단의 $it 번째 문장입니다. 페이지 시작은 문단 시작과 다릅니다." } else ""

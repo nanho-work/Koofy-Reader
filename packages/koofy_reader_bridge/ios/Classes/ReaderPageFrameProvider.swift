@@ -13,19 +13,49 @@ struct ReaderPageFrame {
     let visibleText: String
 }
 
-struct ReaderPageFrames {
-    let previous: ReaderPageFrame?
-    let current: ReaderPageFrame
-    let next: ReaderPageFrame?
+/// One layout generation, with a rolling window of at most five viewports.
+@MainActor
+final class ReaderPageFrames {
+    private var pages: [Int: ReaderPageFrame]
+    private var boundaries = Set<Int>()
+    private var center = 0
     let rightToLeft: Bool
+    var current: ReaderPageFrame { pages[center]! }
+    var next: ReaderPageFrame? { frame(at: 1) }
+    var previous: ReaderPageFrame? { frame(at: -1) }
 
-    func frame(at offset: Int) -> ReaderPageFrame? {
-        switch offset {
-        case -1: return previous
-        case 0: return current
-        case 1: return next
-        default: return nil
+    init(previous: ReaderPageFrame?, current: ReaderPageFrame, next: ReaderPageFrame?, rightToLeft: Bool) {
+        pages = [0: current]
+        pages[-1] = previous
+        pages[1] = next
+        self.rightToLeft = rightToLeft
+    }
+    func matchesViewport(_ locator: Locator) -> Bool {
+        guard current.locator.href == locator.href else { return false }
+        func point(_ value: Locator) -> NSDictionary? {
+            guard let data = try? value.jsonString().data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let locations = json["locations"] as? [String: Any],
+                  let point = locations["koofyText"] as? [String: Any] else { return nil }
+            return NSDictionary(dictionary: point)
         }
+        if let a = point(current.locator), let b = point(locator) { return a == b }
+        return current.locator.locations.progression == locator.locations.progression
+    }
+
+    func frame(at offset: Int) -> ReaderPageFrame? { pages[center + offset] }
+    func known(_ offset: Int) -> Bool { pages[center + offset] != nil || boundaries.contains(center + offset) }
+    func put(_ frame: ReaderPageFrame?, at offset: Int) {
+        if let frame { pages[center + offset] = frame }
+        else { boundaries.insert(center + offset) }
+    }
+    @discardableResult
+    func advance(to frame: ReaderPageFrame) -> Bool {
+        guard let entry = pages.first(where: { $0.value.image === frame.image }) else { return false }
+        center = entry.key
+        pages = pages.filter { abs($0.key - center) <= 2 }
+        boundaries = boundaries.filter { abs($0 - center) <= 2 }
+        return true
     }
 }
 
@@ -150,7 +180,7 @@ enum ReaderWebViewport {
         let text = locator.text.highlight ?? ""
         let rect = navigator.view.convert(web.bounds, from: web)
         let deviceScale = navigator.view.window?.screen.scale ?? 2
-        // Three cached viewports stay under ~30 MiB before temporary UIKit
+        // Five cached viewports stay under ~48 MiB before temporary UIKit
         // animation surfaces. Live text always remains at the native scale.
         let scale = min(min(deviceScale, 2), sqrt(2_500_000 / (bounds.width * bounds.height)))
         let config = WKSnapshotConfiguration()
@@ -196,53 +226,103 @@ final class ReaderPageFrameProvider {
 
     func prepare(current: EPUBNavigatorViewController, parent: UIViewController,
                  container: UIView, generation: Int, background: UIColor,
+                 existing: ReaderPageFrames? = nil, preferForward: Bool = true,
+                 publish: (ReaderPageFrames) -> Void = { _ in },
                  factory: (Locator) throws -> EPUBNavigatorViewController) async throws -> ReaderPageFrames {
-        removePreview()
         try await ReaderWebViewport.waitUntilStable(current)
-        let source = try await ReaderWebViewport.capture(current, generation: generation, background: background)
-        let preview = try factory(source.locator)
-        self.preview = preview
-        parent.addChild(preview)
-        preview.view.frame = current.view.frame
-        preview.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        preview.view.isUserInteractionEnabled = false
-        preview.view.accessibilityElementsHidden = true
-        // Attached, opaque and rendered, but occluded by the real navigator.
-        // isHidden / alpha=0 / an offscreen frame are deliberately not used.
-        container.insertSubview(preview.view, belowSubview: current.view)
-        preview.didMove(toParent: parent)
-        preview.view.layoutIfNeeded()
-        defer {
-            if self.preview === preview { removePreview() }
+        let frames: ReaderPageFrames
+        if let existing {
+            let actual = try await ReaderWebViewport.exactLocator(in: current)
+            guard try point(actual) == point(existing.current.locator),
+                  existing.current.viewport == current.view.bounds.size else {
+                throw ReaderWebViewport.FrameError.stale
+            }
+            frames = existing
+        } else {
+            let source = try await ReaderWebViewport.capture(current, generation: generation, background: background)
+            frames = ReaderPageFrames(previous: nil, current: source, next: nil,
+                rightToLeft: current.presentation.readingProgression == .rtl)
         }
-        try await ReaderWebViewport.waitUntilStable(preview)
-        _ = try await preview.evaluateJavaScript(ReaderWebViewport.anchorScript(locator: source.locator, restore: true)).get()
-        try await ReaderWebViewport.waitUntilStable(preview)
-        let sourceSignature = try await viewportSignature(current)
-        let previewSignature = try await viewportSignature(preview)
-        guard sourceSignature == previewSignature else { throw ReaderWebViewport.FrameError.invalidAnchor }
+        let source = frames.current
+        let renderer: EPUBNavigatorViewController
+        if let preview { renderer = preview }
+        else {
+            renderer = try factory(source.locator)
+            preview = renderer
+            parent.addChild(renderer)
+            renderer.view.frame = current.view.frame
+            renderer.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            renderer.view.isUserInteractionEnabled = false
+            renderer.view.accessibilityElementsHidden = true
+            container.insertSubview(renderer.view, belowSubview: current.view)
+            renderer.didMove(toParent: parent)
+            renderer.view.layoutIfNeeded()
+            try await ReaderWebViewport.waitUntilStable(renderer)
+        }
+        if existing == nil {
+            try await align(renderer, to: source.locator)
+            let sourceSignature = try await viewportSignature(current)
+            let previewSignature = try await viewportSignature(renderer)
+            guard sourceSignature == previewSignature else { throw ReaderWebViewport.FrameError.invalidAnchor }
+        }
+        publish(frames)
+        let order = preferForward ? [1, 2, -1, -2] : [-1, -2, 1, 2]
+        for offset in order where !frames.known(offset) {
+            try Task.checkCancellation()
+            let forward = offset > 0
+            guard let base = frames.frame(at: offset - (forward ? 1 : -1)) else {
+                frames.put(nil, at: offset)
+                publish(frames)
+                continue
+            }
+            try await align(renderer, to: base.locator)
+            let moved = forward ? await renderer.goForward(options: .init(animated: false))
+                : await renderer.goBackward(options: .init(animated: false))
+            if moved {
+                try await ReaderWebViewport.waitUntilStable(renderer)
+                let frame = try await ReaderWebViewport.capture(renderer, generation: generation, background: background)
+                // Some Readium boundaries accept a move without changing the
+                // visible text. Do not cache the current page as its own neighbor.
+                frames.put(try point(frame.locator) == point(base.locator) ? nil : frame, at: offset)
+            } else { frames.put(nil, at: offset) }
+            try Task.checkCancellation()
+            publish(frames)
+        }
+        return frames
+    }
 
-        var next: ReaderPageFrame?
-        if await preview.goForward(options: .init(animated: false)) {
-            try await ReaderWebViewport.waitUntilStable(preview)
-            next = try? await ReaderWebViewport.capture(preview, generation: generation, background: background)
-        }
-        try Task.checkCancellation()
-        guard await preview.go(to: source.locator, options: .init(animated: false)) else {
+    private func align(_ navigator: EPUBNavigatorViewController, to locator: Locator) async throws {
+        let current = try await ReaderWebViewport.exactLocator(in: navigator)
+        if try point(current) == point(locator) { return }
+        // These are exact viewport-start locators from this layout. Avoid quote
+        // search when returning a warm preview to a repeated/long paragraph:
+        // use its verified progression, then check/restore the precise DOM point.
+        guard var json = try JSONSerialization.jsonObject(with: Data(locator.jsonString().utf8)) as? [String: Any] else {
             throw ReaderWebViewport.FrameError.invalidAnchor
         }
-        _ = try await preview.evaluateJavaScript(ReaderWebViewport.anchorScript(locator: source.locator, restore: true)).get()
-        try await ReaderWebViewport.waitUntilStable(preview)
-        var previous: ReaderPageFrame?
-        if await preview.goBackward(options: .init(animated: false)) {
-            try await ReaderWebViewport.waitUntilStable(preview)
-            previous = try? await ReaderWebViewport.capture(preview, generation: generation, background: background)
+        json.removeValue(forKey: "text")
+        if var locations = json["locations"] as? [String: Any] {
+            locations.removeValue(forKey: "fragments")
+            json["locations"] = locations
         }
-        try Task.checkCancellation()
-        guard sourceSignature == (try await viewportSignature(current)),
-              source.viewport == current.view.bounds.size else { throw ReaderWebViewport.FrameError.stale }
-        return ReaderPageFrames(previous: previous, current: source, next: next,
-            rightToLeft: current.presentation.readingProgression == .rtl)
+        let page = try Locator(jsonString: String(decoding: JSONSerialization.data(withJSONObject: json), as: UTF8.self))
+        guard await navigator.go(to: page, options: .init(animated: false)) else {
+            throw ReaderWebViewport.FrameError.invalidAnchor
+        }
+        for _ in 0..<4 {
+            try await ReaderWebViewport.waitUntilStable(navigator)
+            let actual = try await ReaderWebViewport.exactLocator(in: navigator)
+            if try point(actual) == point(locator) { return }
+            _ = try await navigator.evaluateJavaScript(ReaderWebViewport.anchorScript(locator: locator, restore: true)).get()
+        }
+        throw ReaderWebViewport.FrameError.invalidAnchor
+    }
+
+    private func point(_ locator: Locator) throws -> String {
+        let data = try JSONSerialization.jsonObject(with: Data(locator.jsonString().utf8)) as? [String: Any]
+        let locations = data?["locations"] as? [String: Any] ?? [:]
+        let point = locations["koofyText"] ?? locations
+        return "\(locator.href)|" + String(decoding: try JSONSerialization.data(withJSONObject: point, options: [.sortedKeys]), as: UTF8.self)
     }
 
     private func viewportSignature(_ navigator: EPUBNavigatorViewController) async throws -> String {

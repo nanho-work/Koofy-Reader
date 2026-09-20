@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
 
-class AppFooterAdShell extends StatelessWidget {
+class AppFooterAdShell extends ConsumerWidget {
   const AppFooterAdShell({
     super.key,
     required this.child,
@@ -14,10 +16,9 @@ class AppFooterAdShell extends StatelessWidget {
   final bool showFooterAd;
 
   @override
-  Widget build(BuildContext context) {
-    if (!showFooterAd) {
-      return child;
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hidden =
+        ref.watch(adStateProvider).valueOrNull?.isBannerHidden ?? false;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: KoofyTheme.systemStyle(Theme.of(context).brightness),
       child: ColoredBox(
@@ -25,7 +26,8 @@ class AppFooterAdShell extends StatelessWidget {
         child: Column(
           children: [
             Expanded(child: child),
-            const SafeArea(top: false, child: AdFooterWidget()),
+            if (showFooterAd && !hidden)
+              const SafeArea(top: false, child: AdFooterWidget()),
           ],
         ),
       ),

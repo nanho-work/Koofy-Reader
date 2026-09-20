@@ -13,6 +13,8 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.FragmentManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -36,19 +38,36 @@ internal fun readerNavigatorConfiguration(fonts: ReaderFonts) = EpubNavigatorFra
 
 internal data class PageSurface(val image: Bitmap, val locator: Locator)
 
-/** One source spread and two adjacent spreads. Never passed across the Flutter bridge. */
+/** A rolling window of at most five viewports, scoped to one layout generation. */
 internal class PageSurfaces(
     val generation: Long,
-    val source: PageSurface,
+    source: PageSurface,
     val columns: Int,
     val rtl: Boolean,
 ) {
-    var next: PageSurface? = null
-    var previous: PageSurface? = null
+    private val pages = mutableMapOf(0 to source)
+    private val boundaries = mutableSetOf<Int>()
+    private var center = 0
+    val source: PageSurface get() = pages.getValue(center)
+    val next: PageSurface? get() = at(1)
+    val previous: PageSurface? get() = at(-1)
+    fun at(offset: Int): PageSurface? = pages[center + offset]
+    fun known(offset: Int): Boolean = pages.containsKey(center + offset) || boundaries.contains(center + offset)
+    fun put(offset: Int, frame: PageSurface?) {
+        if (frame == null) boundaries.add(center + offset) else pages[center + offset] = frame
+    }
+    fun advance(target: PageSurface): Boolean {
+        val index = pages.entries.firstOrNull { it.value === target }?.key ?: return false
+        center = index
+        val expired = pages.keys.filter { kotlin.math.abs(it - center) > 2 }
+        expired.forEach { pages.remove(it)?.image?.recycle() }
+        boundaries.removeAll { kotlin.math.abs(it - center) > 2 }
+        return true
+    }
     fun recycle() {
-        listOfNotNull(source, next, previous).map { it.image }.distinct().forEach {
-            if (!it.isRecycled) it.recycle()
-        }
+        pages.values.map { it.image }.distinct().forEach { if (!it.isRecycled) it.recycle() }
+        pages.clear()
+        boundaries.clear()
     }
 }
 
@@ -73,6 +92,8 @@ internal class ReaderPageSurfaces(
         private set
     var capturedBytes = 0L
         private set
+    var sourceMismatch = false
+        private set
     var lastFailure: String? = null
         private set
 
@@ -80,67 +101,89 @@ internal class ReaderPageSurfaces(
         main: EpubNavigatorFragment,
         preferences: EpubPreferences,
         generation: Long,
+        existing: PageSurfaces? = null,
+        preferForward: Boolean = true,
         publish: (PageSurfaces) -> Unit,
     ) {
-        var surfaces: PageSurfaces? = null
+        var frames = existing
         var unattachedSource: PageSurface? = null
-        var published = false
-        var ownedNavigator: EpubNavigatorFragment? = null
+        var published = existing != null
         try {
-            // This is the actual viewport start, not the persistent interior reading anchor.
-            val sourceLocator = exactLocator(main, main.currentLocator.value)
-            val source = capture(main, sourceLocator)
-            unattachedSource = source
-            val geometry = json(main, GEOMETRY)
-            val columns = geometry.optInt("columns", 1).coerceIn(1, 2)
-            surfaces = PageSurfaces(generation, source, columns,
-                main.settings.value.readingProgression == ReadingProgression.RTL)
-            unattachedSource = null
-            recreate(preferences, sourceLocator)
-            val preview = requireNotNull(reader)
-            ownedNavigator = preview
-            awaitPosition { it.locator.href.removeFragment() == sourceLocator.href.removeFragment() }
-            restore(preview, sourceLocator)
-            // Verify the preview's exact first character against the real viewport. If an
-            // interior anchor rounds to another page, no mismatched curl is published.
-            val previewSource = exactLocator(preview, position!!.locator)
-            check(samePoint(sourceLocator, previewSource)) { "Preview layout differs from visible page" }
-            val webView = readyWebView(preview)
-            val origin = requireNotNull(position).copy(index = webView.scrollX / webView.width)
-            position = origin
-            if (canMove(origin, true)) {
-                move(preview, origin, true)
-                val target = exactLocator(preview, requireNotNull(position).locator)
-                surfaces.next = capture(preview, target)
-            }
-            // Publish forward first. Reading is never blocked while the previous page loads.
-            publish(surfaces)
-            published = true
-            if (canMove(origin, false)) {
-                navigate(preview, sourceLocator)
-                restore(preview, sourceLocator)
-                val sourceView = readyWebView(preview)
-                move(preview, requireNotNull(position).copy(index = sourceView.scrollX / sourceView.width), false)
-                val target = exactLocator(preview, requireNotNull(position).locator)
-                surfaces.previous = capture(preview, target)
-                publish(surfaces)
-            }
             lastFailure = null
+            sourceMismatch = false
+            val sourceLocator = exactLocator(main, main.currentLocator.value)
+            currentCoroutineContext().ensureActive()
+            if (frames == null) {
+                val source = capture(main, sourceLocator)
+                unattachedSource = source
+                val columns = json(main, GEOMETRY).optInt("columns", 1).coerceIn(1, 2)
+                frames = PageSurfaces(generation, source, columns,
+                    main.settings.value.readingProgression == ReadingProgression.RTL)
+                unattachedSource = null
+            } else {
+                sourceMismatch = !samePoint(sourceLocator, frames.source.locator)
+                check(!sourceMismatch) { "Visible page differs from cached source" }
+            }
+            val window = frames
+            if (reader == null) {
+                recreate(preferences, sourceLocator)
+                awaitPosition { it.locator.href.removeFragment() == sourceLocator.href.removeFragment() }
+            }
+            val preview = requireNotNull(reader)
+            if (existing == null) {
+                align(preview, sourceLocator)
+                check(samePoint(sourceLocator, exactLocator(preview, requireNotNull(position).locator))) {
+                    "Preview layout differs from visible page"
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            publish(window)
+            published = true
+            // Adjacent faces first, then one more in each direction. Existing
+            // destination/source bitmaps survive a commit and are never recaptured.
+            val order = if (preferForward) listOf(1, 2, -1, -2) else listOf(-1, -2, 1, 2)
+            for (offset in order) {
+                currentCoroutineContext().ensureActive()
+                if (window.known(offset)) continue
+                val direction = offset > 0
+                val baseOffset = offset - if (direction) 1 else -1
+                val base = window.at(baseOffset)
+                if (base == null) { window.put(offset, null); publish(window); continue }
+                align(preview, base.locator)
+                val webView = readyWebView(preview)
+                val origin = requireNotNull(position).copy(index = kotlin.math.abs(webView.scrollX) / webView.width)
+                position = origin
+                if (canMove(origin, direction)) {
+                    move(preview, origin, direction)
+                    val target = exactLocator(preview, requireNotNull(position).locator)
+                    currentCoroutineContext().ensureActive()
+                    check(!samePoint(base.locator, target)) { "Preview did not advance" }
+                    window.put(offset, capture(preview, target))
+                } else window.put(offset, null)
+                publish(window)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: OutOfMemoryError) {
             lastFailure = "Not enough memory for page images"
-            android.util.Log.w("KoofyPageSurfaces", "Not enough memory for page images")
+            disposeNavigator()
         } catch (error: Exception) {
             lastFailure = error.message ?: error.javaClass.simpleName
-            android.util.Log.w("KoofyPageSurfaces", "Preview unavailable: $lastFailure")
+            android.util.Log.w("KoofyPageSurfaces", "Preview unavailable: $lastFailure", error)
+            disposeNavigator()
         } finally {
             unattachedSource?.image?.recycle()
-            if (!published) surfaces?.recycle()
-            // Only bitmaps are retained while reading. A canceled old request cannot
-            // remove the render context created by a more recent preparation.
-            if (ownedNavigator != null && reader === ownedNavigator) disposeNavigator()
+            if (!published) frames?.recycle()
+            // Keep the attached renderer warm until a layout change, background
+            // transition or memory warning. It never writes reading checkpoints.
         }
+    }
+
+    private suspend fun align(preview: EpubNavigatorFragment, locator: Locator) {
+        val current = position?.locator
+        if (current != null && samePoint(exactLocator(preview, current), locator)) return
+        navigate(preview, locator)
+        restore(preview, locator)
     }
 
     private fun recreate(preferences: EpubPreferences, initial: Locator) {
@@ -253,9 +296,10 @@ internal class ReaderPageSurfaces(
     private suspend fun capture(navigator: EpubNavigatorFragment, locator: Locator): PageSurface {
         val started = SystemClock.elapsedRealtime()
         val view = readyWebView(navigator)
+        currentCoroutineContext().ensureActive()
         check(view.width == host.width && view.height == host.height) { "Preview viewport mismatch" }
-        // Cap resident pixels at 16 MiB per spread. The same scale is used for all faces.
-        val scale = minOf(1.0, kotlin.math.sqrt(4_194_304.0 / (view.width.toDouble() * view.height)))
+        // Five viewports use at most ~48 MiB. No per-gesture half-page bitmap copies.
+        val scale = minOf(1.0, kotlin.math.sqrt(2_500_000.0 / (view.width.toDouble() * view.height)))
         val image = Bitmap.createBitmap((view.width * scale).toInt().coerceAtLeast(1),
             (view.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         try {

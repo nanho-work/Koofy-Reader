@@ -44,6 +44,37 @@ async function change(contentId: string, expected: number, uid: string, action: 
   });
 }
 function cursor(value: unknown): string | undefined { return value === undefined ? undefined : id(value); }
+async function deleteContent(contentId: string, expected: number, uid: string) {
+  const ref = contents.doc(contentId);
+  // Lock edits and unpublish before touching Storage. A failed cleanup can be
+  // retried, but can never republish a partly deleted publication.
+  await db.runTransaction(async transaction => {
+    const doc = await transaction.get(ref);
+    if (!doc.exists) return; // Response loss/repeated delete is safe.
+    const item = doc.data() as Content;
+    if (item.deleting) return;
+    assertRevision(item, expected);
+    const at = new Date().toISOString();
+    transaction.update(ref, { deleting: true, published: false, revision: item.revision + 1, updatedAt: at });
+    transaction.create(db.collection('readerAudit').doc(), { contentId, uid, action: 'deleteStarted', at });
+  });
+  try {
+    // Uploads have server-generated, per-content paths; include replaced and
+    // removed draft assets, not just the current published snapshot.
+    await bucket.deleteFiles({ prefix: `readerContent/${contentId}/` });
+  } catch (error) {
+    logger.error('Content file deletion failed', { contentId, error });
+    throw new ApiError(503, '다운로드를 차단했지만 파일 정리가 완료되지 않았습니다. 삭제를 다시 시도해 주세요.');
+  }
+  await db.runTransaction(async transaction => {
+    const doc = await transaction.get(ref);
+    if (!doc.exists) return;
+    requireValue(doc.data()?.deleting === true, '삭제 상태를 확인할 수 없습니다.');
+    transaction.delete(ref);
+    transaction.create(db.collection('readerAudit').doc(), { contentId, uid, action: 'deleteCompleted', at: new Date().toISOString() });
+  });
+  return { id: contentId, deleted: true };
+}
 async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false) {
   let query = contents.where('kind', '==', kind(contentKind));
   if (publicOnly) query = query.where('published', '==', true);
@@ -100,6 +131,9 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     }
     const contentId = id(data.id), expected = revision(data.revision);
     const action = data.action;
+    if (action === 'delete') {
+      response.json(await deleteContent(contentId, expected, claims.uid)); return;
+    }
     requireValue(action === 'save' || action === 'publish' || action === 'unpublish' || action === 'removeAsset', '지원하지 않는 작업입니다.');
     const next = await change(contentId, expected, claims.uid, action, item => {
       switch (action) {

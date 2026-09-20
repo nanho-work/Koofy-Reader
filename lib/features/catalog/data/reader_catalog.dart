@@ -20,6 +20,88 @@ final readerCatalogProvider = Provider<ReaderCatalog>((ref) {
   return catalog;
 });
 
+// Cache metadata separately from the files. Search includes every server page,
+// including empty pages produced by backwards-compatible catalog filtering.
+final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
+  ref,
+  kind,
+) async {
+  final repository = ref.watch(readerCatalogProvider);
+  final items = <String, CatalogItem>{};
+  final visited = <String>{};
+  String? cursor;
+  do {
+    final page = await repository.list(kind, after: cursor);
+    for (final item in page.items) {
+      items[item.id] = item;
+    }
+    cursor = page.nextCursor;
+    if (cursor != null && !visited.add(cursor)) {
+      throw const CatalogException('목록을 끝까지 읽지 못했습니다. 다시 시도해 주세요.');
+    }
+  } while (cursor != null);
+  return items.values.toList()..sort((a, b) {
+    final order = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    return order != 0 ? order : a.id.compareTo(b.id);
+  });
+});
+
+String catalogItemKey(CatalogItem item) =>
+    '${item.kind}_${item.id}_${item.version}';
+final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
+  ref,
+  kind,
+) async {
+  final repository = ref.watch(readerCatalogProvider);
+  // Local deletion must immediately make a downloaded book available again.
+  if (kind == 'book') ref.watch(booksProvider);
+  final items = await ref.watch(catalogItemsProvider(kind).future);
+  final installed = <String>{};
+  for (final item in items) {
+    if (await repository.isInstalled(item)) installed.add(catalogItemKey(item));
+  }
+  return installed;
+});
+
+class CatalogDownloadState {
+  const CatalogDownloadState({this.itemKey, this.progress = 0});
+  final String? itemKey;
+  final double progress;
+  bool get busy => itemKey != null;
+}
+
+final catalogDownloadProvider =
+    NotifierProvider<CatalogDownloadController, CatalogDownloadState>(
+      CatalogDownloadController.new,
+    );
+
+class CatalogDownloadController extends Notifier<CatalogDownloadState> {
+  @override
+  CatalogDownloadState build() => const CatalogDownloadState();
+  Future<void> download(CatalogItem item) async {
+    if (state.busy) throw const CatalogException('진행 중인 다운로드를 기다려 주세요.');
+    final key = catalogItemKey(item);
+    state = CatalogDownloadState(itemKey: key);
+    try {
+      await ref
+          .read(readerCatalogProvider)
+          .install(
+            item,
+            progress: (value) {
+              state = CatalogDownloadState(
+                itemKey: key,
+                progress: value.clamp(0, 1),
+              );
+            },
+          );
+      ref.invalidate(booksProvider);
+      ref.invalidate(catalogInstalledProvider(item.kind));
+    } finally {
+      state = const CatalogDownloadState();
+    }
+  }
+}
+
 class CatalogException implements Exception {
   const CatalogException(this.message);
   final String message;
@@ -54,6 +136,8 @@ class CatalogItem {
       author = json['author'] as String,
       description = json['description'] as String,
       license = json['license'] as String,
+      category = json['category'] as String? ?? '기타',
+      source = json['source'] as String? ?? '',
       version = json['version'] as int,
       assets = (json['assets'] as Map<String, dynamic>).map(
         (key, value) =>
@@ -84,7 +168,7 @@ class CatalogItem {
       throw const FormatException('책 파일은 EPUB 또는 TXT 한 개와 표지가 필요합니다.');
     }
   }
-  final String id, kind, title, author, description, license;
+  final String id, kind, title, author, description, license, category, source;
   final int version;
   final Map<String, CatalogAsset> assets;
   String get bookId => 'catalog_${id}_$version';

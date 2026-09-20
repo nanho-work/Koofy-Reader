@@ -76,6 +76,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var status: TextView
     private lateinit var toolbar: LinearLayout
     private lateinit var navigation: LinearLayout
+    private var bannerFooter: ReaderBannerFooter? = null
     private var chromeVisible = true
     private lateinit var container: FragmentContainerView
     private lateinit var turnHost: ReaderTurnHost
@@ -147,7 +148,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setPadding(dp(8), 0, dp(8), 0)
         }, LinearLayout.LayoutParams(0, -2, 1f))
         toolbar.addView(button("목차") { showContents() })
-        toolbar.addView(button("보기") { showSettings() })
+        toolbar.addView(button("독서 설정") { showSettings() })
         page.addView(toolbar, LinearLayout.LayoutParams(-1, dp(52)))
         container = FragmentContainerView(this).apply { id = View.generateViewId() }
         previewContainer = FragmentContainerView(this).apply {
@@ -171,6 +172,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         navigation.addView(button("다음") { pageTurns?.request(true) })
         page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
+        bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, beforeResize = {
+            if (session.ready && !session.closing) scheduleRelayout()
+        }).also {
+            page.addView(it, LinearLayout.LayoutParams(-1, dp(66)))
+        }
         ViewCompat.setOnApplyWindowInsetsListener(outer) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
@@ -484,6 +490,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         val palette = ReaderPalette.forTheme(session.preferences.theme)
         outer.setBackgroundColor(palette.background)
         page.setBackgroundColor(palette.background)
+        bannerFooter?.applyPalette(palette)
         container.setBackgroundColor(palette.background)
         fun tint(view: View) {
             if (view is TextView) view.setTextColor(palette.foreground)
@@ -567,7 +574,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::session.isInitialized && session.ready) scheduleRelayout()
     }
 
+    fun updateAdHiddenUntil(epochMs: Long?) { bannerFooter?.updateHiddenUntil(epochMs) }
+
     override fun onPause() {
+        bannerFooter?.pause()
         pageTurns?.suspendPreparation()
         if (::session.isInitialized && session.ready && !session.closing && !loadingFailed) emit("locationChanged")
         super.onPause()
@@ -575,6 +585,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     override fun onResume() {
         super.onResume()
+        bannerFooter?.resume()
         if (::session.isInitialized && session.ready) pageTurns?.resumePreparation()
     }
 
@@ -640,6 +651,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onDestroy() {
+        bannerFooter?.dispose()
         pageTurns?.dispose()
         if (ReaderRuntime.reader === this) ReaderRuntime.reader = null
         super.onDestroy()

@@ -99,3 +99,20 @@ test('format replacement is exclusive and does not mutate published files', asyn
   assert.throws(() => publish({ ...original, assets: { txt } }), ApiError);
   assert.equal(replaceAsset({ ...original, assets }, 'epub', epub).txt, undefined);
 });
+
+
+test('catalog category and source are optional for old clients and survive publishing', () => {
+  const legacy = metadata(item);
+  assert.equal(legacy.category, '기타');
+  assert.equal(legacy.source, '');
+  const updated = metadata({ ...item, category: '시', source: '  https://example.org/poem  ' });
+  assert.equal(updated.category, '시');
+  assert.equal(updated.source, 'https://example.org/poem');
+  assert.throws(() => metadata({ ...item, category: 'invalid' }), ApiError);
+  assert.throws(() => metadata({ ...item, source: 'a'.repeat(501) }), ApiError);
+  const asset = { path: 'private/path', sha256: 'b'.repeat(64), size: 100, extension: 'epub', contentType: 'application/epub+zip' };
+  const uploaded = { ...item, ...updated, assets: { epub: asset, cover: { ...asset, extension: 'webp' } } };
+  const result = publicItem({ ...uploaded, published: true, publishedContent: publish(uploaded) });
+  assert.equal(result.category, '시');
+  assert.equal(result.source, updated.source);
+});

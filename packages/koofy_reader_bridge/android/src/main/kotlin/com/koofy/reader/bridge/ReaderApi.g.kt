@@ -136,7 +136,10 @@ data class ReaderLaunchRequest (
   val filePath: String,
   val title: String,
   val initialLocatorJson: String? = null,
-  val preferences: ReaderPreferences
+  val preferences: ReaderPreferences,
+  /** Uses the same test/production ID and reward expiry as the Flutter shell. */
+  val bannerAdUnitId: String? = null,
+  val adHiddenUntilEpochMs: Long? = null
 )
  {
   companion object {
@@ -150,7 +153,9 @@ data class ReaderLaunchRequest (
       val title = pigeonVar_list[6] as String
       val initialLocatorJson = pigeonVar_list[7] as String?
       val preferences = pigeonVar_list[8] as ReaderPreferences
-      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences)
+      val bannerAdUnitId = pigeonVar_list[9] as String?
+      val adHiddenUntilEpochMs = pigeonVar_list[10] as Long?
+      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs)
     }
   }
   fun toList(): List<Any?> {
@@ -164,6 +169,8 @@ data class ReaderLaunchRequest (
       title,
       initialLocatorJson,
       preferences,
+      bannerAdUnitId,
+      adHiddenUntilEpochMs,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -278,6 +285,7 @@ private open class ReaderApiPigeonCodec : StandardMessageCodec() {
 
 /** Generated interface from Pigeon that represents a handler of messages from Flutter. */
 interface ReaderHostApi {
+  fun updateAdHiddenUntil(epochMs: Long?, callback: (Result<Unit>) -> Unit)
   fun openReader(request: ReaderLaunchRequest, callback: (Result<Unit>) -> Unit)
   fun closeReader(sessionId: String, callback: (Result<Unit>) -> Unit)
   fun goTo(sessionId: String, locatorJson: String, callback: (Result<Unit>) -> Unit)
@@ -294,6 +302,25 @@ interface ReaderHostApi {
     @JvmOverloads
     fun setUp(binaryMessenger: BinaryMessenger, api: ReaderHostApi?, messageChannelSuffix: String = "") {
       val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.updateAdHiddenUntil$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val epochMsArg = args[0] as Long?
+            api.updateAdHiddenUntil(epochMsArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(ReaderApiPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(ReaderApiPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
       run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.openReader$separatedMessageChannelSuffix", codec)
         if (api != null) {

@@ -23,7 +23,7 @@ class AdFooterWidget extends ConsumerWidget {
       error: (_, _) => _AdBox(message: '광고 정보를 불러오지 못했습니다.'),
       data: (adState) {
         if (adState.isBannerHidden) {
-          return _AdBox(message: '광고 숨김 적용 중');
+          return const SizedBox.shrink();
         }
         return connectivityAsync.when(
           loading: () => _AdBox(message: '광고 로딩중...'),

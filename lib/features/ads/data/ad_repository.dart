@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
@@ -7,9 +9,20 @@ final adRepositoryProvider = Provider<AdRepository>(
   (ref) => LocalAdRepository(ref.watch(localStorageProvider)),
 );
 
-final adStateProvider = FutureProvider<AdState>(
-  (ref) => ref.watch(adRepositoryProvider).getState(),
-);
+final adStateProvider = FutureProvider<AdState>((ref) async {
+  var disposed = false;
+  Timer? timer;
+  ref.onDispose(() {
+    disposed = true;
+    timer?.cancel();
+  });
+  final state = await ref.watch(adRepositoryProvider).getState();
+  final remaining = state.hiddenUntil?.difference(DateTime.now());
+  if (!disposed && remaining != null && remaining > Duration.zero) {
+    timer = Timer(remaining, ref.invalidateSelf);
+  }
+  return state;
+});
 
 abstract class AdRepository {
   Future<AdState> getState();

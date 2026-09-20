@@ -161,6 +161,29 @@ final class ReaderPageTurnController: UIViewController, UIPageViewControllerData
         onCancel?()
     }
 
+    /// Keep UIKit and the warm renderer across turns; only page identities change.
+    func rebase() {
+        guard !invalidated else { return }
+        isTurning = false
+        faces.removeAll()
+        installSource()
+        showImages(false)
+    }
+
+    func refreshFrames() {
+        guard !invalidated, !isTurning, !isSpread else { return }
+        // A new neighbor only changes a cached reverse texture. Reinstalling
+        // viewControllers here can cancel UIKit's next interactive transition.
+        for (index, face) in faces {
+            let pairIndex = Int(floor(Double(index) / 2))
+            let side = index - pairIndex * 2
+            let isBack = frames.rightToLeft ? side == 0 : side == 1
+            if isBack, let frame = frames.frame(at: pairIndex * directionSign + 1) {
+                face.updateImage(frame.image)
+            }
+        }
+    }
+
     /// Called before close, resize, settings, memory pressure or a new epoch.
     func invalidate() {
         invalidated = true
@@ -208,7 +231,7 @@ final class ReaderPageTurnController: UIViewController, UIPageViewControllerData
 
 private final class ReaderPageFaceController: UIViewController {
     let index: Int
-    private let image: UIImage
+    private var image: UIImage
     private let background: UIColor
     private let imageView = UIImageView()
 
@@ -227,6 +250,10 @@ private final class ReaderPageFaceController: UIViewController {
         imageView.frame = view.bounds
         imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(imageView)
+    }
+    func updateImage(_ image: UIImage) {
+        self.image = image
+        if isViewLoaded { imageView.image = image }
     }
     func setPaperVisible(_ visible: Bool) {
         loadViewIfNeeded()

@@ -12,5 +12,5 @@ class AppConstants {
   static const int maxTxtBytes = 20 * 1024 * 1024;
   static const int maxEpubBytes = 40 * 1024 * 1024;
 
-  static const List<int> adRewardHourOptions = <int>[5, 6];
+  static const int adRewardHours = 2;
 }

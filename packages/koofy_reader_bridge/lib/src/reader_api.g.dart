@@ -118,6 +118,8 @@ class ReaderLaunchRequest {
     required this.title,
     this.initialLocatorJson,
     required this.preferences,
+    this.bannerAdUnitId,
+    this.adHiddenUntilEpochMs,
   });
 
   int protocolVersion;
@@ -138,6 +140,11 @@ class ReaderLaunchRequest {
 
   ReaderPreferences preferences;
 
+  /// LevelPlay viewer ad unit and the shared reward expiry.
+  String? bannerAdUnitId;
+
+  int? adHiddenUntilEpochMs;
+
   List<Object?> _toList() {
     return <Object?>[
       protocolVersion,
@@ -149,6 +156,8 @@ class ReaderLaunchRequest {
       title,
       initialLocatorJson,
       preferences,
+      bannerAdUnitId,
+      adHiddenUntilEpochMs,
     ];
   }
 
@@ -167,6 +176,8 @@ class ReaderLaunchRequest {
       title: result[6]! as String,
       initialLocatorJson: result[7] as String?,
       preferences: result[8]! as ReaderPreferences,
+      bannerAdUnitId: result[9] as String?,
+      adHiddenUntilEpochMs: result[10] as int?,
     );
   }
 
@@ -328,6 +339,29 @@ class ReaderHostApi {
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
+
+  Future<void> updateAdHiddenUntil(int? epochMs) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.updateAdHiddenUntil$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[epochMs]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
 
   Future<void> openReader(ReaderLaunchRequest request) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.openReader$pigeonVar_messageChannelSuffix';

@@ -1,85 +1,141 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
-import 'package:koofy_reader/features/library/data/book_repository.dart';
 
-class ReaderCatalogPage extends ConsumerStatefulWidget {
+const catalogBookCategories = ['시', '소설', '에세이', '기타'];
+
+class ReaderCatalogPage extends StatelessWidget {
   const ReaderCatalogPage({super.key});
   @override
-  ConsumerState<ReaderCatalogPage> createState() => _ReaderCatalogPageState();
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('도서·글꼴 다운로드')),
+    body: const SafeArea(child: ReaderCatalogBrowser()),
+  );
 }
 
-class _ReaderCatalogPageState extends ConsumerState<ReaderCatalogPage> {
-  String _kind = 'book';
-  List<CatalogItem> _items = [];
-  final Set<String> _installed = {};
-  String? _cursor, _error, _downloading;
-  bool _loading = true;
-  double _progress = 0;
-  int _request = 0;
-  String _key(CatalogItem item) => '${item.id}_${item.version}';
-
+/// The same catalog is used in the wide library sidebar and the phone route.
+/// Both tabs retain their own query, category and scroll position.
+class ReaderCatalogBrowser extends ConsumerStatefulWidget {
+  const ReaderCatalogBrowser({super.key});
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  ConsumerState<ReaderCatalogBrowser> createState() =>
+      _ReaderCatalogBrowserState();
+}
 
-  Future<void> _load({bool more = false}) async {
-    final request = ++_request;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final repository = ref.read(readerCatalogProvider);
-      final page = await repository.list(_kind, after: more ? _cursor : null);
-      final installed = <String>{};
-      for (final item in page.items) {
-        if (await repository.isInstalled(item)) installed.add(_key(item));
-      }
-      if (!mounted || request != _request) return;
-      setState(() {
-        _items = more ? [..._items, ...page.items] : page.items;
-        _cursor = page.nextCursor;
-        if (!more) _installed.clear();
-        _installed.addAll(installed);
-      });
-    } catch (error) {
-      if (mounted && request == _request) {
-        setState(() => _error = _message(error));
-      }
-    } finally {
-      if (mounted && request == _request) setState(() => _loading = false);
-    }
+class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
+  int _tab = 0;
+  bool _fontsVisited = false;
+  @override
+  Widget build(BuildContext context) {
+    final busy = ref.watch(
+      catalogDownloadProvider.select((value) => value.busy),
+    );
+    return PopScope(
+      canPop: !busy,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('다운로드가 끝날 때까지 잠시 기다려 주세요.')),
+          );
+        }
+      },
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 0, label: Text('도서')),
+                      ButtonSegment(value: 1, label: Text('글꼴')),
+                    ],
+                    selected: {_tab},
+                    onSelectionChanged: (values) => setState(() {
+                      _tab = values.first;
+                      if (_tab == 1) _fontsVisited = true;
+                    }),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '다운로드 목록 새로고침',
+                  onPressed: busy
+                      ? null
+                      : () {
+                          final kind = _tab == 0 ? 'book' : 'font';
+                          ref.invalidate(catalogItemsProvider(kind));
+                          ref.invalidate(catalogInstalledProvider(kind));
+                        },
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _tab,
+              children: [
+                const _CatalogList(kind: 'book'),
+                if (_fontsVisited)
+                  const _CatalogList(kind: 'font')
+                else
+                  const SizedBox.shrink(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogList extends ConsumerStatefulWidget {
+  const _CatalogList({required this.kind});
+  final String kind;
+  @override
+  ConsumerState<_CatalogList> createState() => _CatalogListState();
+}
+
+class _CatalogListState extends ConsumerState<_CatalogList> {
+  final _search = TextEditingController();
+  final _scroll = ScrollController();
+  String? _category;
+  bool get _books => widget.kind == 'book';
+  @override
+  void dispose() {
+    _search.dispose();
+    _scroll.dispose();
+    super.dispose();
   }
 
   String _message(Object error) =>
       error is CatalogException ? error.message : '목록을 처리하지 못했습니다. 다시 시도해 주세요.';
 
-  Future<void> _download(CatalogItem item) async {
-    setState(() {
-      _downloading = item.id;
-      _progress = 0;
-    });
+  void _changed() {
+    setState(() {});
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  Future<void> _refresh() async {
+    if (ref.read(catalogDownloadProvider).busy) return;
+    ref.invalidate(catalogItemsProvider(widget.kind));
+    ref.invalidate(catalogInstalledProvider(widget.kind));
     try {
-      await ref
-          .read(readerCatalogProvider)
-          .install(
-            item,
-            progress: (value) {
-              if (mounted) setState(() => _progress = value.clamp(0, 1));
-            },
-          );
-      ref.invalidate(booksProvider);
+      await ref.read(catalogItemsProvider(widget.kind).future);
+    } catch (_) {
+      /* Render retry below. */
+    }
+  }
+
+  Future<void> _download(CatalogItem item) async {
+    try {
+      await ref.read(catalogDownloadProvider.notifier).download(item);
       if (!mounted) return;
-      setState(() => _installed.add(_key(item)));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            item.kind == 'book'
-                ? '내 서재에 책을 추가했습니다.'
-                : '글꼴을 내려받았습니다. 책의 보기 설정에서 선택해 주세요.',
+            _books ? '내 서재에 책을 추가했습니다.' : '글꼴을 내려받았습니다. 책의 독서 설정에서 선택해 주세요.',
           ),
         ),
       );
@@ -89,173 +145,240 @@ class _ReaderCatalogPageState extends ConsumerState<ReaderCatalogPage> {
           context,
         ).showSnackBar(SnackBar(content: Text(_message(error))));
       }
-    } finally {
-      if (mounted) setState(() => _downloading = null);
     }
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: _downloading == null,
-    onPopInvokedWithResult: (didPop, result) {
-      if (!didPop) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('다운로드가 끝날 때까지 잠시 기다려 주세요.')),
-        );
-      }
-    },
-    child: Scaffold(
-      appBar: AppBar(title: const Text('책 · 글꼴 다운로드')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'book',
-                    label: Text('책'),
-                    icon: Icon(Icons.menu_book),
-                  ),
-                  ButtonSegment(
-                    value: 'font',
-                    label: Text('글꼴'),
-                    icon: Icon(Icons.text_fields),
-                  ),
-                ],
-                selected: {_kind},
-                onSelectionChanged: _downloading != null
-                    ? null
-                    : (values) {
-                        setState(() {
-                          _kind = values.first;
-                          _items = [];
-                          _cursor = null;
-                        });
-                        _load();
-                      },
+  Widget build(BuildContext context) {
+    final catalog = ref.watch(catalogItemsProvider(widget.kind));
+    final installed = ref.watch(catalogInstalledProvider(widget.kind));
+    final download = ref.watch(catalogDownloadProvider);
+    final query = _search.text.trim().toLowerCase();
+    final items = (catalog.valueOrNull ?? const <CatalogItem>[])
+        .where(
+          (item) =>
+              (_category == null || item.category == _category) &&
+              (_books ? '${item.title} ${item.author}' : item.title)
+                  .toLowerCase()
+                  .contains(query),
+        )
+        .toList();
+    final categories = <String>{
+      ...catalogBookCategories,
+      ...?catalog.valueOrNull?.map((item) => item.category),
+    };
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        children: [
+          // This header scrolls when text scaling or a short foldable pane leaves
+          // too little room, while normal layouts keep the search above the list.
+          Flexible(
+            flex: 0,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: constraints.maxHeight * .55,
               ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  if (_downloading == null) await _load();
-                },
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  physics: const AlwaysScrollableScrollPhysics(),
+              child: SingleChildScrollView(
+                primary: false,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      _kind == 'book'
-                          ? '공개된 책을 내 서재에 담아 오프라인에서도 읽어 보세요.'
-                          : '내려받은 글꼴은 책의 보기 설정 맨 아래에서 선택할 수 있어요.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    TextField(
+                      key: ValueKey('catalog-search-${widget.kind}'),
+                      controller: _search,
+                      onChanged: (_) => _changed(),
+                      decoration: InputDecoration(
+                        hintText: _books ? '제목·작가로 검색' : '글꼴 이름으로 검색',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _search.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: '검색어 지우기',
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _search.clear();
+                                  _changed();
+                                },
+                              ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Column(
+                    if (_books)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
                           children: [
-                            Text(_error!, textAlign: TextAlign.center),
-                            const SizedBox(height: 12),
-                            OutlinedButton(
-                              onPressed: _loading ? null : () => _load(),
-                              child: const Text('다시 시도'),
-                            ),
+                            for (final category in <String?>[
+                              null,
+                              ...categories,
+                            ])
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  right: 6,
+                                  top: 8,
+                                ),
+                                child: ChoiceChip(
+                                  label: Text(category ?? '전체'),
+                                  selected: _category == category,
+                                  onSelected: (_) {
+                                    _category = category;
+                                    _changed();
+                                  },
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                    if (!_loading && _error == null && _items.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text(
-                          '아직 공개된 항목이 없습니다.',
-                          textAlign: TextAlign.center,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        catalog.isLoading
+                            ? '전체 목록 불러오는 중…'
+                            : '${items.length}개 · 가나다순',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    for (final item in _items)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${item.author} · ${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB',
-                              ),
-                              if (item.description.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(item.description),
-                                ),
-                              ExpansionTile(
-                                tilePadding: EdgeInsets.zero,
-                                title: const Text(
-                                  '이용 조건',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                                children: [
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(item.license),
-                                  ),
-                                ],
-                              ),
-                              if (_downloading == item.id) ...[
-                                LinearProgressIndicator(value: _progress),
-                                const SizedBox(height: 8),
-                                Text('다운로드 중 ${(_progress * 100).round()}%'),
-                              ] else
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: FilledButton.tonalIcon(
-                                    onPressed:
-                                        _downloading != null ||
-                                            _installed.contains(_key(item))
-                                        ? null
-                                        : () => _download(item),
-                                    icon: Icon(
-                                      _installed.contains(_key(item))
-                                          ? Icons.check
-                                          : Icons.download_outlined,
-                                    ),
-                                    label: Text(
-                                      _installed.contains(_key(item))
-                                          ? '다운로드 완료'
-                                          : '다운로드',
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    if (_loading)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    if (!_loading && _cursor != null)
-                      TextButton(
-                        onPressed: _downloading != null
-                            ? null
-                            : () => _load(more: true),
-                        child: const Text('더 보기'),
-                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView.builder(
+                key: PageStorageKey('catalog-list-${widget.kind}'),
+                controller: _scroll,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: 1 + items.length,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Column(
+                      children: [
+                        if (catalog.isLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: LinearProgressIndicator(),
+                          ),
+                        if (catalog.hasError || installed.hasError)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Column(
+                              children: [
+                                Text(
+                                  catalog.hasError
+                                      ? _message(catalog.error!)
+                                      : '다운로드 상태를 확인하지 못했습니다.',
+                                ),
+                                TextButton(
+                                  onPressed: download.busy ? null : _refresh,
+                                  child: const Text('다시 시도'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (!catalog.isLoading &&
+                            !catalog.hasError &&
+                            items.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Text(
+                              query.isNotEmpty || _category != null
+                                  ? '검색 조건에 맞는 ${_books ? '도서가' : '글꼴이'} 없습니다.'
+                                  : '아직 공개된 ${_books ? '도서가' : '글꼴이'} 없습니다.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                      ],
+                    );
+                  }
+                  final item = items[index - 1];
+                  final key = catalogItemKey(item);
+                  final downloaded =
+                      installed.valueOrNull?.contains(key) ?? false;
+                  return Card(
+                    key: ValueKey(key),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            item.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.author,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            '${_books ? '${item.category} · ' : ''}${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          if (item.description.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                item.description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ExpansionTile(
+                            key: PageStorageKey('catalog-license-$key'),
+                            tilePadding: EdgeInsets.zero,
+                            title: const Text(
+                              '출처·이용 조건',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            children: [
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  [
+                                    if (item.source.isNotEmpty) item.source,
+                                    item.license,
+                                  ].join('\n\n'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (download.itemKey == key) ...[
+                            LinearProgressIndicator(value: download.progress),
+                            const SizedBox(height: 8),
+                            Text(
+                              '다운로드 중 ${(download.progress * 100).round()}%',
+                            ),
+                          ] else
+                            FilledButton.tonalIcon(
+                              onPressed:
+                                  download.busy ||
+                                      !installed.hasValue ||
+                                      installed.isLoading ||
+                                      installed.hasError ||
+                                      downloaded
+                                  ? null
+                                  : () => _download(item),
+                              icon: Icon(
+                                downloaded
+                                    ? Icons.check
+                                    : Icons.download_outlined,
+                              ),
+                              label: Text(downloaded ? '다운로드 완료' : '다운로드'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
-    ),
-  );
+    );
+  }
 }

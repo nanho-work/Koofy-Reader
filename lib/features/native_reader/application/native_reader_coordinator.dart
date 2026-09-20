@@ -56,6 +56,8 @@ class NativeReaderCoordinator {
     required String contentRevision,
     required String filePath,
     required String title,
+    String? bannerAdUnitId,
+    int? adHiddenUntilEpochMs,
     Future<String?> Function(StoredReaderPosition)? resolveInitialLocator,
   }) async {
     if (_opening || _activeSessionId != null) {
@@ -94,6 +96,8 @@ class NativeReaderCoordinator {
             title: title,
             initialLocatorJson: initialLocator,
             preferences: position.preferences,
+            bannerAdUnitId: bannerAdUnitId,
+            adHiddenUntilEpochMs: adHiddenUntilEpochMs,
           ),
         );
       } catch (_) {

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
@@ -32,7 +33,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
   LibraryBookStatus? _filter;
-  bool _searching = false;
   bool _titleSort = false;
   bool _importing = false;
   bool _opening = false;
@@ -135,20 +135,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     tooltip: '책 묶음 만들기',
                     icon: const Icon(Icons.create_new_folder_outlined),
                     onPressed: _groupBusy ? null : () => _createGroup(),
-                  ),
-                  IconButton(
-                    tooltip: '책 · 글꼴 다운로드',
-                    icon: const Icon(Icons.cloud_download_outlined),
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.catalog),
-                  ),
-                  IconButton(
-                    tooltip: '서재 검색',
-                    icon: Icon(_searching ? Icons.search_off : Icons.search),
-                    onPressed: () => setState(() {
-                      _searching = !_searching;
-                      if (!_searching) _search.clear();
-                    }),
                   ),
                   IconButton(
                     tooltip: '설정',
@@ -320,7 +306,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           progressError: readingAsync.hasError,
           groups: groups,
         );
-        return RefreshIndicator(
+        final shelfScroll = RefreshIndicator(
           onRefresh: _refresh,
           child: CustomScrollView(
             key: const PageStorageKey('library-scroll'),
@@ -355,33 +341,58 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ),
                 ),
-              if (wide)
-                SliverCrossAxisGroup(
-                  key: const ValueKey('library-two-pane'),
-                  slivers: [
-                    SliverConstrainedCrossAxis(
-                      maxExtent: leftWidth,
-                      sliver: SliverToBoxAdapter(child: intro),
-                    ),
-                    SliverConstrainedCrossAxis(
-                      maxExtent: gap,
-                      sliver: const SliverToBoxAdapter(
-                        child: SizedBox.shrink(),
-                      ),
-                    ),
-                    if (books.isNotEmpty || groups.isNotEmpty)
-                      shelf
-                    else
-                      const SliverToBoxAdapter(child: SizedBox.shrink()),
-                  ],
-                )
-              else ...[
+              if (!wide) ...[
                 SliverToBoxAdapter(child: intro),
-                if (books.isNotEmpty || groups.isNotEmpty) shelf,
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('도서·글꼴 다운로드'),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, AppRoutes.catalog),
+                    ),
+                  ),
+                ),
               ],
+              if (books.isNotEmpty || groups.isNotEmpty) shelf,
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
           ),
+        );
+        if (!wide) return shelfScroll;
+        return Row(
+          key: const ValueKey('library-two-pane'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: leftWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight * .48,
+                    ),
+                    child: SingleChildScrollView(primary: false, child: intro),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      '다운로드',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  const Expanded(child: ReaderCatalogBrowser()),
+                ],
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(child: shelfScroll),
+          ],
         );
       },
     );
@@ -571,25 +582,25 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ],
                 ),
-                if (_searching)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: TextField(
-                      controller: _search,
-                      autofocus: true,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        labelText: '제목 또는 작가 검색',
-                        prefixIcon: const Icon(Icons.search),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: '내 서재에서 책 검색',
+                      prefixIcon: const Icon(Icons.search),
 
-                        suffixIcon: IconButton(
-                          tooltip: '검색어 지우기',
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => setState(_search.clear),
-                        ),
-                      ),
+                      suffixIcon: _search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: '검색어 지우기',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () => setState(_search.clear),
+                            ),
                     ),
                   ),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,

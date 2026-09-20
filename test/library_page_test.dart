@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/app/router.dart';
+import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -17,6 +18,7 @@ import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dar
 import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
 import 'package:koofy_reader/features/native_reader/migration/legacy_reader_archive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/catalog_fixture.dart';
 
 final demoBooks = List.generate(
   12,
@@ -54,6 +56,7 @@ Future<void> pumpLibrary(
   List<RouteSettings>? routes,
   List<NativeLibraryPosition> Function()? nativePositions,
   bool realCompletion = false,
+  List<CatalogItem> catalog = const [],
 }) async {
   const captureDirectory = String.fromEnvironment('LIBRARY_CAPTURE_DIR');
   if (captureDirectory.isNotEmpty) {
@@ -80,6 +83,8 @@ Future<void> pumpLibrary(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        catalogItemsProvider('book').overrideWith((ref) async => catalog),
+        catalogInstalledProvider('book').overrideWith((ref) async => {}),
         booksProvider.overrideWith((ref) async => books ?? demoBooks),
         if (nativePositions == null)
           libraryReadingStateProvider.overrideWith(
@@ -111,7 +116,11 @@ Future<void> pumpLibrary(
             settings: settings,
             builder: (context) => Scaffold(
               appBar: AppBar(title: Text(settings.name!)),
-              body: Text((settings.arguments as Book).id),
+              body: Text(
+                settings.arguments is Book
+                    ? (settings.arguments as Book).id
+                    : '다운로드 화면',
+              ),
             ),
           );
         },
@@ -140,6 +149,46 @@ Future<void> capture(WidgetTester tester, String name) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets('phone exposes a named download button and persistent search', (
+    tester,
+  ) async {
+    final routes = <RouteSettings>[];
+    await pumpLibrary(tester, routes: routes);
+    expect(find.byTooltip('서재 검색'), findsNothing);
+    expect(find.byTooltip('책 · 글꼴 다운로드'), findsNothing);
+    expect(find.widgetWithText(TextField, '내 서재에서 책 검색'), findsOneWidget);
+    await tester.ensureVisible(find.text('도서·글꼴 다운로드'));
+    await tester.tap(find.text('도서·글꼴 다운로드'));
+    await tester.pumpAndSettle();
+    expect(routes.single.name, AppRoutes.catalog);
+  });
+  testWidgets('wide catalog scrolls independently below the continuation', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      size: const Size(840, 900),
+      catalog: [for (var i = 0; i < 12; i++) catalogFixture(i)],
+    );
+    await tester.pumpAndSettle();
+    final shelf = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final before = tester.getRect(
+      find.byKey(const ValueKey('continue-reading-card')),
+    );
+    final list = find.byKey(const PageStorageKey('catalog-list-book'));
+    await tester.drag(list, const Offset(0, -350));
+    await tester.pumpAndSettle();
+    expect(tester.widget<ListView>(list).controller!.offset, greaterThan(0));
+    expect(shelf.offset, 0);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('continue-reading-card'))),
+      before,
+    );
+    expect(tester.takeException(), isNull);
+    await capture(tester, 'catalog-sidebar');
+  });
   testWidgets('returning from reader refreshes committed native progress', (
     tester,
   ) async {
@@ -274,7 +323,8 @@ void main() {
     'search matches author and filters combine without losing query',
     (tester) async {
       await pumpLibrary(tester);
-      await tester.tap(find.byTooltip('서재 검색'));
+      expect(find.byTooltip('서재 검색'), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byType(TextField));
       await tester.enterText(find.byType(TextField), '김작가');
@@ -341,8 +391,18 @@ void main() {
     testWidgets('six books occupy two rows of three at $size', (tester) async {
       await pumpLibrary(tester, size: size, books: demoBooks.take(6).toList());
       await tester.pumpAndSettle();
-      // Bring the shelf into view without changing its layout or filtering it.
-      await tester.ensureVisible(find.byType(BookTile).first);
+      // A permanently visible search field can put the grid beyond the lazy
+      // viewport on small phones; scroll until its first row is built.
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('b0')),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
       final tiles = find.byType(BookTile);
       expect(tiles, findsNWidgets(6));

@@ -56,6 +56,12 @@ class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
         })
     }
 
+    override fun updateAdHiddenUntil(epochMs: Long?, callback: (Result<Unit>) -> Unit) {
+        ReaderRuntime.session?.adHiddenUntilEpochMs = epochMs
+        ReaderRuntime.reader?.updateAdHiddenUntil(epochMs)
+        callback(Result.success(Unit))
+    }
+
     override fun closeReader(sessionId: String, callback: (Result<Unit>) -> Unit) {
         callback(runCatching {
             val current = checkNotNull(ReaderRuntime.session) { "No active reader session" }
@@ -108,6 +114,7 @@ internal fun validatePreferences(value: ReaderPreferences) {
 }
 
 internal class ReaderSession(val request: ReaderLaunchRequest) {
+    var adHiddenUntilEpochMs = request.adHiddenUntilEpochMs
     var sequence = 0L
     var preferences = request.preferences
     var locatorJson = request.initialLocatorJson

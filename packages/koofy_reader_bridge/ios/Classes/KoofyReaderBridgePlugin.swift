@@ -71,6 +71,11 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
         } catch { completion(.failure(error)) }
     }
 
+    func updateAdHiddenUntil(epochMs: Int64?, completion: @escaping (Result<Void, Error>) -> Void) {
+        reader?.updateAdHiddenUntil(epochMs)
+        completion(.success(()))
+    }
+
     func closeReader(sessionId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         do { try active(sessionId).close(completion: completion) }
         catch { completion(.failure(error)) }

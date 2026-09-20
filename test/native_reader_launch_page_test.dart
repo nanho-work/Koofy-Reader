@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
 import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -124,6 +126,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          levelPlayReadyProvider.overrideWith((ref) async => true),
           nativeReaderServicesProvider.overrideWith((ref) async => services),
         ],
         child: MaterialApp(
@@ -157,6 +160,24 @@ void main() {
     }
     expect(ready(), isTrue);
   }
+
+  testWidgets('reader launch forwards the saved rewarded banner expiry', (
+    tester,
+  ) async {
+    final expiry = DateTime.now()
+        .add(const Duration(hours: 5))
+        .millisecondsSinceEpoch;
+    SharedPreferences.setMockInitialValues({
+      AppConstants.adHideExpiryKey: expiry,
+    });
+    preparer.complete();
+    gateway.recovery.complete([]);
+    await mount(tester);
+    await pumpUntil(tester, () => gateway.openCalls == 1);
+    expect(gateway.request!.adHiddenUntilEpochMs, expiry);
+    expect(gateway.request!.bannerAdUnitId, '2dr1bupao7hqz66b');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'unconvertible legacy position never silently opens at the start',

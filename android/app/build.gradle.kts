@@ -52,11 +52,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // Use Google test App ID by default.
-        // Release script overrides via ORG_GRADLE_PROJECT_ADMOB_APP_ID.
-        manifestPlaceholders["ADMOB_APP_ID"] =
-            (project.findProperty("ADMOB_APP_ID") as String?)
-                ?: "ca-app-pub-3940256099942544~3347511713"
+
     }
 
     signingConfigs {

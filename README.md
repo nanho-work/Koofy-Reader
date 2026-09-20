@@ -32,67 +32,27 @@ Android API 24+ or iOS 15+. Run `flutter pub get`, then `pod install` in `ios`
 for iOS. Regenerate the three bridge bindings together with
 `dart run pigeon --input pigeons/reader_api.dart` after changing the contract.
 
-## AdMob policy in this repository
+## LevelPlay ads
 
-- Public repository: do not commit production AdMob IDs.
-- Development uses Google test ad IDs by default.
-- Production IDs are injected only at release build time.
+Android and iOS use LevelPlay with Unity Ads and the built-in ironSource network.
+App keys and separate library/viewer/rewarded ad unit IDs are configured in
+`lib/features/ads/config/levelplay_ids.dart`. These are app identifiers, not secret API credentials.
+AdMob SDK, adapter and direct ad requests are not included.
 
-## Ad-related files
+- Debug APK with integration test suite: `./scripts/android_ads_build.sh debug apk`
+- Signed release AAB: `./scripts/android_ads_build.sh release aab`
+- iOS device testing: `flutter run --dart-define=LEVELPLAY_TEST_SUITE=true`
 
-- `lib/features/ads/config/admob_ids.dart`
-- `lib/features/ads/presentation/banner_ad_widget.dart`
-- `lib/features/ads/data/rewarded_ad_service.dart`
-- `lib/features/ads/presentation/ad_footer_widget.dart`
+The Settings page shows a test-suite button only in a non-release build with
+`LEVELPLAY_TEST_SUITE=true`. This flag enables diagnostics, not forced test ads.
+Register the physical test device in LevelPlay before requesting ads.
+Existing Android signing configuration and GitHub signing secrets are still required for release.
 
-## Local secret file
+See `docs/reader-ads.md` for configuration, reward delivery and device checks.
 
-1. Copy `.env.admob.example` to `.env.admob`
-2. Fill real production values in `.env.admob`
-3. Keep `.env.admob` private (`.gitignore` already configured)
+## Android release signing
 
-## Android build script (auto test/prod split)
-
-`scripts/android_ads_build.sh` handles branching automatically:
-
-- `debug` mode => test IDs
-- `release` mode => production IDs from `.env.admob`
-
-Examples:
-
-```bash
-./scripts/android_ads_build.sh debug apk
-./scripts/android_ads_build.sh release aab
-```
-
-## GitHub Actions release build
-
-Manual workflow:
-
-- `.github/workflows/android-release.yml`
-
-Required repository secrets:
-
-- `ADMOB_APP_ID_ANDROID`
-- `ADMOB_BANNER_ANDROID`
-- `ADMOB_REWARDED_ANDROID`
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-
-Execution:
-
-1. GitHub repository -> `Actions`
-2. Run `Android Release (AdMob Prod)` workflow
-3. Download artifact `app-release-aab`
-
-## Why Play Console said "debug mode"
-
-If release signing is missing, Play Console may reject upload as debug-signed.
-This repository now requires `android/key.properties` for release builds.
-
-Local file format (`android/key.properties`):
+Create `android/key.properties` for a locally signed release:
 
 ```properties
 storeFile=upload-keystore.jks
@@ -101,17 +61,7 @@ keyAlias=YOUR_KEY_ALIAS
 keyPassword=YOUR_KEY_PASSWORD
 ```
 
-In GitHub Actions, this file is generated from secrets automatically.
-
-## Android manifest App ID injection
-
-- Manifest key uses `${ADMOB_APP_ID}`
-- Value is injected by Gradle `manifestPlaceholders`
-- Default is Google test App ID
-- Release script overrides with `ORG_GRADLE_PROJECT_ADMOB_APP_ID`
-
-## Quick release checklist
-
-1. Ensure `.env.admob` is present locally/CI secrets.
-2. Run `./scripts/android_ads_build.sh release aab`.
-3. Verify ads in internal test track before store submission.
+The `Android Release (LevelPlay)` GitHub Actions workflow requires
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+and `ANDROID_KEY_PASSWORD` secrets. It generates signing files and uploads
+`app-release-aab`. No AdMob secrets are required.

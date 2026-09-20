@@ -12,7 +12,6 @@ import android.graphics.Shader
 import android.view.View
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.sin
 
 /** A cylindrical paper mesh, including the real target page on its reverse face. */
@@ -24,9 +23,10 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
     private var back: Bitmap? = null
     private var toLeft = true
     private var spread = false
+    private var grabY = .8f
     private var fingerY = .8f
-    private val nx = 64
-    private val ny = 40
+    private val nx = 40
+    private val ny = 28
     private val vertices = FloatArray((nx + 1) * (ny + 1) * 2)
     private val frontUV = FloatArray(vertices.size)
     private val backUV = FloatArray(vertices.size)
@@ -37,8 +37,11 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
     private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private var frontShader: BitmapShader? = null
     private var backShader: BitmapShader? = null
+    // The grabbed edge follows one viewport of finger travel. A single sheet
+    // finishes outside the viewport (two leaf widths); only release animates there.
+    val completionProgress: Float get() = if (spread) 1f else 2f
     var progress: Float = 0f
-        set(value) { field = value.coerceIn(0f, 1f); invalidate() }
+        set(value) { field = value.coerceIn(0f, completionProgress); postInvalidateOnAnimation() }
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -55,17 +58,11 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
         target = destination
         toLeft = left
         spread = frames.columns == 2
-        fingerY = y.coerceIn(0f, 1f)
-        val source = frames.source.image
-        val next = destination.image
-        if (spread) {
-            val half = source.width / 2
-            front = Bitmap.createBitmap(source, if (left) half else 0, 0, half, source.height)
-            back = Bitmap.createBitmap(next, if (left) 0 else half, 0, half, next.height)
-        } else {
-            front = source
-            back = next
-        }
+        grabY = y.coerceIn(0f, 1f)
+        fingerY = grabY
+        // Sample the half-page directly; do not allocate/recycle crops per gesture.
+        front = frames.source.image
+        back = destination.image
         frontShader = BitmapShader(requireNotNull(front), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
         backShader = BitmapShader(requireNotNull(back), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
         progress = 0f
@@ -78,7 +75,6 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
     }
 
     fun clear() {
-        if (spread) { front?.recycle(); back?.recycle() }
         front = null
         back = null
         surfaces = null
@@ -97,7 +93,7 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
             canvas.drawBitmap(frames.source.image, null, rect, paint)
             return
         }
-        if (progress >= .999f) {
+        if (progress >= completionProgress - .001f) {
             canvas.drawBitmap(destination.image, null, rect, paint)
             return
         }
@@ -119,18 +115,16 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
     private fun drawPaper(canvas: Canvas, w: Float, h: Float) {
         val frontImage = front ?: return
         val backImage = back ?: return
-        // Finger height tilts the bend near the grabbed corner. The tilt vanishes
-        // at both endpoints so the final mesh exactly matches the flat EPUB page.
-        val tilt = (fingerY - .5f) * .6f * sin(PI * progress).toFloat()
-        val normalX = cos(tilt)
-        val normalY = sin(tilt)
-        val radius = w * (.025f + .105f * sin(PI * progress).toFloat())
-        val fold = w * (1 - progress) - (PI * radius / 2).toFloat()
+        val shape = ReaderCurlGeometry.fold(w, h, width.toFloat(), progress, grabY, fingerY)
+        val normalX = shape.normalX
+        val normalY = shape.normalY
+        val radius = shape.radius
+        val fold = shape.fold
         for (y in 0..ny) for (x in 0..nx) {
             val index = y * (nx + 1) + x
             val px = x * w / nx
             val py = y * h / ny
-            val distance = px * normalX + (py - h * fingerY) * normalY
+            val distance = px * normalX + (py - h * grabY) * normalY
             val theta = ((distance - fold) / radius).coerceIn(0f, PI.toFloat())
             val bent = when {
                 distance <= fold -> distance
@@ -145,9 +139,11 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
             colors[index] = Color.rgb(shade, shade, shade)
             val u = x.toFloat() / nx
             val v = y.toFloat() / ny
-            frontUV[index * 2] = (if (toLeft) u else 1 - u) * frontImage.width
+            val frontU = if (toLeft) u else 1 - u
+            val backU = if (toLeft) 1 - u else u
+            frontUV[index * 2] = (if (spread) (frontU + if (toLeft) 1f else 0f) / 2 else frontU) * frontImage.width
             frontUV[index * 2 + 1] = v * frontImage.height
-            backUV[index * 2] = (if (toLeft) 1 - u else u) * backImage.width
+            backUV[index * 2] = (if (spread) (backU + if (toLeft) 0f else 1f) / 2 else backU) * backImage.width
             backUV[index * 2 + 1] = v * backImage.height
         }
         var frontCount = 0
@@ -170,10 +166,10 @@ internal class ReaderPageCurlView(context: Context) : View(context) {
         }
         // The bend's contact shadow is a continuous line. Drawing each mesh cell's
         // border would introduce repeated bands that do not exist on a paper surface.
-        shadow.color = Color.argb((34 * sin(PI * progress)).toInt(), 0, 0, 0)
+        shadow.color = Color.argb((34 * sin(PI * progress / completionProgress)).toInt(), 0, 0, 0)
         shadow.strokeWidth = w * .045f
-        val top = (fold + radius + h * fingerY * normalY) / normalX
-        val bottom = (fold + radius - h * (1 - fingerY) * normalY) / normalX
+        val top = (fold + radius + h * grabY * normalY) / normalX
+        val bottom = (fold + radius - h * (1 - grabY) * normalY) / normalX
         canvas.drawLine(top + w * .02f, 0f, bottom + w * .02f, h, shadow)
         paint.shader = frontShader
         if (frontCount > 0) canvas.drawVertices(Canvas.VertexMode.TRIANGLES, vertices.size,

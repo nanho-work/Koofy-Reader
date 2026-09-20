@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/ads/config/levelplay_ids.dart';
+import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
+import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_coordinator.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_services.dart';
 import 'package:koofy_reader_bridge/koofy_reader_bridge.dart';
@@ -72,11 +75,20 @@ class _NativeReaderLaunchPageState
       final publication = await services.preparer.prepare(book: widget.book);
       if (!mounted || _leaveRequested) return;
       setState(() => _status = '읽던 위치를 불러오고 있습니다…');
+      // Read storage afresh on every launch, including after earning a reward.
+      final ads = await ref.read(adRepositoryProvider).getState();
+      // Ad initialization must not delay opening an offline book.
+      final adsReady = await ref
+          .refresh(levelPlayReadyProvider.future)
+          .timeout(const Duration(seconds: 1), onTimeout: () => false);
+      if (!mounted || _leaveRequested) return;
       await services.coordinator.open(
         publicationId: publication.publicationId,
         contentRevision: publication.contentRevision,
         filePath: publication.filePath,
         title: publication.title,
+        bannerAdUnitId: adsReady ? LevelPlayIds.readerBanner : null,
+        adHiddenUntilEpochMs: ads.hiddenUntil?.millisecondsSinceEpoch,
         resolveInitialLocator: (position) =>
             _resolvePosition(services, publication, position),
       );

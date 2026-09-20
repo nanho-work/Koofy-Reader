@@ -1,89 +1,142 @@
+import 'dart:async';
+import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
+import 'package:koofy_reader/features/ads/config/levelplay_ids.dart';
+import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final adStateAsync = ref.watch(adStateProvider);
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
 
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  Timer? _ticker;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _remaining(DateTime until) {
+    final minutes = (until.difference(DateTime.now()).inSeconds / 60)
+        .ceil()
+        .clamp(1, 1000000);
+    final hours = minutes ~/ 60;
+    final rest = minutes % 60;
+    return hours == 0
+        ? '$rest분 남음'
+        : '$hours시간${rest == 0 ? '' : ' $rest분'} 남음';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final adState = ref.watch(adStateProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('광고 설정', style: Theme.of(context).textTheme.titleLarge),
+          Text('광고 없이 읽기', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          adStateAsync.when(
-            loading: () => const Text('광고 상태를 불러오는 중입니다.'),
-            error: (error, _) => Text('광고 상태 로드 실패: $error'),
-            data: (state) {
-              final hiddenUntil = state.hiddenUntil;
-              final hiddenText = hiddenUntil == null
-                  ? '사용 안 함'
-                  : DateFormat(
-                      'yyyy-MM-dd HH:mm',
-                    ).format(hiddenUntil.toLocal());
-              return Text('광고 숨김: $hiddenText');
-            },
-          ),
+          const Text('리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.'),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: AppConstants.adRewardHourOptions
-                .map((hours) {
-                  final label = Text('광고 보고 $hours시간 숨기기');
-                  if (hours == AppConstants.adRewardHourOptions.first) {
-                    return FilledButton(
-                      onPressed: () => _runRewardedFlow(context, ref, hours),
-                      child: label,
-                    );
-                  }
-                  return FilledButton.tonal(
-                    onPressed: () => _runRewardedFlow(context, ref, hours),
-                    child: label,
-                  );
-                })
-                .toList(growable: false),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            '오프라인 안내\n네트워크가 없으면 광고 영역에 안내 문구만 표시됩니다.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          if (LevelPlayIds.testSuite)
+            TextButton(
+              onPressed: () async {
+                if (await LevelPlayService.instance.initialize()) {
+                  await LevelPlay.launchTestSuite();
+                }
+              },
+              child: const Text('LevelPlay 광고 연동 테스트'),
+            ),
+          adState.when(
+            loading: () => const Text('광고 상태를 불러오는 중입니다.'),
+            error: (_, __) => TextButton(
+              onPressed: () => ref.invalidate(adStateProvider),
+              child: const Text('광고 상태를 불러오지 못했습니다. 다시 시도'),
+            ),
+            data: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.isBannerHidden
+                      ? '광고 숨김 · ${_remaining(state.hiddenUntil!)}'
+                      : '광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다.',
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _busy || state.isBannerHidden
+                      ? null
+                      : _runRewardedFlow,
+                  child: Text(
+                    _busy
+                        ? '처리 중…'
+                        : state.isBannerHidden
+                        ? '광고 숨김 적용 중'
+                        : '광고 보고 2시간 광고 없이 읽기',
+                  ),
+                ),
+                if (state.isBannerHidden)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('숨김 시간이 끝나면 다시 시청할 수 있습니다.'),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _runRewardedFlow(
-    BuildContext context,
-    WidgetRef ref,
-    int hours,
-  ) async {
-    final result = await ref.read(rewardedAdServiceProvider).show();
-    if (result == true) {
-      await ref.read(adRepositoryProvider).hideBannerForHours(hours);
-      ref.invalidate(adStateProvider);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('광고를 $hours시간 동안 숨깁니다.')));
-      return;
+  Future<void> _runRewardedFlow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      // Check storage again to avoid starting another reward from stale UI.
+      final state = await ref.read(adRepositoryProvider).getState();
+      if (!mounted) return;
+      if (state.isBannerHidden) {
+        ref.invalidate(adStateProvider);
+        return;
+      }
+      final result = await ref.read(rewardedAdServiceProvider).show();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result == true
+                ? '2시간 동안 배너 광고를 숨깁니다.'
+                : result == false
+                ? '광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.'
+                : '광고를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-
-    if (!context.mounted) return;
-    final message = result == false
-        ? '보상을 받지 못했습니다. 다시 시도해 주세요.'
-        : '리워드 광고 준비중입니다. 잠시 후 다시 시도해 주세요.';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

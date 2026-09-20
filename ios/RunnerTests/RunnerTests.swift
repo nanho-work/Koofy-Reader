@@ -212,7 +212,7 @@ final class RunnerTests: XCTestCase {
     @MainActor
     private func verifyPageFramesAndCurl(manualProbe: Bool = false, startingColumns: Int64 = 2,
                                         chapterBoundary: Bool = false) async throws {
-        let file = try await makeEPUB(longParagraph: true, chapterBoundary: chapterBoundary)
+        let file = try await makeEPUB(longParagraph: true, chapterBoundary: chapterBoundary, paragraphCount: 600)
         let journal = try ReaderCheckpointStore(directory: directory.appendingPathComponent("curl-journal"))
         var events: [ReaderEvent] = []
         let ready = expectation(description: "Curl reader ready")
@@ -394,6 +394,7 @@ final class RunnerTests: XCTestCase {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertEqual(events.last?.locatorJson, try singleTarget.locator.jsonString(), "Single curl advances only one viewport")
+        guard events.last?.locatorJson == (try singleTarget.locator.jsonString()) else { return }
         let reverse = try await waitForCurl(in: reader)
         XCTAssertTrue(reverse.turn(forward: false))
         for _ in 0..<100 {
@@ -401,6 +402,21 @@ final class RunnerTests: XCTestCase {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertEqual(events.last?.locatorJson, singleSource, "Single reverse must return to the source viewport")
+        for step in 0..<5 {
+            let continuous = try await waitForCurl(in: reader)
+            let target = try XCTUnwrap(continuous.frames.next)
+            let epoch = continuous.frames.current.generation
+            reader.requestPageTurn(forward: true)
+            for _ in 0..<100 {
+                if !continuous.isTurning, events.last?.locatorJson == (try target.locator.jsonString()) { break }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            XCTAssertEqual(events.last?.locatorJson, try target.locator.jsonString(), "Continuous turn \(step)")
+            XCTAssertTrue(reader.children.contains { $0 === continuous }, "Reuse the native curl controller")
+            XCTAssertTrue(continuous.frames.current.image === target.image, "Reuse destination pixels")
+            XCTAssertEqual(continuous.frames.current.generation, epoch)
+            XCTAssertNotNil(continuous.frames.previous)
+        }
         try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
             reader.close { c.resume(with: $0) }
         }
@@ -409,7 +425,8 @@ final class RunnerTests: XCTestCase {
     @MainActor
     private func waitForCurl(in reader: KoofyReaderViewController) async throws -> ReaderPageTurnController {
         for _ in 0..<200 {
-            if let controller = reader.children.compactMap({ $0 as? ReaderPageTurnController }).first { return controller }
+            if let controller = reader.children.compactMap({ $0 as? ReaderPageTurnController }).first,
+               !controller.isTurning, controller.frames.next != nil { return controller }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         throw NSError(domain: "PageCurl", code: 1, userInfo: [NSLocalizedDescriptionKey: "Actual EPUB frame preparation failed"])
@@ -640,9 +657,9 @@ final class RunnerTests: XCTestCase {
         return result as? Bool ?? false
     }
 
-    private func makeEPUB(longParagraph: Bool = false, chapterBoundary: Bool = false, fontFaces: Bool = false) async throws -> URL {
+    private func makeEPUB(longParagraph: Bool = false, chapterBoundary: Bool = false, fontFaces: Bool = false, paragraphCount: Int = 120) async throws -> URL {
         let file = directory.appendingPathComponent("reader-fixture.epub")
-        let paragraphs = (1...120).map { index in
+        let paragraphs = (1...paragraphCount).map { index in
             let bold = fontFaces ? "<strong>굵은 글씨 Bold</strong>" : ""
             let repeated = longParagraph && index == 60 ? (1...160).map { "긴 문단 \($0) 번째 문장입니다. 페이지와 문단의 시작은 다릅니다." }.joined(separator: " ") : ""
             return "<p id=\"p\(index)\">\(repeated)한글 문단 \(index). 책장을 넘기고 글자 크기를 바꾸어도 읽던 위치를 유지합니다. English text remains readable.\(bold)</p>" }.joined()

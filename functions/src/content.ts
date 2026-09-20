@@ -12,11 +12,12 @@ export function requireValue(value: unknown, message: string): asserts value {
 }
 export type Kind = 'book' | 'font';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
-export interface Metadata { title: string; author: string; description: string; license: string }
+export interface Metadata { title: string; author: string; description: string; license: string; category?: string; source?: string }
 export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number }
 export interface Content extends Metadata {
   id: string; kind: Kind; revision: number; assets: Record<string, Asset>;
   published: boolean; publishedContent: Snapshot | null; updatedAt: string;
+  deleting?: boolean;
 }
 export function kind(value: unknown): Kind {
   requireValue(value === 'book' || value === 'font', '콘텐츠 종류를 확인해 주세요.');
@@ -34,7 +35,10 @@ export function metadata(input: unknown): Metadata {
     requireValue(typeof value === 'string' && value.trim().length <= max && (!required || value.trim().length > 0), `${key} 입력을 확인해 주세요.`);
     return value.trim();
   }
-  return { title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
+  const category = data.category === undefined ? '기타' : field('category', 40);
+  requireValue(['시', '소설', '에세이', '기타'].includes(category), '도서 분류를 확인해 주세요.');
+  const source = data.source === undefined ? '' : field('source', 500);
+  return { category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
 }
 export function revision(value: unknown): number {
   const result = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
@@ -42,6 +46,7 @@ export function revision(value: unknown): number {
   return result;
 }
 export function assertRevision(item: Content, expected: number) {
+  if (item.deleting) throw new ApiError(409, '삭제 중인 콘텐츠입니다. 삭제를 다시 시도해 주세요.');
   if (item.revision !== expected) throw new ApiError(409, '다른 변경이 저장되었습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
 }
 export function publish(item: Content): Snapshot {
@@ -51,7 +56,7 @@ export function publish(item: Content): Snapshot {
   return { ...fields, assets: item.assets, version: item.revision + 1 };
 }
 export function publicItem(item: Content) {
-  if (!item.published || !item.publishedContent) throw new ApiError(404, '공개된 콘텐츠가 없습니다.');
+  if (item.deleting || !item.published || !item.publishedContent) throw new ApiError(404, '공개된 콘텐츠가 없습니다.');
   const snapshot = item.publishedContent;
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
   return { id: item.id, kind: item.kind, ...snapshot, assets };

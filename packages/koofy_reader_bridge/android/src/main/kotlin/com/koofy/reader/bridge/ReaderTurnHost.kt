@@ -13,7 +13,6 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
     var pageMode = true
     var selecting = false
     var blocked = false
-    var travelFactor = 1f
     var begin: (Boolean, Float) -> Unit = { _, _ -> }
     var move: (Float, Float) -> Unit = { _, _ -> }
     var end: (Boolean) -> Unit = {}
@@ -85,15 +84,16 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
         if (!dragging) return super.onTouchEvent(event)
         velocity?.addMovement(event)
         val distance = (event.x - downX) * if (left) -1 else 1
-        val travel = width * travelFactor
+        val travel = width.coerceAtLeast(1).toFloat()
         when (event.actionMasked) {
             MotionEvent.ACTION_POINTER_DOWN -> { dragging = false; end(false) }
             MotionEvent.ACTION_MOVE -> move((distance / travel).coerceIn(0f, 1f), event.y / height.coerceAtLeast(1))
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                move((distance / travel).coerceIn(0f, 1f), event.y / height.coerceAtLeast(1))
                 velocity?.computeCurrentVelocity(1000)
                 val speed = (velocity?.xVelocity ?: 0f) * if (left) -1 else 1
                 val commit = event.actionMasked == MotionEvent.ACTION_UP &&
-                    (distance > width * .28f || (distance > slop * 2 && speed > 650 * resources.displayMetrics.density))
+                    ReaderTurnGesture.shouldComplete(distance / travel, speed / resources.displayMetrics.density, distance > slop * 2)
                 dragging = false
                 ownsCorner = false
                 velocity?.recycle()

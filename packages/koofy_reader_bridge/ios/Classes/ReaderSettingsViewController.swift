@@ -17,7 +17,7 @@ final class ReaderSettingsViewController: UITableViewController {
         self.preferences = preferences
         self.change = change
         super.init(style: .insetGrouped)
-        title = "보기 설정"
+        title = "독서 설정"
     }
     required init?(coder: NSCoder) { fatalError("Use init(preferences:change:)") }
 
@@ -68,25 +68,29 @@ final class ReaderSettingsViewController: UITableViewController {
         }
     }
 
-    override func numberOfSections(in tableView: UITableView) -> Int { 6 }
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { section == 5 ? fontIds.count : 1 }
+    private func settingIndex(_ path: IndexPath) -> Int {
+        path.section == 2 ? path.row + 2 : path.section == 3 ? 5 : path.section
+    }
+    override func numberOfSections(in tableView: UITableView) -> Int { 4 }
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        section == 3 ? fontIds.count : section == 2 ? 3 : 1
+    }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        ["글자 크기", "배경", "읽기 방식", "페이지 배치", "페이지 전환 효과", "글꼴"][section]
+        ["글자 크기", "배경", "읽기 방식", "글꼴"][section]
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        if section == 3 { return "두 페이지는 화면 너비가 충분할 때 적용됩니다." }
-        if section == 4 {
-            return preferences.scroll ? "연속 스크롤에서는 적용되지 않습니다. 선택한 효과는 유지됩니다."
-                : "책장 넘기기는 가장자리를 잡고 밀어 넘길 수 있습니다. 이 책에 저장됩니다."
-        }
-        return nil
+        guard section == 2 else { return nil }
+        return preferences.scroll
+            ? "연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다."
+            : "두 페이지는 화면 너비가 충분할 때 적용됩니다. 책장 넘기기는 가장자리를 잡고 밀어 넘길 수 있습니다."
     }
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let setting = settingIndex(indexPath)
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         let palette = ReaderPalette.forTheme(preferences.theme)
         cell.backgroundColor = palette.panel
         cell.selectionStyle = .none
-        if indexPath.section == 5 {
+        if setting == 5 {
             cell.textLabel?.text = fontLabels[indexPath.row]
             cell.textLabel?.textColor = palette.foreground
             cell.textLabel?.numberOfLines = 0
@@ -97,7 +101,7 @@ final class ReaderSettingsViewController: UITableViewController {
             return cell
         }
         let control: UIView
-        if indexPath.section == 0 {
+        if setting == 0 {
             let minus = UIButton(type: .system)
             minus.setTitle("A−", for: .normal)
             minus.accessibilityLabel = "글자 작게"
@@ -119,19 +123,29 @@ final class ReaderSettingsViewController: UITableViewController {
             control = stack
         } else {
             let labels = [["밝게", "종이색", "어둡게"], ["페이지 넘김", "연속 스크롤"], ["자동", "한 페이지", "두 페이지"], ["바로 넘기기", "책장 넘기기"]]
-            let segment = UISegmentedControl(items: labels[indexPath.section - 1])
+            let segment = UISegmentedControl(items: labels[setting - 1])
             // Keep action identifiers independent of the displayed section order.
-            segment.tag = indexPath.section + 1
-            segment.accessibilityLabel = ["", "배경", "읽기 방식", "페이지 배치", "페이지 전환 효과"][indexPath.section]
+            segment.tag = setting + 1
+            segment.accessibilityLabel = ["", "배경", "읽기 방식", "페이지 배치", "페이지 전환 효과"][setting]
             segment.selectedSegmentIndex = segment.tag == 2
                 ? (["light", "sepia", "dark"].firstIndex(of: preferences.theme) ?? 1)
                 : segment.tag == 3 ? (preferences.scroll ? 1 : 0)
                 : segment.tag == 4 ? Int(preferences.columnCount) : (preferences.pageTurnStyle == "curl" ? 1 : 0)
             segment.selectedSegmentTintColor = palette.background
             segment.setTitleTextAttributes([.foregroundColor: palette.foreground], for: .normal)
-            segment.isEnabled = !busy && !(segment.tag == 5 && preferences.scroll)
+            segment.isEnabled = !busy && !((segment.tag == 4 || segment.tag == 5) && preferences.scroll)
             segment.addTarget(self, action: #selector(selected(_:)), for: .valueChanged)
-            control = segment
+            if setting >= 2 {
+                let label = UILabel()
+                label.text = ["넘김 방식", "페이지 배치", "페이지 전환 효과"][setting - 2]
+                label.font = .preferredFont(forTextStyle: .subheadline)
+                label.textColor = palette.foreground
+                label.adjustsFontForContentSizeCategory = true
+                let stack = UIStackView(arrangedSubviews: [label, segment])
+                stack.axis = .vertical
+                stack.spacing = 8
+                control = stack
+            } else { control = segment }
         }
         control.tintColor = palette.accent
         control.translatesAutoresizingMaskIntoConstraints = false
@@ -146,19 +160,20 @@ final class ReaderSettingsViewController: UITableViewController {
         return cell
     }
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        guard indexPath.section == 5 else { return }
+        guard settingIndex(indexPath) == 5 else { return }
         tableView.deselectRow(at: indexPath, animated: true)
         update { $0.fontId = fontIds[indexPath.row] }
     }
     @objc private func smaller() { update { $0.fontScale = max(0.5, $0.fontScale - 0.1) } }
     @objc private func larger() { update { $0.fontScale = min(3, $0.fontScale + 0.1) } }
     @objc private func selected(_ control: UISegmentedControl) {
+        guard !(preferences.scroll && (control.tag == 4 || control.tag == 5)) else { return }
         update {
             switch control.tag {
             case 2: $0.theme = ["light", "sepia", "dark"][control.selectedSegmentIndex]
             case 3: $0.scroll = control.selectedSegmentIndex == 1
             case 5: $0.pageTurnStyle = control.selectedSegmentIndex == 1 ? "curl" : "instant"
-            default: $0.columnCount = Int64(control.selectedSegmentIndex); $0.scroll = false
+            default: $0.columnCount = Int64(control.selectedSegmentIndex)
             }
         }
     }

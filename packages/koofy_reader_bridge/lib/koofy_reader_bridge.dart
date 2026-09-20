@@ -60,3 +60,7 @@ class NativeReaderGateway implements ReaderGateway, ReaderFlutterApi {
     ReaderPreferences preferences,
   ) => _host.applyPreferences(sessionId, preferences);
 }
+
+/// Update an already-open native reader after a delayed reward callback.
+Future<void> updateNativeReaderAdHiddenUntil(int? epochMs) =>
+    ReaderHostApi().updateAdHiddenUntil(epochMs);

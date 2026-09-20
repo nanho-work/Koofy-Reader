@@ -42,6 +42,8 @@ class ReaderLaunchRequest {
     required this.title,
     this.initialLocatorJson,
     required this.preferences,
+    this.bannerAdUnitId,
+    this.adHiddenUntilEpochMs,
   });
   int protocolVersion;
   String sessionId;
@@ -52,6 +54,10 @@ class ReaderLaunchRequest {
   String title;
   String? initialLocatorJson;
   ReaderPreferences preferences;
+
+  /// LevelPlay viewer ad unit and the shared reward expiry.
+  String? bannerAdUnitId;
+  int? adHiddenUntilEpochMs;
 }
 
 class ReaderEvent {
@@ -83,6 +89,8 @@ class ReaderEvent {
 
 @HostApi()
 abstract class ReaderHostApi {
+  @async
+  void updateAdHiddenUntil(int? epochMs);
   @async
   void openReader(ReaderLaunchRequest request);
   @async

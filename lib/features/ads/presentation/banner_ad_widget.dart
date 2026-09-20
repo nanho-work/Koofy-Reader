@@ -1,88 +1,120 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:koofy_reader/features/ads/config/admob_ids.dart';
+import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
+import '../config/levelplay_ids.dart';
+import '../data/levelplay_service.dart';
 
 class BannerAdWidget extends StatefulWidget {
   const BannerAdWidget({super.key});
-
   @override
   State<BannerAdWidget> createState() => _BannerAdWidgetState();
 }
 
-class _BannerAdWidgetState extends State<BannerAdWidget> {
-  BannerAd? _bannerAd;
-  bool _isLoaded = false;
-  String? _errorText;
-
+class _BannerAdWidgetState extends State<BannerAdWidget>
+    with WidgetsBindingObserver
+    implements LevelPlayBannerAdViewListener {
+  final _key = GlobalKey<LevelPlayBannerAdViewState>();
+  bool _ready = false;
+  bool _loaded = false;
+  String _message = '광고 불러오는 중…';
   @override
   void initState() {
     super.initState();
-    _loadBanner();
+    WidgetsBinding.instance.addObserver(this);
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    final ready = await LevelPlayService.instance.initialize();
+    if (!mounted) return;
+    setState(() {
+      _ready = ready;
+      if (!ready) _message = '광고를 준비하지 못했습니다.';
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (!_ready) {
+        _initialize();
+      } else {
+        unawaited(_key.currentState?.resumeAutoRefresh());
+      }
+    } else {
+      unawaited(_key.currentState?.pauseAutoRefresh());
+    }
   }
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    // The SDK platform view destroys its native banner when unmounted.
     super.dispose();
   }
 
-  void _loadBanner() {
-    final unitId = AdMobIds.bannerUnitId;
-    if (unitId == null || unitId.isEmpty) {
-      setState(() {
-        _errorText = '현재 플랫폼은 배너 광고를 지원하지 않습니다.';
-      });
-      return;
-    }
-
-    final banner = BannerAd(
-      size: AdSize.banner,
-      adUnitId: unitId,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (!mounted) return;
-          setState(() {
-            _bannerAd = ad as BannerAd;
-            _isLoaded = true;
-            _errorText = null;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          if (!mounted) return;
-          setState(() {
-            _isLoaded = false;
-            _errorText = '광고 로딩중...';
-          });
-        },
-      ),
-    );
-
-    banner.load();
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 320) return const SizedBox(height: 50);
+      return SizedBox(
+        height: 50,
+        child: Center(
+          child: SizedBox(
+            width: 320,
+            height: 50,
+            child: Stack(
+              children: [
+                if (!_loaded)
+                  Center(
+                    child: Text(
+                      _message,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                if (_ready)
+                  LevelPlayBannerAdView(
+                    key: _key,
+                    adUnitId: LevelPlayIds.libraryBanner,
+                    adSize: LevelPlayAdSize.BANNER,
+                    listener: this,
+                    onPlatformViewCreated: () {
+                      unawaited(_key.currentState?.loadAd());
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  @override
+  void onAdLoaded(LevelPlayAdInfo adInfo) {
+    if (mounted) setState(() => _loaded = true);
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (_isLoaded && _bannerAd != null) {
-      return SizedBox(
-        width: _bannerAd!.size.width.toDouble(),
-        height: _bannerAd!.size.height.toDouble(),
-        child: AdWidget(ad: _bannerAd!),
-      );
+  void onAdLoadFailed(LevelPlayAdError error) {
+    if (mounted) {
+      setState(() {
+        _loaded = false;
+        _message = '광고를 불러오지 못했습니다.';
+      });
     }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Text(
-        _errorText ?? '광고 불러오는 중…',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
   }
+
+  @override
+  void onAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error) =>
+      onAdLoadFailed(error);
+  @override
+  void onAdDisplayed(LevelPlayAdInfo adInfo) {}
+  @override
+  void onAdClicked(LevelPlayAdInfo adInfo) {}
+  @override
+  void onAdExpanded(LevelPlayAdInfo adInfo) {}
+  @override
+  void onAdCollapsed(LevelPlayAdInfo adInfo) {}
+  @override
+  void onAdLeftApplication(LevelPlayAdInfo adInfo) {}
 }

@@ -109,3 +109,44 @@ test('TXT upload, format replacement, publishing and legacy catalog compatibilit
   assert.equal((await download.json()).sha256, item.assets.txt.sha256);
   assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=epub&version=${visible.version}`)).status, 400);
 });
+
+test('delete blocks downloads, removes all versions and safely retries books and fonts', async t => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const { getStorage } = require('firebase-admin/storage');
+  const { Bucket } = require('@google-cloud/storage');
+  const bucket = getStorage().bucket();
+  for (const kind of ['book', 'font']) {
+    const { body: item } = await api('create', { kind, metadata: { title: `Delete ${kind}`, author: 'Test', description: '', license: 'Test only' } });
+    const prefix = `readerContent/${item.id}/`, neighbor = `readerContent/${item.id}0/keep.txt`;
+    await Promise.all(['old/file', 'current/file', 'draft/file'].map(name => bucket.file(prefix + name).save('fixture')));
+    await bucket.file(neighbor).save('keep');
+    const ref = getFirestore().collection('readerContent').doc(item.id);
+    await ref.update({ published: true, publishedContent: { title: item.title, author: 'Test', description: '', license: 'Test', version: 1, assets: {} } });
+    assert.equal((await api('delete', { id: item.id, revision: 99 })).status, 409);
+    assert.equal((await api('delete', { id: item.id, revision: 1 }, token('slimestrikeforce', false))).status, 403);
+    assert.equal((await bucket.getFiles({ prefix }))[0].length, 3);
+    const failure = t.mock.method(Bucket.prototype, 'deleteFiles', async () => { throw new Error('simulated storage failure'); });
+    const failed = await api('delete', { id: item.id, revision: 1 });
+    failure.mock.restore();
+    assert.equal(failed.status, 503);
+    const pending = (await ref.get()).data();
+    assert.equal(pending.deleting, true);
+    assert.equal(pending.published, false);
+    assert.equal((await api('publish', { id: item.id, revision: pending.revision })).status, 409);
+    const upload = await fetch(base + `readerAdmin?action=upload&id=${item.id}&revision=${pending.revision}&slot=txt`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' }, body: 'blocked' });
+    assert.equal(upload.status, 409);
+    const catalog = await (await fetch(base + `readerCatalog?kind=${kind}&supportsTxt=1`)).json();
+    assert(!catalog.items.some(value => value.id === item.id));
+    assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&version=1&slot=txt`)).status, 404);
+    const deleted = await api('delete', { id: item.id, revision: 1 });
+    assert.equal(deleted.status, 200, JSON.stringify(deleted.body));
+    assert.equal(deleted.body.deleted, true);
+    assert.equal((await ref.get()).exists, false);
+    assert.equal((await bucket.getFiles({ prefix }))[0].length, 0);
+    assert.equal((await bucket.file(neighbor).exists())[0], true);
+    assert.equal((await api('delete', { id: item.id, revision: 1 })).status, 200);
+    const audit = await getFirestore().collection('readerAudit').where('contentId', '==', item.id).get();
+    assert(audit.docs.some(doc => doc.data().action === 'deleteCompleted'));
+    await bucket.file(neighbor).delete();
+  }
+});

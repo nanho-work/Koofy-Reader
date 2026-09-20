@@ -46,10 +46,23 @@ internal class ReaderPageTurns(
     private var forward = true
     private var activeTarget: PageSurface? = null
     private var active = true
+    private var leftward = true
+    private var grabY = .5f
+    private var fingerY = .5f
+    private var dragProgress = 0f
+    private var waitTimeout: Job? = null
+    private var queuedRequest: Boolean? = null
+    private val wantsCurl: Boolean get() = curlEnabled() && !reducedMotion()
 
     init {
         host.begin = { left, y -> begin(left, y) }
-        host.move = { progress, y -> if (state == "dragging") overlay.drag(progress, y) }
+        host.move = { progress, y ->
+            if (state == "dragging") {
+                dragProgress = progress
+                fingerY = y
+                if (activeTarget != null) overlay.drag(progress, y)
+            }
+        }
         host.end = { complete -> finish(complete) }
     }
 
@@ -57,28 +70,92 @@ internal class ReaderPageTurns(
         if (state == "committing") {
             commitTimeout?.cancel()
             overlay.clear()
+            val target = activeTarget
+            activeTarget = null
             state = "idle"
             host.blocked = false
+            if (target != null && surfaces?.advance(target) == true) {
+                prepareWindow()
+                drainRequest()
+                return
+            }
         }
         if (state == "idle" && active) refresh()
     }
 
     fun refresh() {
         invalidate()
-        if (!active || !curlEnabled()) { provider.disposeNavigator(); return }
+        if (!active || !wantsCurl) return
+        prepareWindow()
+    }
+
+    private fun prepareWindow() {
         val reader = navigator() ?: return
+        prepareJob?.cancel()
         val epoch = generation
         prepareJob = activity.lifecycleScope.launch {
-            provider.prepare(reader, preferences(), epoch) { result ->
-                if (generation == epoch) surfaces = result else result.recycle()
+            provider.prepare(reader, preferences(), epoch, surfaces, forward) { result ->
+                if (generation == epoch) {
+                    surfaces = result
+                    activatePreparedTurn()
+                } else result.recycle()
+            }
+            if (epoch == generation && provider.sourceMismatch) {
+                refresh()
+                return@launch
+            }
+            if (epoch == generation && state == "waiting") {
+                // Boundary or failed preparation must not trap input. A temporary
+                // cache miss never silently changes a curl into an instant turn.
+                cancelWaiting()
             }
         }
     }
 
+    private fun activatePreparedTurn() {
+        if (activeTarget != null || !wantsCurl || state !in listOf("dragging", "waiting")) return
+        val frames = surfaces ?: return
+        val target = if (forward) frames.next else frames.previous
+        if (target == null) return
+        try {
+            overlay.show(frames, target, leftward, grabY)
+            overlay.drag(dragProgress, fingerY)
+            activeTarget = target
+            if (state == "waiting") {
+                waitTimeout?.cancel()
+                state = "dragging"
+                finish(true)
+            }
+        } catch (_: OutOfMemoryError) {
+            overlay.clear()
+            activeTarget = null
+            cancelWaiting()
+        }
+    }
+
+    private fun cancelWaiting() {
+        waitTimeout?.cancel()
+        if (state == "waiting") {
+            queuedRequest = null
+            state = "idle"
+            host.blocked = false
+        }
+    }
+
+    private fun drainRequest() {
+        val next = queuedRequest ?: return
+        val epoch = generation
+        queuedRequest = null
+        host.post { if (generation == epoch && active) request(next) }
+    }
+
     fun invalidate() {
         generation++
+        waitTimeout?.cancel()
+        queuedRequest = null
         prepareJob?.cancel()
         prepareJob = null
+        provider.disposeNavigator()
         animator?.removeAllListeners()
         animator?.cancel()
         animator = null
@@ -96,7 +173,8 @@ internal class ReaderPageTurns(
         Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
     fun request(next: Boolean) {
-        if (state != "idle" || !available()) return
+        if (state != "idle") { queuedRequest = next; return }
+        if (!available()) return
         val rtl = navigator()?.settings?.value?.readingProgression == ReadingProgression.RTL
         begin(if (rtl) !next else next, .82f)
         finish(true)
@@ -106,39 +184,45 @@ internal class ReaderPageTurns(
         if (state != "idle" || !available()) return
         val rtl = navigator()?.settings?.value?.readingProgression == ReadingProgression.RTL
         forward = if (rtl) !left else left
-        val frames = surfaces
-        val target = if (forward) frames?.next else frames?.previous
-        activeTarget = if (curlEnabled() && !reducedMotion()) target else null
-        // The free edge travels two leaf widths during a physical turn. A single
-        // visible page therefore follows a finger at half the spread's progress rate.
-        host.travelFactor = if (activeTarget != null && frames?.columns == 1) 2f else 1f
+        leftward = left
+        grabY = y
+        fingerY = y
+        dragProgress = 0f
+        activeTarget = null
         state = "dragging"
-        if (frames != null && activeTarget != null) {
-            try { overlay.show(frames, activeTarget!!, left, y) }
-            catch (_: OutOfMemoryError) {
-                overlay.clear()
-                activeTarget = null
-                prepareJob?.cancel()
-                surfaces?.recycle()
-                surfaces = null
-                provider.disposeNavigator()
-                fallbackCount++
-            }
-        }
-        else if (curlEnabled()) fallbackCount++
+        activatePreparedTurn()
     }
 
     private fun finish(complete: Boolean) {
         if (state != "dragging") return
         if (activeTarget == null) {
-            if (complete) commitTurn() else state = "idle"
+            if (!complete) { state = "idle"; return }
+            if (wantsCurl && surfaces?.known(if (forward) 1 else -1) == true) {
+                state = "idle" // A known book boundary is not a capture failure.
+                return
+            }
+            if (wantsCurl && prepareJob?.isActive == true &&
+                surfaces?.known(if (forward) 1 else -1) != true) {
+                state = "waiting"
+                host.blocked = true
+                waitTimeout?.cancel()
+                waitTimeout = activity.lifecycleScope.launch {
+                    delay(5_000)
+                    cancelWaiting()
+                }
+            } else {
+                if (wantsCurl) fallbackCount++
+                commitTurn()
+            }
             return
         }
         state = "settling"
         host.blocked = true
-        val end = if (complete) 1f else 0f
+        val end = if (complete) overlay.completionProgress else 0f
         animator = ValueAnimator.ofFloat(overlay.progress, end).apply {
-            duration = (340 * kotlin.math.abs(end - overlay.progress)).toLong().coerceAtLeast(100)
+            duration = (280 * kotlin.math.abs(end - overlay.progress) / overlay.completionProgress)
+                .toLong().coerceIn(100, 280)
+            interpolator = android.view.animation.DecelerateInterpolator()
             addUpdateListener { overlay.progress = it.animatedValue as Float }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -148,6 +232,7 @@ internal class ReaderPageTurns(
                         activeTarget = null
                         state = "idle"
                         host.blocked = false
+                        drainRequest()
                     }
                 }
             })
@@ -157,6 +242,7 @@ internal class ReaderPageTurns(
 
     private fun commitTurn() {
         state = "committing"
+        prepareJob?.cancel()
         host.blocked = true
         val target = activeTarget
         val reader = navigator()

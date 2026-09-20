@@ -190,6 +190,9 @@ struct ReaderLaunchRequest: Hashable {
   var title: String
   var initialLocatorJson: String? = nil
   var preferences: ReaderPreferences
+  /// Uses the same test/production ID and reward expiry as the Flutter shell.
+  var bannerAdUnitId: String? = nil
+  var adHiddenUntilEpochMs: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -203,6 +206,8 @@ struct ReaderLaunchRequest: Hashable {
     let title = pigeonVar_list[6] as! String
     let initialLocatorJson: String? = nilOrValue(pigeonVar_list[7])
     let preferences = pigeonVar_list[8] as! ReaderPreferences
+    let bannerAdUnitId: String? = nilOrValue(pigeonVar_list[9])
+    let adHiddenUntilEpochMs: Int64? = nilOrValue(pigeonVar_list[10])
 
     return ReaderLaunchRequest(
       protocolVersion: protocolVersion,
@@ -213,7 +218,9 @@ struct ReaderLaunchRequest: Hashable {
       filePath: filePath,
       title: title,
       initialLocatorJson: initialLocatorJson,
-      preferences: preferences
+      preferences: preferences,
+      bannerAdUnitId: bannerAdUnitId,
+      adHiddenUntilEpochMs: adHiddenUntilEpochMs
     )
   }
   func toList() -> [Any?] {
@@ -227,6 +234,8 @@ struct ReaderLaunchRequest: Hashable {
       title,
       initialLocatorJson,
       preferences,
+      bannerAdUnitId,
+      adHiddenUntilEpochMs,
     ]
   }
   static func == (lhs: ReaderLaunchRequest, rhs: ReaderLaunchRequest) -> Bool {
@@ -350,6 +359,7 @@ class ReaderApiPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 
 /// Generated protocol from Pigeon that represents a handler of messages from Flutter.
 protocol ReaderHostApi {
+  func updateAdHiddenUntil(epochMs: Int64?, completion: @escaping (Result<Void, Error>) -> Void)
   func openReader(request: ReaderLaunchRequest, completion: @escaping (Result<Void, Error>) -> Void)
   func closeReader(sessionId: String, completion: @escaping (Result<Void, Error>) -> Void)
   func goTo(sessionId: String, locatorJson: String, completion: @escaping (Result<Void, Error>) -> Void)
@@ -364,6 +374,23 @@ class ReaderHostApiSetup {
   /// Sets up an instance of `ReaderHostApi` to handle messages through the `binaryMessenger`.
   static func setUp(binaryMessenger: FlutterBinaryMessenger, api: ReaderHostApi?, messageChannelSuffix: String = "") {
     let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+    let updateAdHiddenUntilChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.updateAdHiddenUntil\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      updateAdHiddenUntilChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let epochMsArg: Int64? = nilOrValue(args[0])
+        api.updateAdHiddenUntil(epochMs: epochMsArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      updateAdHiddenUntilChannel.setMessageHandler(nil)
+    }
     let openReaderChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.koofy_reader_bridge.ReaderHostApi.openReader\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       openReaderChannel.setMessageHandler { message, reply in

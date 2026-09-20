@@ -71,7 +71,7 @@ internal class ReaderSettingsDialog(
         }
         fun update(next: ReaderPreferences) { change(next); render() }
         val heading = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
-        heading.addView(label("보기 설정", 20f), LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(label("독서 설정", 20f), LinearLayout.LayoutParams(0, -2, 1f))
         heading.addView(button("완료") { dialog.dismiss() }, LinearLayout.LayoutParams(dp(64), dp(48)))
         column.addView(heading)
         column.addView(label("글자 크기"))
@@ -80,29 +80,30 @@ internal class ReaderSettingsDialog(
         font.addView(label("${(p.fontScale * 100).toInt()}%", 16f).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, -2, 1f))
         font.addView(button("A+") { update(current().copy(fontScale = (current().fontScale + .1).coerceAtMost(3.0))) }, LinearLayout.LayoutParams(0, -2, 1f))
         column.addView(font)
-        fun choices(title: String, labels: List<String>, selected: Int, action: (Int) -> Unit) {
+        fun choices(title: String, labels: List<String>, selected: Int, enabled: Boolean = true, action: (Int) -> Unit) {
             column.addView(label(title))
             val row = LinearLayout(context)
             labels.forEachIndexed { i, text ->
-                row.addView(button(if (i == selected) "✓ $text" else text, i == selected) { action(i) }, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(button(if (i == selected) "✓ $text" else text, i == selected) { action(i) }.apply { isEnabled = enabled; alpha = if (enabled) 1f else .4f }, LinearLayout.LayoutParams(0, -2, 1f))
             }
             column.addView(row)
         }
         choices("배경", listOf("밝게", "종이색", "어둡게"), listOf("light", "sepia", "dark").indexOf(p.theme)) {
             update(current().copy(theme = listOf("light", "sepia", "dark")[it]))
         }
-        choices("읽기 방식", listOf("페이지 넘김", "연속 스크롤"), if (p.scroll) 1 else 0) {
+        column.addView(label("읽기 방식", 17f))
+        choices("넘김 방식", listOf("페이지 넘김", "연속 스크롤"), if (p.scroll) 1 else 0) {
             update(current().copy(scroll = it == 1))
         }
-        choices("페이지 배치", listOf("자동", "한 페이지", "두 페이지"), p.columnCount.toInt()) {
-            update(current().copy(columnCount = it.toLong(), scroll = false))
+        choices("페이지 배치", listOf("자동", "한 페이지", "두 페이지"), p.columnCount.toInt(), enabled = !p.scroll) {
+            update(current().copy(columnCount = it.toLong()))
         }
         if (!p.scroll) {
             choices("페이지 전환 효과", listOf("바로 넘기기", "책장 넘기기"), if (p.pageTurnStyle == "curl") 1 else 0) {
                 update(current().copy(pageTurnStyle = if (it == 1) "curl" else "instant"))
             }
         } else {
-            column.addView(label("페이지 전환 효과 · 연속 스크롤에서는 사용하지 않습니다.", 12f)
+            column.addView(label("연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다.", 12f)
                 .apply { setTextColor(colors.secondary) })
         }
         column.addView(label("두 페이지는 화면 너비가 충분할 때 적용됩니다.", 12f).apply { setTextColor(colors.secondary) })
