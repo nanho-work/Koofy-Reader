@@ -59,6 +59,17 @@ class Book {
 
   bool get isLocalFile => sourceType == BookSourceType.localFile;
 
+  Book withCoverPath(String? path) => Book(
+    id: id,
+    title: title,
+    author: author,
+    description: description,
+    sourceType: sourceType,
+    assetPath: assetPath,
+    localPath: localPath,
+    coverPath: path,
+  );
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

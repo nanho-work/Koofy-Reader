@@ -36,7 +36,7 @@ class CatalogAsset {
     if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(sha) ||
         size < 1 ||
         size > 20 * 1024 * 1024 ||
-        !const ['epub', 'webp', 'otf', 'ttf'].contains(extension)) {
+        !const ['epub', 'txt', 'webp', 'otf', 'ttf'].contains(extension)) {
       throw const FormatException('올바르지 않은 파일 정보입니다.');
     }
   }
@@ -71,6 +71,7 @@ class CatalogItem {
       final asset = entry.value;
       final valid = kind == 'book'
           ? (entry.key == 'epub' && asset.extension == 'epub') ||
+                (entry.key == 'txt' && asset.extension == 'txt') ||
                 (entry.key == 'cover' && asset.extension == 'webp')
           : RegExp(r'^font[1-9]00$').hasMatch(entry.key) &&
                 const ['otf', 'ttf'].contains(asset.extension) &&
@@ -78,8 +79,9 @@ class CatalogItem {
       if (!valid) throw const FormatException('지원하지 않는 파일 정보입니다.');
     }
     if (kind == 'book' &&
-        (!assets.containsKey('epub') || !assets.containsKey('cover'))) {
-      throw const FormatException('책 또는 표지 파일이 없습니다.');
+        (assets.containsKey('epub') == assets.containsKey('txt') ||
+            !assets.containsKey('cover'))) {
+      throw const FormatException('책 파일은 EPUB 또는 TXT 한 개와 표지가 필요합니다.');
     }
   }
   final String id, kind, title, author, description, license;
@@ -161,7 +163,11 @@ class ReaderCatalog {
   }
 
   Future<CatalogPage> list(String kind, {String? after}) async {
-    final data = await _json({'kind': kind, if (after != null) 'after': after});
+    final data = await _json({
+      'kind': kind,
+      if (kind == 'book') 'supportsTxt': '1',
+      if (after != null) 'after': after,
+    });
     return CatalogPage(
       (data['items'] as List)
           .map((item) => CatalogItem.fromJson(item as Map<String, dynamic>))
@@ -307,7 +313,7 @@ class ReaderCatalog {
             title: item.title,
             author: item.author,
             description: item.description,
-            localPath: files['epub']!.path,
+            localPath: (files['epub'] ?? files['txt'])!.path,
             coverPath: files['cover']!.path,
           ),
         );

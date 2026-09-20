@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import yauzl from 'yauzl';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import iconv from 'iconv-lite';
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -44,8 +45,8 @@ export function assertRevision(item: Content, expected: number) {
   if (item.revision !== expected) throw new ApiError(409, '다른 변경이 저장되었습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
 }
 export function publish(item: Content): Snapshot {
-  requireValue(item.kind === 'book' ? item.assets.epub && item.assets.cover : Object.keys(item.assets).some(key => /^font[1-9]00$/.test(key)),
-    item.kind === 'book' ? 'EPUB와 표지를 먼저 업로드해 주세요.' : '글꼴 파일을 하나 이상 업로드해 주세요.');
+  requireValue(item.kind === 'book' ? Boolean(item.assets.epub) !== Boolean(item.assets.txt) && item.assets.cover : Object.keys(item.assets).some(key => /^font[1-9]00$/.test(key)),
+    item.kind === 'book' ? 'EPUB 또는 TXT 한 개와 표지를 먼저 업로드해 주세요.' : '글꼴 파일을 하나 이상 업로드해 주세요.');
   const fields = metadata(item);
   return { ...fields, assets: item.assets, version: item.revision + 1 };
 }
@@ -62,7 +63,40 @@ export function bearer(header: string | undefined): string {
   if (!header || !/^Bearer \S+$/.test(header)) throw new ApiError(401, '관리자 로그인이 필요합니다.');
   return header.slice(7);
 }
-export const limits = { epub: 20 * 1024 * 1024, cover: 5 * 1024 * 1024, font: 10 * 1024 * 1024 };
+export const limits = { epub: 20 * 1024 * 1024, txt: 20 * 1024 * 1024, cover: 5 * 1024 * 1024, font: 10 * 1024 * 1024 };
+
+// One body per book. Replacing its format changes only the draft; published
+// assets remain immutable until the administrator publishes again.
+export function replaceAsset(item: Content, slot: string, asset: Asset): Record<string, Asset> {
+  const assets = { ...item.assets, [slot]: asset };
+  if (item.kind === 'book' && slot === 'txt') delete assets.epub;
+  if (item.kind === 'book' && slot === 'epub') delete assets.txt;
+  return assets;
+}
+
+export function normalizeText(bytes: Buffer): Buffer {
+  requireValue(bytes.length > 0 && bytes.length <= limits.txt, 'TXT는 20MB 이하여야 합니다.');
+  const bomEncoding = bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
+    : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be'
+    : bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 'utf-8' : null;
+  let text: string;
+  try {
+    if (bomEncoding) text = new TextDecoder(bomEncoding, { fatal: true }).decode(bytes);
+    else {
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+      catch {
+        text = iconv.decode(bytes, 'cp949');
+        // Do not silently replace undecodable bytes or guess a lossy encoding.
+        if (!iconv.encode(text, 'cp949').equals(bytes)) throw new Error('Invalid CP949');
+      }
+    }
+  } catch { throw new ApiError(400, 'TXT 인코딩을 읽을 수 없습니다. UTF-8로 저장한 뒤 다시 등록해 주세요.'); }
+  requireValue(text.trim().length > 0, '내용이 있는 TXT 파일을 선택해 주세요.');
+  requireValue(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\ufffe\uffff]/.test(text), '일반 텍스트 파일이 아닙니다. TXT 파일을 확인해 주세요.');
+  const output = Buffer.from(text.replace(/\r\n?/g, '\n'), 'utf8');
+  requireValue(output.length <= limits.txt, 'UTF-8 변환 후 TXT 크기가 20MB를 넘습니다. 파일을 나누어 등록해 주세요.');
+  return output;
+}
 
 // Inspect every ZIP entry without extracting it to disk. Bounded decompression
 // prevents a small compressed upload from exhausting the function's memory.
@@ -147,6 +181,9 @@ export async function validateUpload(contentKind: Kind, slot: string, bytes: Buf
     try { await inspectEpub(bytes); }
     catch (error) { throw error instanceof ApiError ? error : new ApiError(400, 'EPUB 압축 파일을 읽을 수 없습니다.'); }
     extension = 'epub'; contentType = 'application/epub+zip';
+  } else if (contentKind === 'book' && slot === 'txt') {
+    output = normalizeText(bytes);
+    extension = 'txt'; contentType = 'text/plain; charset=utf-8';
   } else if (contentKind === 'book' && slot === 'cover') {
     requireValue(bytes.length > 0 && bytes.length <= limits.cover, '표지는 5MB 이하여야 합니다.');
     try {

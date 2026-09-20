@@ -55,3 +55,47 @@ test('cover is decoded, resized and re-encoded to a safe static format', async (
   const info = await sharp(checked.bytes).metadata();
   assert.equal(info.format, 'webp'); assert.equal(info.width, 900); assert.equal(info.height, 1200);
 });
+
+test('TXT normalizes Unicode and Korean legacy encodings to UTF-8', async () => {
+  const { createHash } = await import('node:crypto');
+  const text = '한글 본문 😀\r\n두 번째 줄';
+  const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+  const bigEndian = Buffer.from(utf16); bigEndian.swap16();
+  for (const bytes of [Buffer.from(text), Buffer.from('\ufeff' + text), utf16, bigEndian]) {
+    const result = await validateUpload('book', 'txt', bytes);
+    assert.equal(result.bytes.toString('utf8'), text.replace('\r\n', '\n'));
+    assert.equal(result.asset.extension, 'txt');
+    assert.equal(result.asset.contentType, 'text/plain; charset=utf-8');
+    assert.equal(result.asset.size, result.bytes.length);
+    assert.equal(result.asset.sha256, createHash('sha256').update(result.bytes).digest('hex'));
+  }
+  const korean = await validateUpload('book', 'txt', Buffer.from([0xb0, 0xa1, 0x0d, 0x0a, 0xb3, 0xaa]));
+  assert.equal(korean.bytes.toString('utf8'), '가\n나');
+  const extended = await validateUpload('book', 'txt', Buffer.from([0x8c, 0x63]));
+  assert.equal(extended.bytes.toString('utf8'), '똠');
+});
+
+test('TXT rejects empty, binary, invalid encoding and oversized uploads', async () => {
+  for (const bytes of [Buffer.alloc(0), Buffer.from(' \n\t'), Buffer.from([0xff]), Buffer.from([0xef, 0xbb, 0xbf, 0xb0, 0xa1]), Buffer.from('본문\uffff'), Buffer.from('본문\x00'), readFileSync('test/fixtures/valid.epub'), Buffer.alloc(20 * 1024 * 1024 + 1)]) {
+    await assert.rejects(validateUpload('book', 'txt', bytes), ApiError);
+  }
+  await assert.rejects(validateUpload('font', 'txt', Buffer.from('본문')), ApiError);
+});
+
+test('format replacement is exclusive and does not mutate published files', async () => {
+  const { replaceAsset } = await import('../src/content');
+  const epub = { path: 'epub/original', ...(await validateUpload('book', 'epub', readFileSync('test/fixtures/valid.epub'))).asset };
+  const txt = { path: 'txt/new', ...(await validateUpload('book', 'txt', Buffer.from('본문'))).asset };
+  const cover = { ...epub, path: 'cover/original', extension: 'webp' };
+  const uploaded = { ...item, assets: { epub, cover } };
+  const publishedContent = publish(uploaded);
+  const original = { ...uploaded, published: true, publishedContent };
+  const assets = replaceAsset(original, 'txt', txt);
+  assert.equal(assets.epub, undefined);
+  assert.deepEqual(assets.txt, txt);
+  assert.deepEqual(publicItem(original).assets.epub.sha256, epub.sha256);
+  assert.equal(publish({ ...original, assets }).assets.txt, txt);
+  assert.throws(() => publish({ ...original, assets: { ...assets, epub } }), ApiError);
+  assert.throws(() => publish({ ...original, assets: { txt } }), ApiError);
+  assert.equal(replaceAsset({ ...original, assets }, 'epub', epub).txt, undefined);
+});

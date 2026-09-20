@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
+import 'package:koofy_reader/features/library/data/book_cover_store.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:xml/xml.dart';
 
@@ -20,14 +21,18 @@ abstract class BookRepository {
   Future<List<Book>> getBooks();
   Future<Book?> importBookFile(String path);
   Future<void> saveDownloadedBook(Book book);
+  Future<void> setBookCover(String bookId, String imagePath);
+  Future<void> resetBookCover(String bookId);
   Future<bool> removeBookFromLibrary(String bookId);
   Future<bool> deleteLocalBook(String bookId);
 }
 
 class LocalBookRepository implements BookRepository {
-  LocalBookRepository(this._storage);
+  LocalBookRepository(this._storage, {BookCoverStore? covers})
+    : _covers = covers ?? BookCoverStore(_storage);
 
   final LocalStorage _storage;
+  final BookCoverStore _covers;
   static final List<Book> _books = [
     Book.asset(
       id: 'sample_1',
@@ -52,8 +57,19 @@ class LocalBookRepository implements BookRepository {
     final visibleSamples = _books
         .where((book) => !hiddenIds.contains(book.id))
         .toList(growable: false);
-    return [...local, ...visibleSamples];
+    return _covers.apply([...local, ...visibleSamples]);
   }
+
+  @override
+  Future<void> setBookCover(String bookId, String imagePath) async {
+    if (!(await getBooks()).any((book) => book.id == bookId)) {
+      throw StateError('표지를 바꿀 책을 찾지 못했습니다.');
+    }
+    await _covers.setImage(bookId, imagePath);
+  }
+
+  @override
+  Future<void> resetBookCover(String bookId) => _covers.reset(bookId);
 
   @override
   Future<Book?> importBookFile(String path) async {
@@ -134,6 +150,7 @@ class LocalBookRepository implements BookRepository {
     if (hiddenIds.add(bookId)) {
       await _saveHiddenBookIds(hiddenIds);
     }
+    await _covers.reset(bookId);
     return true;
   }
 
@@ -147,6 +164,7 @@ class LocalBookRepository implements BookRepository {
 
     final next = localBooks.where((book) => book.id != bookId).toList();
     await _saveLocalBooks(next);
+    await _covers.reset(bookId);
     return true;
   }
 

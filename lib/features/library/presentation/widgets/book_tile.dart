@@ -10,10 +10,12 @@ class BookCover extends StatelessWidget {
     required this.book,
     this.compact = false,
     this.bottomInset = 0,
+    this.topInset = 0,
   });
   final Book book;
   final bool compact;
   final double bottomInset;
+  final double topInset;
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +86,7 @@ class BookCover extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             compact ? 8 : 16,
-            compact ? 10 : 16,
+            (compact ? 10 : 16) + topInset,
             compact ? 8 : 16,
             (compact ? 10 : 16) + bottomInset,
           ),
@@ -128,11 +130,15 @@ class BookTile extends StatelessWidget {
     required this.onTap,
     required this.onMore,
     required this.statusLabel,
+    this.enableLongPress = true,
+    this.badge,
   });
   final Book book;
   final VoidCallback? onTap;
   final VoidCallback onMore;
   final String statusLabel;
+  final bool enableLongPress;
+  final String? badge;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -180,16 +186,39 @@ class BookTile extends StatelessWidget {
                   button: true,
                   child: InkWell(
                     onTap: onTap,
-                    onLongPress: onMore,
+                    onLongPress: enableLongPress ? onMore : null,
                     child: ExcludeSemantics(
                       child: BookCover(
                         book: book,
                         compact: compact,
                         bottomInset: compact ? 38 : 0,
+                        topInset: badge == null ? 0 : scaler.scale(11) + 12,
                       ),
                     ),
                   ),
                 ),
+                if (badge != null)
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xDD243D32),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        badge!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (compact) Positioned(right: 0, bottom: 0, child: more),
               ],
             ),

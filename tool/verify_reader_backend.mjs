@@ -6,7 +6,7 @@ const origin = 'https://admin.koofy.co.kr';
 const fetchTimed = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(60000) });
 let verifiedAssets = 0;
 for (const kind of ['book', 'font']) {
-  const response = await fetchTimed(`${base}readerCatalog?kind=${kind}`);
+  const response = await fetchTimed(`${base}readerCatalog?kind=${kind}${kind === 'book' ? '&supportsTxt=1' : ''}`);
   assert.equal(response.status, 200, `${kind} catalog must return 200`);
   const catalog = await response.json();
   assert(Array.isArray(catalog.items));

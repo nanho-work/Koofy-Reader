@@ -8,6 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
+import 'package:koofy_reader/features/library/domain/book_group.dart';
+import 'package:koofy_reader/features/library/presentation/book_group_editor.dart';
+import 'package:koofy_reader/features/library/presentation/book_group_page.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/domain/library_reading_state.dart';
@@ -15,6 +19,8 @@ import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dar
 import 'package:koofy_reader/features/native_reader/application/native_reader_services.dart';
 import 'package:koofy_reader/features/native_reader/migration/legacy_reader_archive.dart';
 import 'package:koofy_reader/features/native_reader/presentation/legacy_records_page.dart';
+
+part 'library_groups.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
   const LibraryPage({super.key});
@@ -30,6 +36,22 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   bool _titleSort = false;
   bool _importing = false;
   bool _opening = false;
+  bool _updatingCover = false;
+  bool _groupBusy = false;
+
+  void _setGroupBusy(bool value) {
+    if (mounted) setState(() => _groupBusy = value);
+  }
+
+  void _clearShelfFilters() {
+    if (mounted) {
+      setState(() {
+        _filter = null;
+        _search.clear();
+      });
+    }
+  }
+
   ({double width, String bookId, double rowFraction, bool scrolled})?
   _gridAnchor;
 
@@ -51,6 +73,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   Future<void> _refresh() async {
     ref.invalidate(booksProvider);
+    ref.invalidate(bookGroupsProvider);
     ref.invalidate(libraryCompletionProvider);
     _refreshProgress();
     try {
@@ -109,6 +132,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 toolbarHeight: 76,
                 actions: [
                   IconButton(
+                    tooltip: '책 묶음 만들기',
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    onPressed: _groupBusy ? null : () => _createGroup(),
+                  ),
+                  IconButton(
                     tooltip: '책 · 글꼴 다운로드',
                     icon: const Icon(Icons.cloud_download_outlined),
                     onPressed: () =>
@@ -147,13 +175,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   Widget _body(BuildContext context, MediaQueryData media) {
     final booksAsync = ref.watch(booksProvider);
+    final groupsAsync = ref.watch(bookGroupsProvider);
     final readingAsync = ref.watch(libraryReadingStateProvider);
     final completion =
         ref.watch(libraryCompletionProvider).valueOrNull ??
         const <String, bool>{};
     final books = booksAsync.valueOrNull;
-    if (books == null) {
-      final content = booksAsync.hasError
+    if (books == null || !groupsAsync.hasValue) {
+      final content = booksAsync.hasError || groupsAsync.hasError
           ? _message(
               context,
               '서재를 불러오지 못했습니다.',
@@ -171,19 +200,51 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         ),
       );
     }
-    final states =
-        readingAsync.valueOrNull ?? const <String, LibraryReadingState>{};
+    final states = {...?readingAsync.valueOrNull};
+    final groups = {
+      for (final group in groupsAsync.requireValue) group.id: group,
+    };
+    final groupedIds = groups.values.expand((g) => g.bookIds).toSet();
+    for (final group in groups.values) {
+      final memberStates =
+          group.bookIds
+              .map((id) => states[id])
+              .whereType<LibraryReadingState>()
+              .toList()
+            ..sort(
+              (a, b) => (b.lastReadAt?.millisecondsSinceEpoch ?? 0).compareTo(
+                a.lastReadAt?.millisecondsSinceEpoch ?? 0,
+              ),
+            );
+      if (memberStates.isNotEmpty) states[group.id] = memberStates.first;
+    }
     // Never open a book at a guessed position while its saved state is unknown.
     final canOpen =
         readingAsync.hasValue &&
         !readingAsync.hasError &&
         !readingAsync.isLoading &&
         !_opening;
-    LibraryBookStatus status(Book book) => completion[book.id] == true
-        ? LibraryBookStatus.finished
-        : states.containsKey(book.id)
-        ? LibraryBookStatus.reading
-        : LibraryBookStatus.unread;
+    LibraryBookStatus status(Book book) {
+      final group = groups[book.id];
+      if (group != null) {
+        if (group.bookIds.isNotEmpty &&
+            group.bookIds.every((id) => completion[id] == true)) {
+          return LibraryBookStatus.finished;
+        }
+        if (group.bookIds.any(
+          (id) => states.containsKey(id) || completion[id] == true,
+        )) {
+          return LibraryBookStatus.reading;
+        }
+        return LibraryBookStatus.unread;
+      }
+      return completion[book.id] == true
+          ? LibraryBookStatus.finished
+          : states.containsKey(book.id)
+          ? LibraryBookStatus.reading
+          : LibraryBookStatus.unread;
+    }
+
     final recent =
         books
             .where(
@@ -195,11 +256,24 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ..sort((a, b) => _compareRecent(a, b, states));
     final query = _search.text.trim().toLowerCase();
     final visible =
-        books
+        [
+              ...books.where((book) => !groupedIds.contains(book.id)),
+              ...groups.values.map((g) => g.displayBook),
+            ]
             .where(
               (b) =>
                   (_filter == null || status(b) == _filter) &&
-                  ('${b.title} ${b.author}'.toLowerCase().contains(query)),
+                  ('${b.title} ${b.author}'.toLowerCase().contains(query) ||
+                      (groups[b.id]?.bookIds.any(
+                            (id) => books.any(
+                              (member) =>
+                                  member.id == id &&
+                                  '${member.title} ${member.author}'
+                                      .toLowerCase()
+                                      .contains(query),
+                            ),
+                          ) ??
+                          false)),
             )
             .toList()
           ..sort(
@@ -244,6 +318,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           canOpen,
           progressLoading: readingAsync.isLoading,
           progressError: readingAsync.hasError,
+          groups: groups,
         );
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -252,7 +327,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             controller: _scroll,
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              if (booksAsync.hasError || readingAsync.hasError)
+              if (booksAsync.hasError ||
+                  groupsAsync.hasError ||
+                  readingAsync.hasError)
                 SliverToBoxAdapter(
                   child: Align(
                     alignment: Alignment.topLeft,
@@ -264,7 +341,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              booksAsync.hasError
+                              booksAsync.hasError || groupsAsync.hasError
                                   ? '서재를 새로 불러오지 못했습니다.'
                                   : '읽기 기록을 불러오지 못했습니다. 다시 시도해 주세요.',
                             ),
@@ -292,7 +369,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         child: SizedBox.shrink(),
                       ),
                     ),
-                    if (books.isNotEmpty)
+                    if (books.isNotEmpty || groups.isNotEmpty)
                       shelf
                     else
                       const SliverToBoxAdapter(child: SizedBox.shrink()),
@@ -300,7 +377,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 )
               else ...[
                 SliverToBoxAdapter(child: intro),
-                if (books.isNotEmpty) shelf,
+                if (books.isNotEmpty || groups.isNotEmpty) shelf,
               ],
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
@@ -470,6 +547,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     bool canOpen, {
     required bool progressLoading,
     required bool progressError,
+    required Map<String, BookGroup> groups,
   }) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
@@ -536,7 +614,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   spacing: 8,
                   children: [
                     Text(
-                      '${books.length}권',
+                      books.any((b) => groups.containsKey(b.id))
+                          ? '${books.where((b) => !groups.containsKey(b.id)).length}권 · ${books.where((b) => groups.containsKey(b.id)).length}묶음'
+                          : '${books.length}권',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     PopupMenuButton<bool>(
@@ -640,21 +720,38 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 itemBuilder: (context, index) {
                   final book = books[index];
                   final state = states[book.id];
-                  return BookTile(
-                    key: ValueKey(book.id),
-                    book: book,
-                    onTap: canOpen ? () => _openReader(book, state) : null,
-                    onMore: () => _bookMenu(book, state, status(book)),
-                    statusLabel: progressError
-                        ? '읽기 기록 확인 필요'
-                        : progressLoading
-                        ? '기록 불러오는 중'
-                        : switch (status(book)) {
-                            LibraryBookStatus.finished => '완독',
-                            LibraryBookStatus.unread => '아직 읽지 않음',
-                            LibraryBookStatus.reading =>
-                              state?.progressLabel ?? '읽는 중',
-                          },
+                  final group = groups[book.id];
+                  return _groupDropTarget(
+                    book,
+                    group,
+                    BookTile(
+                      key: ValueKey(book.id),
+                      book: book,
+                      enableLongPress: false,
+                      badge: group == null
+                          ? null
+                          : '${group.bookIds.length}권 묶음',
+                      onTap: group != null
+                          ? () => _openGroup(group)
+                          : canOpen
+                          ? () => _openReader(book, state)
+                          : null,
+                      onMore: () => group != null
+                          ? _groupMenu(group)
+                          : _bookMenu(book, state, status(book)),
+                      statusLabel: group != null
+                          ? '${group.bookIds.length}권'
+                          : progressError
+                          ? '읽기 기록 확인 필요'
+                          : progressLoading
+                          ? '기록 불러오는 중'
+                          : switch (status(book)) {
+                              LibraryBookStatus.finished => '완독',
+                              LibraryBookStatus.unread => '아직 읽지 않음',
+                              LibraryBookStatus.reading =>
+                                state?.progressLabel ?? '읽는 중',
+                            },
+                    ),
                   );
                 },
               );
@@ -710,6 +807,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     LibraryReadingState? state,
     LibraryBookStatus status,
   ) async {
+    final membership =
+        (ref.read(bookGroupsProvider).valueOrNull ?? <BookGroup>[])
+            .where((g) => g.bookIds.contains(book.id))
+            .toList();
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -720,6 +821,37 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(title: Text(book.title), subtitle: Text(book.author)),
+              if (membership.isEmpty) ...[
+                ListTile(
+                  leading: const Icon(Icons.create_new_folder_outlined),
+                  title: const Text('책 묶음 만들기'),
+                  onTap: () => Navigator.pop(context, 'createGroup'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.drive_file_move_outlined),
+                  title: const Text('묶음에 추가'),
+                  onTap: () => Navigator.pop(context, 'addToGroup'),
+                ),
+              ] else
+                ListTile(
+                  leading: const Icon(Icons.move_to_inbox_outlined),
+                  title: const Text('묶음에서 꺼내기'),
+                  onTap: () => Navigator.pop(context, 'takeOut'),
+                ),
+              ListTile(
+                leading: const Icon(Icons.add_photo_alternate_outlined),
+                title: Text(book.coverPath == null ? '표지 이미지 등록' : '표지 이미지 변경'),
+                enabled: !_updatingCover,
+                onTap: () => Navigator.pop(context, 'cover'),
+              ),
+              if (book.coverPath != null)
+                ListTile(
+                  leading: const Icon(Icons.restore),
+                  title: const Text('표지 초기화'),
+                  subtitle: const Text('제목이 표시되는 기본 표지로 되돌립니다.'),
+                  enabled: !_updatingCover,
+                  onTap: () => Navigator.pop(context, 'resetCover'),
+                ),
               ListTile(
                 leading: const Icon(Icons.check_circle_outline),
                 title: Text(
@@ -746,6 +878,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'createGroup':
+        await _createGroup(initialIds: [book.id], title: book.title);
+      case 'addToGroup':
+        await _chooseGroup(book);
+      case 'takeOut':
+        await _changeGroup(
+          () => ref
+              .read(bookGroupRepositoryProvider)
+              .takeOut(membership.single.id, book.id),
+          '서재로 꺼냈습니다.',
+        );
+      case 'cover':
+        await _updateCover(book);
+      case 'resetCover':
+        await _updateCover(book, reset: true);
       case 'completion':
         try {
           await ref
@@ -790,14 +937,59 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
     if (!mounted || confirmed != true) return;
     try {
+      final groupsRepository = ref.read(bookGroupRepositoryProvider);
       final removed = await ref
           .read(bookRepositoryProvider)
           .removeBookFromLibrary(book.id);
+      if (removed) {
+        for (final group in await groupsRepository.load()) {
+          if (group.bookIds.contains(book.id)) {
+            await groupsRepository.takeOut(group.id, book.id);
+          }
+        }
+      }
       if (!mounted) return;
       ref.invalidate(booksProvider);
       _snack(removed ? '$action 완료: ${book.title}' : '제거할 책을 찾지 못했습니다.');
     } catch (_) {
       _snack('책을 제거하지 못했습니다. 다시 시도해 주세요.');
+    }
+  }
+
+  Future<void> _updateCover(Book book, {bool reset = false}) async {
+    if (_updatingCover) return;
+    if (kIsWeb) {
+      _snack('표지 이미지는 Android · iOS 앱에서 등록해 주세요.');
+      return;
+    }
+    setState(() => _updatingCover = true);
+    try {
+      final repository = ref.read(bookRepositoryProvider);
+      if (reset) {
+        await repository.resetBookCover(book.id);
+      } else {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+          dialogTitle: '표지 이미지 선택',
+        );
+        if (!mounted || result == null || result.files.isEmpty) return;
+        final path = result.files.single.path;
+        if (path == null) {
+          _snack('이미지를 열 수 없습니다. 다른 이미지를 선택해 주세요.');
+          return;
+        }
+        await repository.setBookCover(book.id, path);
+      }
+      if (!mounted) return;
+      ref.invalidate(booksProvider);
+      _snack(reset ? '기본 표지로 되돌렸습니다.' : '표지 이미지를 적용했습니다.');
+    } on FormatException catch (error) {
+      _snack(error.message);
+    } catch (_) {
+      _snack('표지를 저장하지 못했습니다. JPG · PNG · WebP 이미지로 다시 시도해 주세요.');
+    } finally {
+      if (mounted) setState(() => _updatingCover = false);
     }
   }
 

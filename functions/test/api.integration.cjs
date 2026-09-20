@@ -62,3 +62,50 @@ test('direct anonymous database and storage access are denied', async () => {
   const write = await fetch('http://127.0.0.1:9199/v0/b/koofy-reader.firebasestorage.app/o?uploadType=media&name=unauthorized.otf', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: 'blocked' });
   assert.equal(write.status, 403);
 });
+
+test('TXT upload, format replacement, publishing and legacy catalog compatibility', async () => {
+  const sharp = require('sharp');
+  const { createHash } = require('node:crypto');
+  const { getStorage } = require('firebase-admin/storage');
+  const created = await api('create', { kind: 'book', metadata: { title: 'TXT integration', author: 'Test', description: '', license: 'Test fixture only' } });
+  assert.equal(created.status, 201);
+  let item = created.body;
+  async function upload(slot, bytes, status = 200) {
+    const response = await fetch(base + `readerAdmin?action=upload&id=${item.id}&revision=${item.revision}&slot=${slot}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' }, body: bytes,
+    });
+    const body = await response.json();
+    assert.equal(response.status, status, JSON.stringify(body));
+    if (status === 200) item = body;
+  }
+  await upload('epub', readFileSync('functions/test/fixtures/valid.epub'));
+  await upload('cover', await sharp({ create: { width: 10, height: 15, channels: 3, background: '#f7f5ee' } }).png().toBuffer());
+  let published = await api('publish', { id: item.id, revision: item.revision });
+  assert.equal(published.status, 200); item = published.body;
+  const originalEpub = item.publishedContent.assets.epub;
+  await upload('txt', Buffer.from('\ufeff등록한 텍스트\r\n둘째 줄'));
+  assert.equal(item.assets.epub, undefined);
+  assert.equal(item.assets.txt.extension, 'txt');
+  assert.equal(item.publishedContent.assets.epub.path, originalEpub.path);
+  const stored = (await getStorage().bucket().file(item.assets.txt.path).download())[0];
+  assert.equal(stored.toString('utf8'), '등록한 텍스트\n둘째 줄');
+  assert.equal(item.assets.txt.sha256, createHash('sha256').update(stored).digest('hex'));
+  const revision = item.revision;
+  await upload('txt', Buffer.from('invalid\x00'), 400);
+  assert.equal(item.revision, revision);
+  let catalog = await (await fetch(base + 'readerCatalog?kind=book')).json();
+  assert(catalog.items.some(book => book.id === item.id && book.assets.epub));
+  published = await api('publish', { id: item.id, revision: item.revision });
+  assert.equal(published.status, 200); item = published.body;
+  catalog = await (await fetch(base + 'readerCatalog?kind=book')).json();
+  assert(!catalog.items.some(book => book.id === item.id));
+  catalog = await (await fetch(base + 'readerCatalog?kind=book&supportsTxt=1')).json();
+  const visible = catalog.items.find(book => book.id === item.id);
+  assert.equal(visible.assets.txt.extension, 'txt');
+  assert.equal(visible.assets.epub, undefined);
+  assert.equal('path' in visible.assets.txt, false);
+  const download = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=txt&version=${visible.version}`);
+  assert.equal(download.status, 200);
+  assert.equal((await download.json()).sha256, item.assets.txt.sha256);
+  assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=epub&version=${visible.version}`)).status, 400);
+});

@@ -204,6 +204,24 @@ void main() {
     expect(find.text('기존 리더로 읽기'), findsNothing);
     expect(find.text('새 리더로 읽기'), findsNothing);
     expect(find.text('이전 버전의 독서 기록'), findsOneWidget);
+    expect(find.text('표지 이미지 등록'), findsOneWidget);
+    expect(find.text('표지 초기화'), findsNothing);
+  });
+  testWidgets('book with an image offers cover replacement and reset', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      books: [demoBooks.first.withCoverPath('/missing-cover.png')],
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('숲의 문장들 더보기'));
+    await tester.tap(find.byTooltip('숲의 문장들 더보기'));
+    await tester.pumpAndSettle();
+    expect(find.text('표지 이미지 변경'), findsOneWidget);
+    expect(find.text('표지 초기화'), findsOneWidget);
+    expect(find.text('표지 이미지 등록'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
   testWidgets('phone shows continuation and opens the matching native route', (
     tester,

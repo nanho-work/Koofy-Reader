@@ -6,6 +6,7 @@ import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/native_reader/data/reading_publication_preparer.dart';
 
 class MemoryStorage implements LocalStorage {
   final values = <String, String>{};
@@ -34,8 +35,11 @@ void main() {
   late ReaderCatalog catalog;
   late LocalBookRepository books;
   var corrupt = false;
+  var textBooks = false;
+  String? requestedTxtSupport;
   final files = {
     'epub': utf8.encode('epub test bytes'),
+    'txt': utf8.encode('다운로드한 한글 책\n\n다음 문단 😀'),
     'cover': utf8.encode('cover test bytes'),
     'font400': utf8.encode('OTTO verified test font'),
   };
@@ -46,7 +50,7 @@ void main() {
         ? 'otf'
         : slot == 'cover'
         ? 'webp'
-        : 'epub',
+        : slot,
     if (slot == 'font400') 'weight': 400,
   };
   Map<String, dynamic> itemJson(String kind, {int version = 1}) => {
@@ -58,13 +62,18 @@ void main() {
     'license': '배포 허가',
     'version': version,
     'assets': kind == 'book'
-        ? {'epub': asset('epub'), 'cover': asset('cover')}
+        ? {
+            if (textBooks) 'txt': asset('txt') else 'epub': asset('epub'),
+            'cover': asset('cover'),
+          }
         : {'font400': asset('font400')},
   };
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('reader_catalog_test_');
     books = LocalBookRepository(MemoryStorage());
     corrupt = false;
+    textBooks = false;
+    requestedTxtSupport = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       if (request.uri.path == '/file') {
@@ -80,6 +89,7 @@ void main() {
           }),
         );
       } else {
+        requestedTxtSupport = request.uri.queryParameters['supportsTxt'];
         request.response.headers.contentType = ContentType.json;
         request.response.write(
           jsonEncode({
@@ -102,6 +112,45 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test(
+    'TXT is discovered, downloaded and prepared for the native reader offline',
+    () async {
+      textBooks = true;
+      final item = (await catalog.list('book')).items.single;
+      expect(requestedTxtSupport, '1');
+      await catalog.install(item);
+      final book = (await books.getBooks()).singleWhere(
+        (b) => b.id == item.bookId,
+      );
+      expect(book.localPath, endsWith('.txt'));
+      expect(await File(book.localPath!).readAsBytes(), files['txt']);
+      expect(await File(book.coverPath!).readAsBytes(), files['cover']);
+      catalog.close();
+      final preparer = ReadingPublicationPreparer(
+        storageDirectory: Directory('${directory.path}/prepared'),
+      );
+      final prepared = await preparer.prepare(book: book);
+      final repeated = await preparer.prepare(
+        book: Book.fromJson(book.toJson())!,
+      );
+      expect(prepared.publicationId, item.bookId);
+      expect(prepared.textMap, isNotNull);
+      expect(await File(prepared.filePath).exists(), true);
+      expect(repeated.contentRevision, prepared.contentRevision);
+    },
+  );
+  test('TXT checksum failure does not add a book', () async {
+    textBooks = true;
+    corrupt = true;
+    await expectLater(
+      catalog.install(CatalogItem.fromJson(itemJson('book'))),
+      throwsA(isA<CatalogException>()),
+    );
+    expect(
+      (await books.getBooks()).where((b) => b.id.startsWith('catalog_')),
+      isEmpty,
+    );
+  });
   test(
     'downloads EPUB and cover into library, persists metadata and reuses one version',
     () async {
@@ -188,6 +237,15 @@ void main() {
       final badId = itemJson('book');
       badId['id'] = '../escape';
       expect(() => CatalogItem.fromJson(badId), throwsFormatException);
+      final ambiguous = itemJson('book');
+      ambiguous['assets']['txt'] = asset('txt');
+      expect(() => CatalogItem.fromJson(ambiguous), throwsFormatException);
+      final noBody = itemJson('book');
+      noBody['assets'].remove('epub');
+      expect(() => CatalogItem.fromJson(noBody), throwsFormatException);
+      final wrongSlot = itemJson('book');
+      wrongSlot['assets']['epub'] = asset('txt');
+      expect(() => CatalogItem.fromJson(wrongSlot), throwsFormatException);
     },
   );
 }

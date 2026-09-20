@@ -6,7 +6,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { ApiError, Content, assertRevision, bearer, id, kind, metadata, publicItem, publish, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { ApiError, Content, assertRevision, bearer, id, kind, metadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -44,14 +44,17 @@ async function change(contentId: string, expected: number, uid: string, action: 
   });
 }
 function cursor(value: unknown): string | undefined { return value === undefined ? undefined : id(value); }
-async function list(contentKind: unknown, after: unknown, publicOnly: boolean) {
+async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false) {
   let query = contents.where('kind', '==', kind(contentKind));
   if (publicOnly) query = query.where('published', '==', true);
   query = query.orderBy(FieldPath.documentId()).limit(41);
   const start = cursor(after);
   if (start) query = query.startAfter(start);
   const docs = (await query.get()).docs;
-  return { items: docs.slice(0, 40).map(doc => publicOnly ? publicItem(doc.data() as Content) : doc.data()), nextCursor: docs.length > 40 ? docs[39].id : null };
+  // Older apps reject unknown asset slots. Keep TXT out of their responses,
+  // retaining the raw document cursor even when a page contains only TXT books.
+  const visible = docs.slice(0, 40).filter(doc => !publicOnly || supportsTxt || !(doc.data() as Content).publishedContent?.assets.txt);
+  return { items: visible.map(doc => publicOnly ? publicItem(doc.data() as Content) : doc.data()), nextCursor: docs.length > 40 ? docs[39].id : null };
 }
 
 export const readerAdmin = onRequest(options, async (request, response) => {
@@ -82,7 +85,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       const file = bucket.file(path);
       await file.save(checked.bytes, { resumable: false, contentType: checked.asset.contentType, metadata: { cacheControl: 'private, max-age=300' }, preconditionOpts: { ifGenerationMatch: 0 } });
       try {
-        const next = await change(contentId, expected, claims.uid, `upload:${slot}`, current => ({ assets: { ...current.assets, [slot]: { path, ...checked.asset } } }));
+        const next = await change(contentId, expected, claims.uid, `upload:${slot}`, current => ({ assets: replaceAsset(current, slot, { path, ...checked.asset }) }));
         response.json(next);
       } catch (error) { await file.delete().catch(cleanup => logger.error('Orphan upload cleanup failed', cleanup)); throw error; }
       return;
@@ -127,6 +130,6 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       const [url] = await bucket.file(asset.path).getSignedUrl({ action: 'read', version: 'v4', expires: Date.now() + 5 * 60 * 1000 });
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }
-    response.json(await list(request.query.kind, request.query.after, true));
+    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1'));
   } catch (error) { sendError(error, response); }
 });
