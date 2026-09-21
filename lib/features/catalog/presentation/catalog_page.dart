@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
+import 'package:koofy_reader/features/catalog/presentation/font_catalog_row.dart';
 
 const catalogBookCategories = ['시', '소설', '에세이', '기타'];
 
@@ -297,6 +298,24 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                   final key = catalogItemKey(item);
                   final downloaded =
                       installed.valueOrNull?.contains(key) ?? false;
+                  if (!_books) {
+                    return FontCatalogRow(
+                      key: ValueKey(key),
+                      item: item,
+                      installed: downloaded,
+                      progress: download.itemKey == key
+                          ? download.progress
+                          : null,
+                      onDownload:
+                          download.busy ||
+                              !installed.hasValue ||
+                              installed.isLoading ||
+                              installed.hasError ||
+                              downloaded
+                          ? null
+                          : () => _download(item),
+                    );
+                  }
                   return Card(
                     key: ValueKey(key),
                     margin: const EdgeInsets.only(bottom: 12),

@@ -1,0 +1,170 @@
+{
+  "updatedAt": "2026-09-21",
+  "email": "koofylab@gmail.com",
+  "translations": {
+    "ko": {
+      "title": "쿠피리더 개인정보처리방침",
+      "intro": "쿠피리더의 기기 내 독서 정보, 다운로드, 광고 및 문의 처리에 관한 안내입니다.",
+      "sections": [
+        {
+          "heading": "1. 적용 범위와 운영자",
+          "paragraphs": [
+            "Koofy Lab이 제공하는 쿠피리더(Koofy Reader, com.koofylab.koofyreader)의 Android·iOS 앱에 적용됩니다. 앱은 TXT·EPUB 독서와 도서·글꼴 다운로드를 제공합니다."
+          ]
+        },
+        {
+          "heading": "2. 기기에 보관하는 정보",
+          "paragraphs": [
+            "계정 생성이나 로그인 없이 이용하며, 앱 내 결제 기능은 없습니다. 이용자가 가져온 책의 본문·표지, 책 묶음, 읽던 위치, 글꼴과 독서 설정, 광고 숨김 만료 시각 및 광고 선택 기록은 앱 전용 기기 저장소에 보관됩니다.",
+            "앱은 이용자가 가져온 책·표지나 독서 기록을 운영자 서버로 업로드하거나 다른 이용자에게 공개하지 않습니다. 운영체제의 기기 백업·복원은 이용자의 OS 설정에 따라 별도로 작동할 수 있습니다."
+          ]
+        },
+        {
+          "heading": "3. 도서·글꼴 다운로드와 서버 기록",
+          "paragraphs": [
+            "공개된 도서·표지·글꼴 목록 조회와 파일 다운로드에 Firebase Cloud Functions, Cloud Firestore 및 Cloud Storage를 사용합니다. 이 과정에서 요청한 콘텐츠 식별자, IP 주소, 요청 시각, 응답·오류 등 서버 접속 정보가 서비스 제공·보안·장애 대응을 위해 처리될 수 있습니다.",
+            "현재 앱에는 Firebase Authentication, Analytics 또는 Crashlytics SDK를 이용한 사용자 계정·행동 분석·충돌 수집 기능이 포함되어 있지 않습니다. 광고 SDK 자체의 통계·진단 처리는 별개입니다."
+          ]
+        },
+        {
+          "heading": "4. 광고와 선택권",
+          "paragraphs": [
+            "Unity LevelPlay를 통해 ironSource Ads 및 Unity Ads의 배너·선택형 리워드 광고를 제공합니다. 광고 제공, 성과 측정, 부정 이용 방지 및 진단을 위해 광고 사업자가 IP 주소, 기기·운영체제·앱 정보, 광고 노출·클릭·보상·오류 정보 등을 처리할 수 있습니다. 광고 식별자와 개인화에 사용되는 정보는 OS 권한과 이용자의 선택, 제공자 정책에 따라 처리됩니다.",
+            "첫 실행에서 광고 관련 선택을 안내하며 선택 전에는 광고 SDK를 초기화하지 않습니다. 선택은 설정 > 개인정보 및 광고에서 다시 확인·변경할 수 있습니다. 맞춤형 광고를 거부하더라도 독서는 이용할 수 있으며 광고 제공·보안에 필요한 제한된 정보가 처리되는 비맞춤형 광고가 표시될 수 있습니다.",
+            "iOS에서는 앱의 광고 선택과 별개로 Apple의 추적 허가가 적용됩니다. 추적 허가를 거부하거나 제한한 경우 맞춤형 광고 허용 선택만으로 추적을 허용하지 않습니다. OS 추적 권한은 기기 설정에서 변경할 수 있습니다.",
+            "리워드 광고는 이용자가 버튼을 눌러 선택했을 때만 표시됩니다. 시청 완료 보상은 배너를 2시간 숨기는 기능이며, 추적 허가에 대한 대가가 아닙니다."
+          ]
+        },
+        {
+          "heading": "5. 문의와 광고 신고",
+          "paragraphs": [
+            "이용자가 대표 메일로 문의하거나 광고를 신고하면 이메일 주소, 문의 내용 및 직접 첨부한 자료가 문의 응대·문제 확인에 사용됩니다. 앱은 문의 메일을 자동 발송하지 않으며, 책 본문이나 독서 기록을 자동 첨부하지 않습니다.",
+            "광고 신고 시 발생 시각, 서재·독서 화면 등 표시 위치, 광고 내용과 기기 정보를 알려 주시면 확인에 도움이 됩니다. 민감한 정보는 첨부 전에 가려 주세요."
+          ]
+        },
+        {
+          "heading": "6. 외부 서비스 및 국외 처리",
+          "paragraphs": [
+            "Firebase의 서버·파일 제공과 Google의 이메일 서비스, Unity·ironSource의 광고 서비스가 각 역할에 필요한 정보를 처리합니다. 서비스 제공자의 서버와 광고 파트너가 위치한 미국 등 국외에서 정보가 처리될 수 있습니다.",
+            "콘텐츠 메타데이터와 Cloud Functions는 서울 리전, 도서·글꼴 파일의 Cloud Storage는 미국 리전을 사용합니다. 각 제공자의 처리·보유·삭제 정책은 아래 공식 안내에서 확인할 수 있습니다."
+          ],
+          "links": [
+            {
+              "label": "Firebase 개인정보 및 보안",
+              "href": "https://firebase.google.com/support/privacy"
+            },
+            {
+              "label": "Unity·ironSource 앱 이용자 개인정보처리방침",
+              "href": "https://unity.com/legal/game-player-and-app-user-privacy-policy"
+            }
+          ]
+        },
+        {
+          "heading": "7. 보유 및 삭제",
+          "paragraphs": [
+            "기기의 책과 표지는 서재에서 삭제할 수 있습니다. 앱 전용 데이터는 앱 삭제 또는 운영체제의 앱 데이터 삭제 시 제거됩니다. 원래 가져온 파일, 별도로 저장한 사본 및 OS 백업은 별도로 관리해야 합니다.",
+            "광고 선택은 선택 내용·선택 시각·안내 버전을 기기에 저장합니다. 설정에서 선택을 변경할 수 있습니다. 광고 숨김 만료 시각은 기기에서 처리하며 구매 내역이 아닙니다.",
+            "문의 이메일은 문의 해결과 필요한 분쟁 대응 기간 동안 보관한 후 삭제하며 법령이 별도 보관을 요구하면 그 기간을 따릅니다. 인프라 접속 기록과 광고 사업자가 처리하는 데이터의 보유·삭제 기간은 처리 목적, 계약 및 각 제공자의 정책에 따릅니다."
+          ]
+        },
+        {
+          "heading": "8. 이용자의 권리와 보호",
+          "paragraphs": [
+            "개인정보의 열람·정정·삭제·처리 제한 및 동의 철회 관련 요청은 대표 메일로 접수할 수 있습니다. 계정을 만들지 않으므로 앱 계정 삭제 절차는 없으며, 서버로 보내지 않은 기기 내 독서 데이터는 운영자가 조회하거나 대신 삭제할 수 없습니다.",
+            "앱은 아동을 대상으로 설계한 서비스가 아닙니다. 지역 법령상 보호자의 동의가 필요한 경우 해당 요건을 따라야 합니다. 아동의 정보가 부적절하게 처리되었다고 판단되면 대표 메일로 알려 주세요.",
+            "앱 전용 저장소, HTTPS 통신 및 파일 무결성 확인 등 보호 조치를 적용하지만 전자 저장·통신의 완전한 보안을 보장할 수는 없습니다."
+          ]
+        },
+        {
+          "heading": "9. 변경과 연락처",
+          "paragraphs": [
+            "처리 목적·서비스 구성·관련 규정이 바뀌면 방침과 업데이트 일자를 변경하며 중요한 변경은 앱 또는 웹페이지로 안내합니다.",
+            "운영자 및 개인정보 문의: Koofy Lab / koofylab@gmail.com"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "Koofy Reader Privacy Policy",
+      "intro": "How Koofy Reader handles local reading data, downloads, advertising and support requests.",
+      "sections": [
+        {
+          "heading": "1. Scope and operator",
+          "paragraphs": [
+            "This policy applies to Koofy Reader (com.koofylab.koofyreader) for Android and iOS, provided by Koofy Lab. The app reads TXT and EPUB files and offers book and font downloads."
+          ]
+        },
+        {
+          "heading": "2. Data kept on your device",
+          "paragraphs": [
+            "No account, login, or in-app purchases are required. Imported books and covers, book groups, reading positions, fonts, reader settings, the ad-free expiry time, and advertising choices are stored in app-private device storage.",
+            "The app does not upload imported books, covers, or reading history to our servers or publish them to other users. Device backup and restoration may operate separately under your operating-system settings."
+          ]
+        },
+        {
+          "heading": "3. Downloads and infrastructure logs",
+          "paragraphs": [
+            "Firebase Cloud Functions, Cloud Firestore, and Cloud Storage provide the public catalog and book, cover, and font downloads. Content identifiers, IP addresses, request times, responses, and error information may be processed to deliver and secure these services and diagnose problems.",
+            "The app currently does not include user accounts through Firebase Authentication or user analytics/crash collection through Firebase Analytics or Crashlytics. Advertising SDK statistics and diagnostics are separate."
+          ]
+        },
+        {
+          "heading": "4. Advertising and your choices",
+          "paragraphs": [
+            "Unity LevelPlay mediates banner and optional rewarded ads from ironSource Ads and Unity Ads. Advertising providers may process IP addresses, device, operating-system and app details, and ad impressions, interactions, rewards, and errors for ad delivery, measurement, fraud prevention, and diagnostics. Advertising identifiers and personalization data depend on your choices, OS permissions, and provider policies.",
+            "Advertising choices are presented at first launch; the advertising SDK is not initialized before a choice. You can review and change your choice in Settings > Privacy and advertising. Declining personalized ads does not prevent reading. Non-personalized ads may still be shown and process limited information needed for delivery and security.",
+            "On iOS, Apple tracking permission is separate from your in-app advertising choice. An in-app choice does not override denied or restricted tracking permission. OS tracking permission can be changed in device settings.",
+            "Rewarded ads play only after you choose to watch. A completed reward hides banners for two hours; it is not a reward for granting tracking permission."
+          ]
+        },
+        {
+          "heading": "5. Support and reporting ads",
+          "paragraphs": [
+            "If you contact our email address or report an ad, your email address, message and attachments are used to respond and investigate. The app does not automatically send email or attach book contents or reading history.",
+            "For an ad report, the time, placement (library or reader), ad description and device information help us investigate. Remove sensitive information before attaching a screenshot."
+          ]
+        },
+        {
+          "heading": "6. Providers and international processing",
+          "paragraphs": [
+            "Google/Firebase provides hosting and downloads, Google provides email, and Unity/ironSource provides advertising. Data may be processed in the United States and other countries where providers and their partners operate.",
+            "Catalog metadata and Cloud Functions use the Seoul region. Cloud Storage for downloadable files uses a US region. Please consult the linked provider policies for their processing, retention and deletion practices."
+          ],
+          "links": [
+            {
+              "label": "Firebase privacy and security",
+              "href": "https://firebase.google.com/support/privacy"
+            },
+            {
+              "label": "Unity / ironSource app user privacy policy",
+              "href": "https://unity.com/legal/game-player-and-app-user-privacy-policy"
+            }
+          ]
+        },
+        {
+          "heading": "7. Retention and deletion",
+          "paragraphs": [
+            "Books and covers can be removed from your library. Uninstalling the app or clearing app data removes app-private device data. Original imported files, separately saved copies and OS backups must be managed separately.",
+            "Your advertising choice, choice time and notice version are stored on your device and can be updated in settings. The ad-free expiry time is local and is not a purchase record.",
+            "Support email is retained as needed to resolve the request and necessary disputes, subject to any legally required retention. Infrastructure logs and advertising data follow their processing purposes, applicable agreements and provider retention/deletion policies."
+          ]
+        },
+        {
+          "heading": "8. Your rights and safeguards",
+          "paragraphs": [
+            "For applicable access, correction, deletion, restriction or consent-withdrawal requests, contact our email address. There is no app account to delete. We cannot access or remotely delete reading data that remains solely on your device.",
+            "This app is not designed for children. Where local law requires guardian consent, those requirements apply. Contact us if you believe a child’s information was improperly processed.",
+            "We use app-private storage, HTTPS and file-integrity checks, but cannot guarantee absolute security of electronic storage or communication."
+          ]
+        },
+        {
+          "heading": "9. Changes and contact",
+          "paragraphs": [
+            "We update this policy and its date when our processing, services or relevant requirements change. Material changes are communicated through the app or website.",
+            "Operator and privacy contact: Koofy Lab / koofylab@gmail.com"
+          ]
+        }
+      ]
+    }
+  }
+}

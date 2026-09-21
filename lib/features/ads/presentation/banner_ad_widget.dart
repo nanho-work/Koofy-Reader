@@ -39,10 +39,17 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
       if (!_ready) {
         _initialize();
       } else {
-        unawaited(_key.currentState?.resumeAutoRefresh());
+        unawaited(_resumeAfterPrivacyRefresh());
       }
     } else {
       unawaited(_key.currentState?.pauseAutoRefresh());
+    }
+  }
+
+  Future<void> _resumeAfterPrivacyRefresh() async {
+    // Refresh OS permission before a previously loaded banner resumes requests.
+    if (await LevelPlayService.instance.initialize() && mounted) {
+      await _key.currentState?.resumeAutoRefresh();
     }
   }
 

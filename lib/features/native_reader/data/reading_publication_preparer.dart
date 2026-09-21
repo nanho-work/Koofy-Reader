@@ -46,7 +46,7 @@ class ReadingPublicationPreparer {
   ReadingPublicationPreparer({required this.storageDirectory});
 
   final io.Directory storageDirectory;
-  static const int converterVersion = 1;
+  static const int converterVersion = 2;
   static const int maxTextBytes = 20 * 1024 * 1024;
   static const int maxEpubBytes = 40 * 1024 * 1024;
 
@@ -334,7 +334,9 @@ Uint8List _textToEpub(
   _checkXmlCharacters(text);
   _checkXmlCharacters(title);
   _checkXmlCharacters(author);
-  final sections = TextPublicationMap(text).sections;
+  final map = TextPublicationMap(text);
+  final sections = map.sections;
+  final hasChapters = map.hasChapters;
   final archive = Archive();
   void add(String name, String content, {bool stored = false}) {
     final entry = ArchiveFile.string(name, content)
@@ -352,9 +354,9 @@ Uint8List _textToEpub(
   );
   add(
     'EPUB/style.css',
-    'body { line-height: 1.6; } p { white-space: pre-wrap; margin: 0; } p.blank { min-height: 1em; }',
+    'body { line-height: 1.6; } p { white-space: pre-wrap; margin: 0; } p.blank { min-height: 1em; }'
+        '${hasChapters ? ' h2.chapter { white-space: pre-wrap; font-size: 1.2em; margin: 0 0 1em; -webkit-column-break-before: always; break-before: column; } h2.chapter:first-child { -webkit-column-break-before: auto; break-before: auto; }' : ''}',
   );
-  var paragraphId = 0;
   final manifest = StringBuffer();
   final spine = StringBuffer();
   final navigation = StringBuffer();
@@ -362,12 +364,21 @@ Uint8List _textToEpub(
     final name = 'section-${i.toString().padLeft(5, '0')}';
     final body = StringBuffer();
     for (final paragraph in sections[i]) {
-      final id = 'p-${(paragraphId++).toString().padLeft(7, '0')}';
+      final id = paragraph.id;
       body.writeln(
-        paragraph.isEmpty
+        paragraph.chapterTitle != null
+            ? '<h2 id="$id" class="chapter">${_xml(paragraph.text)}</h2>'
+            : paragraph.text.isEmpty
             ? '<p id="$id" class="blank"><br/></p>'
-            : '<p id="$id">${_xml(paragraph)}</p>',
+            : '<p id="$id">${_xml(paragraph.text)}</p>',
       );
+      if (paragraph.chapterTitle != null) {
+        navigation.writeln(
+          '<li><a href="$name.xhtml#$id">${_xml(paragraph.chapterTitle!)}</a></li>',
+        );
+      } else if (hasChapters && paragraph.index == 0) {
+        navigation.writeln('<li><a href="$name.xhtml">머리말</a></li>');
+      }
     }
     add(
       'EPUB/$name.xhtml',
@@ -378,9 +389,11 @@ Uint8List _textToEpub(
       '<item id="$name" href="$name.xhtml" media-type="application/xhtml+xml"/>',
     );
     spine.writeln('<itemref idref="$name"/>');
-    navigation.writeln(
-      '<li><a href="$name.xhtml">${sections.length == 1 ? _xml(title) : '${i + 1}'}</a></li>',
-    );
+    if (!hasChapters) {
+      navigation.writeln(
+        '<li><a href="$name.xhtml">${sections.length == 1 ? _xml(title) : '${i + 1}'}</a></li>',
+      );
+    }
   }
   add(
     'EPUB/nav.xhtml',

@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>허용하면 광고 서비스가 다른 회사의 앱과 웹사이트에서 얻은 정보를 맞춤형 광고에 사용할 수 있습니다. 허용하지 않아도 독서는 이용할 수 있습니다.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

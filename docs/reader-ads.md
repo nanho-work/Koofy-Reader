@@ -60,3 +60,37 @@ Flutter 전체 테스트 119개 통과. 마지막 보상 처리 정리 후 관�
 ## 광고 영역 접기 검증
 
 숨김·만료 때 Flutter 본문 높이 증가/복원 및 광고 여백 제거 테스트와 관련 리워드 테스트 7개 통과. Android·iOS 빌드 검증. 실기기에서 리워드 적용 후 책 열기, 이미 읽는 동안 만료, 접기/펼치기 및 이어읽기 위치를 확인해야 한다.
+
+## 개인정보 및 광고 선택 (2026-09-21)
+
+- 첫 실행은 `PrivacyGate`에서 명시적인 선택을 받는다. 선택이 없으면 LevelPlay를 초기화하지 않는다. 기존 설치도 선택 기록이 없으면 안내를 표시한다.
+- **비맞춤형 광고**를 선택해도 독서를 계속하고 배너·선택형 리워드를 이용한다. 개인정보 설정 전달이 실패하면 광고 요청만 중단하고 독서는 허용한다.
+- 맞춤형 광고는 앱 내 허용과 iOS ATT 허용이 모두 있어야 한다. Android에는 ATT를 요청하지 않는다. iOS ATT 미결정·거부·제한 시 개인화 신호를 false로 적용한다. ATT는 앱에서 맞춤형 광고를 직접 선택했을 때만 요청하고 재실행 시 재요청하지 않는다.
+- `PrivacyService`가 로컬에 선택·시각·방침 버전을 저장한다. 정책 버전 변경 시 다시 선택한다. 서버 계정이나 동의 기록 업로드는 추가하지 않았다.
+- 네이티브 9.4 API `setGDPRConsents`에 `UnityAds`, `IronSource`를 함께 전달한다. 비맞춤형은 두 값 false, `setCCPA(true)`로 처리한다. CCPA true는 판매·공유 거부를 뜻한다. Flutter 9.1의 이전 `setConsent` API 대신 작은 네이티브 채널을 사용한다.
+- 설정 > 개인정보 및 광고에서 선택을 변경한다. 변경 시 기존 Flutter 배너를 제거하고 새 선택으로 만든다. 앱 복귀 시 ATT를 다시 확인한다. 네이티브 iOS 독서 화면에서도 ATT 상태가 바뀌면 기존 광고를 버리고 거부 상태를 반영한 후 재개한다.
+- 비맞춤형은 개인정보를 전혀 처리하지 않는다는 의미가 아니다. IP, 기기·앱 정보, 광고 이벤트 등 제공·보안에 필요한 처리를 방침과 선택 화면에 안내한다.
+- 광고 보상은 기존 `onAdRewarded` 처리 그대로다. 추적 동의 자체에 보상을 제공하지 않는다.
+
+## 방침과 문의 운영
+
+- 앱 오프라인 방침: `assets/legal/reader_privacy.json`
+- Quiz_Site 웹 원본 사본: `lib/legal/koofyReaderPrivacy.json` — 내용 변경 시 두 파일을 함께 갱신한다.
+- 공개 경로: `https://www.koofy.co.kr/koofy-reader/privacy`, `https://www.koofy.co.kr/koofy-reader/support`
+- 웹은 한국어·영어를 제공한다. 앱은 한국어 안내와 오프라인 방침, 웹 최신본 링크를 제공한다.
+- 대표 메일: `koofylab@gmail.com`. 문의/광고 신고 화면은 메일 초안만 열며 본문·독서 기록을 자동 첨부하거나 자동 발송하지 않는다. 메일 앱이 없으면 표시된 주소를 복사해 사용한다.
+- iOS `NSUserTrackingUsageDescription`과 앱 `PrivacyInfo.xcprivacy`를 추가했다. 앱 전용 파일 시각 조회(C617.1), 앱 설정 UserDefaults(CA92.1)를 선언했다. 각 SDK의 개인정보 manifest도 최종 번들에서 별도로 포함된다. 이것이 App Store Connect 개인정보 답변을 대신하지는 않는다.
+
+## 출시 전 남은 확인
+
+1. Quiz_Site를 배포하고 두 공개 URL이 로그인 없이 열리는지 확인한다. 앱 코드는 최신 버전으로 재설치한다. 이 변경만을 위해 Firebase Functions를 배포할 필요는 없다.
+2. 테스트 기기에서 최초 비맞춤형 선택, iOS ATT 허용/거부, 재실행, 설정에서 철회, 기기 설정 변경 후 복귀, 오프라인 독서와 문의 메일 초안을 확인한다. 실제 광고 요청 신호와 각 네트워크의 표시·리워드 지급은 LevelPlay 테스트 기기로 검증한다.
+3. 배포 국가를 정한 뒤 해당 지역의 동의 요건과 광고 네트워크 요구사항을 점검한다. 이 자체 선택 화면은 인증 CMP/TCF를 구현한 것이 아니므로 모든 지역의 요구를 충족했다고 간주하지 않는다. 네트워크를 추가하면 동의 전달 대상과 방침도 같이 갱신해야 한다.
+4. Apple/Google 콘솔에서 개인정보 URL·지원 URL·데이터 수집/공유·광고·추적·연령 등 실제 동작에 맞는 답변을 등록한다. iOS 서명·프로비저닝·수출 규정 답변과 App Review 제출은 별도다.
+5. 배포하는 도서·표지·폰트의 재배포 권한, 문의 처리·삭제 운영 방침은 운영자가 확인한다. 코드에서 확인되지 않은 보유 일수나 권한을 임의로 확정하지 않았다.
+
+공식 기준: [Unity 9.4 동의 설정](https://docs.unity.com/en-us/grow/levelplay/sdk/flutter/regulation-advanced-settings), [Apple 개인정보 및 추적](https://developer.apple.com/app-store/user-privacy-and-data-use/), [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/).
+
+### 이번 변경 검증
+
+2026-09-21 기준 `flutter analyze lib test` 오류·경고 없음, Flutter 전체 152개 테스트 통과. 최초 미선택 상태의 광고 차단, 비맞춤형 선택 후 진입, ATT 거부/외부 철회, 저장·네이티브 설정 실패, 320px 큰 글씨 안내와 오프라인 방침 이동을 검증했다. Android debug APK 및 iOS 서명 없는 release 빌드가 통과했고, 양쪽 번들의 최신 방침 자산과 iOS ATT 설명·앱 privacy manifest 포함을 확인했다. Quiz_Site 타입 검사·production 빌드 통과, 로컬 브라우저 360/1280px에서 한국어·영어 전환, 메일 링크 및 가로 넘침 없음을 확인했다. 웹 배포와 실제 기기 ATT/광고 신호 검증은 수행하지 않았다.

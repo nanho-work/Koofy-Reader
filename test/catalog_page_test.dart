@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' show SemanticsAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +9,7 @@ import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'helpers/catalog_fixture.dart';
+import 'package:koofy_reader/features/catalog/presentation/font_catalog_row.dart';
 
 Future<void> pumpCatalog(
   WidgetTester tester,
@@ -129,8 +133,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<FilledButton>(
-              find.byWidgetPredicate((widget) => widget is FilledButton),
+            .widget<IconButton>(
+              find.byKey(ValueKey('font-download-${catalog.items.last.id}')),
             )
             .onPressed,
         isNull,
@@ -142,6 +146,89 @@ void main() {
       expect(find.text('다운로드 완료'), findsOneWidget);
     },
   );
+
+  testWidgets('fonts use compact name and icon rows with details on name tap', (
+    tester,
+  ) async {
+    final item = catalogFixture(1, kind: 'font', title: '메이플스토리');
+    final catalog = FakeReaderCatalog([
+      item,
+      catalogFixture(2, kind: 'font', title: '학교안심체'),
+    ]);
+    await pumpCatalog(tester, catalog);
+    await tester.tap(find.text('글꼴'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FontCatalogRow), findsNWidgets(2));
+    expect(tester.getSize(find.byType(FontCatalogRow).first).height, 56);
+    expect(find.byType(Card), findsNothing);
+    expect(find.text('다운로드'), findsNothing);
+    expect(find.byTooltip('메이플스토리 다운로드'), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('메이플스토리, 글꼴 정보'))
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+    semantics.dispose();
+    await tester.tap(find.text('메이플스토리'));
+    await tester.pumpAndSettle();
+    expect(find.text('출처·이용 조건'), findsOneWidget);
+    expect(find.text(item.license), findsOneWidget);
+    expect(find.text(item.source), findsOneWidget);
+    expect(catalog.installed, isEmpty);
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+    catalog.downloadGate = Completer<void>();
+    await tester.tap(find.byTooltip('메이플스토리 다운로드'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    catalog.downloadGate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('메이플스토리 다운로드 완료'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsWidgets);
+    expect(find.text('다운로드 완료'), findsNothing);
+  });
+
+  testWidgets(
+    'preview image uses theme tint and failed previews keep searchable names',
+    (tester) async {
+      final item = catalogFixture(1, kind: 'font', title: '글꼴 미리보기');
+      final catalog = FakeReaderCatalog([item]);
+      catalog.previews[item.id] = Uint8List.fromList(
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2h0sAAAAASUVORK5CYII=',
+        ),
+      );
+      await pumpCatalog(tester, catalog);
+      await tester.tap(find.text('글꼴'));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<Image>(find.byType(Image));
+      expect(preview.colorBlendMode, BlendMode.srcIn);
+      expect(
+        preview.color,
+        Theme.of(tester.element(find.byType(Image))).colorScheme.onSurface,
+      );
+      expect(catalog.installed, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('font preview failure falls back to a one-line name', (
+    tester,
+  ) async {
+    final catalog = FakeReaderCatalog([
+      catalogFixture(1, kind: 'font', title: '미리보기 없는 글꼴'),
+    ])..previewFails = true;
+    await pumpCatalog(tester, catalog, size: const Size(280, 450), scale: 2);
+    await tester.tap(find.text('글꼴'));
+    await tester.pumpAndSettle();
+    expect(find.text('미리보기 없는 글꼴'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('미리보기 없는 글꼴')).maxLines, 1);
+    expect(find.byTooltip('미리보기 없는 글꼴 다운로드'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final size in [const Size(280, 350), const Size(320, 700)]) {
     testWidgets('catalog fits $size with large text', (tester) async {

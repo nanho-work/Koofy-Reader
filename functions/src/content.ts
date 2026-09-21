@@ -13,7 +13,7 @@ export function requireValue(value: unknown, message: string): asserts value {
 export type Kind = 'book' | 'font';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata { title: string; author: string; description: string; license: string; category?: string; source?: string }
-export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number }
+export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number; preview?: Asset }
 export interface Content extends Metadata {
   id: string; kind: Kind; revision: number; assets: Record<string, Asset>;
   published: boolean; publishedContent: Snapshot | null; updatedAt: string;
@@ -59,7 +59,8 @@ export function publicItem(item: Content) {
   if (item.deleting || !item.published || !item.publishedContent) throw new ApiError(404, '공개된 콘텐츠가 없습니다.');
   const snapshot = item.publishedContent;
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
-  return { id: item.id, kind: item.kind, ...snapshot, assets };
+  const { preview, ...fields } = snapshot;
+  return { id: item.id, kind: item.kind, ...fields, assets, ...(preview ? { preview: { sha256: preview.sha256, size: preview.size, extension: preview.extension } } : {}) };
 }
 export function requireSuperAdmin(claims: { superAdmin?: unknown }) {
   if (claims.superAdmin !== true) throw new ApiError(403, '총괄 관리자 권한이 필요합니다.');

@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { previewFace, renderFontPreview } from './font-preview';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, getFirestore } from 'firebase-admin/firestore';
@@ -134,11 +135,38 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     if (action === 'delete') {
       response.json(await deleteContent(contentId, expected, claims.uid)); return;
     }
-    requireValue(action === 'save' || action === 'publish' || action === 'unpublish' || action === 'removeAsset', '지원하지 않는 작업입니다.');
+    // Render before entering the Firestore transaction. Recheck revision when
+    // committing so a concurrent rename/upload cannot publish a stale preview.
+    if (action === 'publish') {
+      const item = await getItem(contentId); assertRevision(item, expected);
+      const snapshot = publish(item);
+      let previewFile: ReturnType<typeof bucket.file> | undefined;
+      if (item.kind === 'font') {
+        const face = previewFace(item);
+        const [bytes] = await bucket.file(face.path).download();
+        requireValue(bytes.length === face.size && createHash('sha256').update(bytes).digest('hex') === face.sha256, '글꼴 파일 검증에 실패했습니다. 다시 업로드해 주세요.');
+        const rendered = await renderFontPreview(bytes, item.title);
+        if (rendered) {
+          const path = `readerContent/${contentId}/${randomUUID()}/preview.png`;
+          previewFile = bucket.file(path);
+          await previewFile.save(rendered.bytes, { resumable: false, contentType: 'image/png', metadata: { cacheControl: 'private, max-age=300' }, preconditionOpts: { ifGenerationMatch: 0 } });
+          snapshot.preview = { path, ...rendered.asset };
+        }
+      }
+      let next: Content;
+      try {
+        next = await change(contentId, expected, claims.uid, action, () => ({ published: true, publishedContent: snapshot }));
+      } catch (error) {
+        await previewFile?.delete().catch(cleanup => logger.error('Orphan preview cleanup failed', cleanup));
+        throw error;
+      }
+      response.json(next);
+      return;
+    }
+    requireValue(action === 'save' || action === 'unpublish' || action === 'removeAsset', '지원하지 않는 작업입니다.');
     const next = await change(contentId, expected, claims.uid, action, item => {
       switch (action) {
         case 'save': return metadata(data.metadata);
-        case 'publish': return { published: true, publishedContent: publish(item) };
         case 'unpublish': return { published: false };
         case 'removeAsset': {
           requireValue(typeof data.slot === 'string' && Object.hasOwn(item.assets, data.slot), '등록된 파일이 없습니다.');
@@ -159,8 +187,10 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       publicItem(item); // Never sign draft/unpublished paths supplied by a caller.
       const snapshot = item.publishedContent!;
       if (Number(request.query.version) !== snapshot.version) throw new ApiError(409, '새 버전이 공개되었습니다. 목록을 새로고침해 주세요.');
-      requireValue(typeof request.query.slot === 'string' && Object.hasOwn(snapshot.assets, request.query.slot), '파일을 찾을 수 없습니다.');
-      const asset = snapshot.assets[request.query.slot];
+      requireValue(typeof request.query.slot === 'string', '파일을 찾을 수 없습니다.');
+      const slot = request.query.slot;
+      const asset = slot === 'preview' ? snapshot.preview : Object.hasOwn(snapshot.assets, slot) ? snapshot.assets[slot] : undefined;
+      requireValue(asset, '파일을 찾을 수 없습니다.');
       const [url] = await bucket.file(asset.path).getSignedUrl({ action: 'read', version: 'v4', expires: Date.now() + 5 * 60 * 1000 });
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }

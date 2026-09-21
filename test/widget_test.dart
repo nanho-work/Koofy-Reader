@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
 // This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
@@ -13,7 +14,22 @@ import 'package:koofy_reader/features/library/presentation/library_page.dart';
 
 void main() {
   testWidgets('Library screen renders smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: KoofyReaderApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          privacyStateProvider.overrideWith(
+            (ref) => Stream.value(
+              const PrivacyState(
+                loaded: true,
+                choice: AdvertisingChoice.standard,
+                configured: true,
+              ),
+            ),
+          ),
+        ],
+        child: const KoofyReaderApp(),
+      ),
+    );
     for (int i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 100));
       if (find.byType(LibraryPage).evaluate().isNotEmpty) {

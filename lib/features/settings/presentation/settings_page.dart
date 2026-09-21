@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
+import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -52,6 +53,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('개인정보 및 광고'),
+            subtitle: const Text('광고 선택 · 개인정보처리방침 · 문의 · 광고 신고'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PrivacySettingsPage(),
+              ),
+            ),
+          ),
+          const Divider(height: 24),
           Text('광고 없이 읽기', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           const Text('리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.'),

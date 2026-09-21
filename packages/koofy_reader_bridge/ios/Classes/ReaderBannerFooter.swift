@@ -1,5 +1,6 @@
 import IronSource
 import UIKit
+import AppTrackingTransparency
 
 /// Loading keeps a stable height; reward visibility asks the host to reflow.
 final class ReaderBannerFooter: UIView {
@@ -15,6 +16,7 @@ final class ReaderBannerFooter: UIView {
     private var retryAt = Date.distantPast
     private var timer: Timer?
     private var previousWidth: CGFloat = 0
+    private var trackingStatus = ATTrackingManager.trackingAuthorizationStatus
     var onHeightChanged: ((CGFloat) -> Void)?
     var desiredHeight: CGFloat {
         configured && Double(hiddenUntil ?? 0) / 1000 <= Date().timeIntervalSince1970 ? 66 : 0
@@ -57,6 +59,18 @@ final class ReaderBannerFooter: UIView {
     func updateHiddenUntil(_ epochMs: Int64?) { hiddenUntil = epochMs; refresh() }
     func resume() {
         guard !disposed else { return }
+        // The native reader can be in front while the user changes iOS settings.
+        // Apply denial and discard the previous ad before resuming its requests.
+        let currentTracking = ATTrackingManager.trackingAuthorizationStatus
+        if configured && currentTracking != trackingStatus {
+            removeBanner()
+            retryAt = .distantPast
+            if currentTracking != .authorized {
+                LPMPrivacySettings.setGDPRConsents(["UnityAds": false, "IronSource": false])
+                LPMPrivacySettings.setCCPA(true)
+            }
+        }
+        trackingStatus = currentTracking
         active = true
         banner?.resumeAutoRefresh()
         refresh()

@@ -4,6 +4,7 @@ import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_footer_widget.dart';
+import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
 
 class AppFooterAdShell extends ConsumerWidget {
   const AppFooterAdShell({
@@ -17,6 +18,7 @@ class AppFooterAdShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final privacy = ref.watch(privacyStateProvider).valueOrNull;
     final hidden =
         ref.watch(adStateProvider).valueOrNull?.isBannerHidden ?? false;
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -26,8 +28,12 @@ class AppFooterAdShell extends ConsumerWidget {
         child: Column(
           children: [
             Expanded(child: child),
-            if (showFooterAd && !hidden)
-              const SafeArea(top: false, child: AdFooterWidget()),
+            if (showFooterAd && !hidden && privacy?.canRequestAds == true)
+              SafeArea(
+                key: ValueKey(privacy!.revision),
+                top: false,
+                child: const AdFooterWidget(),
+              ),
           ],
         ),
       ),

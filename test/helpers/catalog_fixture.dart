@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -45,6 +46,9 @@ class FakeReaderCatalog extends ReaderCatalog {
   final calls = <String>[];
   final installed = <String>{};
   bool fail = false;
+  bool previewFails = false;
+  final previews = <String, Uint8List>{};
+  final previewRequests = <String>[];
   Completer<void>? downloadGate;
   @override
   Future<CatalogPage> list(String kind, {String? after}) async {
@@ -56,6 +60,13 @@ class FakeReaderCatalog extends ReaderCatalog {
       filtered.skip(start).take(40).toList(),
       start + 40 < filtered.length ? '${start + 40}' : null,
     );
+  }
+
+  @override
+  Future<Uint8List?> fontPreview(CatalogItem item) async {
+    previewRequests.add(item.id);
+    if (previewFails) throw const CatalogException('미리보기 연결 실패');
+    return previews[item.id];
   }
 
   @override

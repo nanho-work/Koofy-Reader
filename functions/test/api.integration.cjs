@@ -45,12 +45,26 @@ test('draft upload, publish, edit isolation, optimistic conflict and unpublish w
   response = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=font300&version=${visible.version}`);
   assert.equal(response.status, 200);
   const download = await response.json();
+  assert(visible.preview && visible.preview.extension === 'png');
+  assert.equal('path' in visible.preview, false);
+  assert.equal('preview' in visible.assets, false);
+  const previewResponse = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=preview&version=${visible.version}`);
+  assert.equal(previewResponse.status, 200);
+  const previewDownload = await previewResponse.json();
+  assert.equal(previewDownload.sha256, visible.preview.sha256);
+  assert.equal(previewDownload.url, 'https://storage.googleapis.com/emulator-only/' + encodeURIComponent(item.publishedContent.preview.path));
   assert.equal(download.sha256, visible.assets.font300.sha256);
   assert.equal(download.url, 'https://storage.googleapis.com/emulator-only/' + encodeURIComponent(item.publishedContent.assets.font300.path));
   item = saved.body;
+  const republished = await api('publish', { id: item.id, revision: item.revision });
+  assert.equal(republished.status, 200, JSON.stringify(republished.body));
+  item = republished.body;
+  assert.notEqual(item.publishedContent.preview.sha256, visible.preview.sha256);
+  assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=preview&version=${visible.version}`)).status, 409);
   const hidden = await api('unpublish', { id: item.id, revision: item.revision }); assert.equal(hidden.status, 200);
   response = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=font300&version=${visible.version}`); assert.equal(response.status, 404);
   response = await fetch(base + 'readerCatalog?kind=font'); assert.equal((await response.json()).items.length, 0);
+  assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=preview&version=${item.publishedContent.version}`)).status, 404);
 });
 test('direct anonymous database and storage access are denied', async () => {
   const database = await fetch('http://127.0.0.1:8080/v1/projects/demo-koofy-reader/databases/(default)/documents/readerContent');

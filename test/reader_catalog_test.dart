@@ -36,8 +36,12 @@ void main() {
   late LocalBookRepository books;
   var corrupt = false;
   var textBooks = false;
+  final requestedSlots = <String>[];
   String? requestedTxtSupport;
   final files = {
+    'preview': base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2h0sAAAAASUVORK5CYII=',
+    ),
     'epub': utf8.encode('epub test bytes'),
     'txt': utf8.encode('다운로드한 한글 책\n\n다음 문단 😀'),
     'cover': utf8.encode('cover test bytes'),
@@ -46,7 +50,9 @@ void main() {
   Map<String, dynamic> asset(String slot) => {
     'sha256': sha256.convert(files[slot]!).toString(),
     'size': files[slot]!.length,
-    'extension': slot == 'font400'
+    'extension': slot == 'preview'
+        ? 'png'
+        : slot == 'font400'
         ? 'otf'
         : slot == 'cover'
         ? 'webp'
@@ -74,6 +80,7 @@ void main() {
     corrupt = false;
     textBooks = false;
     requestedTxtSupport = null;
+    requestedSlots.clear();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       if (request.uri.path == '/file') {
@@ -81,6 +88,7 @@ void main() {
         request.response.add(corrupt ? List.filled(bytes.length, 0) : bytes);
       } else if (request.uri.queryParameters['action'] == 'download') {
         final slot = request.uri.queryParameters['slot']!;
+        requestedSlots.add(slot);
         request.response.headers.contentType = ContentType.json;
         request.response.write(
           jsonEncode({
@@ -112,6 +120,56 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test(
+    'preview fetches only a PNG and reuses its verified cache without installing fonts',
+    () async {
+      final item = CatalogItem.fromJson({
+        ...itemJson('font'),
+        'preview': asset('preview'),
+      });
+      expect(await catalog.fontPreview(item), files['preview']);
+      expect(await catalog.fontPreview(item), files['preview']);
+      expect(requestedSlots, ['preview']);
+      expect(await catalog.isInstalled(item), false);
+      expect(
+        await File(
+          '${directory.path}/cloud_reader/fonts/catalog.json',
+        ).exists(),
+        false,
+      );
+    },
+  );
+  test(
+    'corrupt previews are rejected and legacy catalogs require no preview request',
+    () async {
+      expect(
+        await catalog.fontPreview(CatalogItem.fromJson(itemJson('font'))),
+        isNull,
+      );
+      expect(requestedSlots, isEmpty);
+      corrupt = true;
+      await expectLater(
+        catalog.fontPreview(
+          CatalogItem.fromJson({
+            ...itemJson('font'),
+            'preview': asset('preview'),
+          }),
+        ),
+        throwsA(isA<CatalogException>()),
+      );
+      expect(
+        await catalog.isInstalled(CatalogItem.fromJson(itemJson('font'))),
+        false,
+      );
+      expect(
+        () => CatalogItem.fromJson({
+          ...itemJson('font'),
+          'preview': {...asset('preview'), 'size': 128 * 1024 + 1},
+        }),
+        throwsFormatException,
+      );
+    },
+  );
   test(
     'TXT is discovered, downloaded and prepared for the native reader offline',
     () async {

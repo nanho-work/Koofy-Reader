@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,15 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            privacyStateProvider.overrideWith(
+              (ref) => Stream.value(
+                const PrivacyState(
+                  loaded: true,
+                  choice: AdvertisingChoice.standard,
+                  configured: true,
+                ),
+              ),
+            ),
             adStateProvider.overrideWith(
               (ref) async => const AdState(hiddenUntil: null),
             ),

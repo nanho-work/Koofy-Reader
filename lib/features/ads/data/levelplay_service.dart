@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
 import '../config/levelplay_ids.dart';
+import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
 
 final levelPlayReadyProvider = FutureProvider<bool>(
   (ref) => LevelPlayService.instance.initialize(),
@@ -14,6 +15,7 @@ class LevelPlayService implements LevelPlayInitListener {
   bool _ready = false;
   Future<bool> initialize() async {
     if (!LevelPlayIds.supported) return false;
+    if (!await PrivacyService.instance.prepareAds()) return false;
     if (_ready) return true;
     if (_initializing != null) {
       return _initializing!.future.timeout(

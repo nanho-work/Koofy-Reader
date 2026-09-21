@@ -102,6 +102,13 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
   }
 }
 
+// Only visible font rows request preview bytes. These are independent of the
+// font installation manifest and cached on disk by verified content hash.
+final catalogFontPreviewProvider = FutureProvider.autoDispose
+    .family<Uint8List?, CatalogItem>((ref, item) {
+      return ref.watch(readerCatalogProvider).fontPreview(item);
+    });
+
 class CatalogException implements Exception {
   const CatalogException(this.message);
   final String message;
@@ -118,7 +125,14 @@ class CatalogAsset {
     if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(sha) ||
         size < 1 ||
         size > 20 * 1024 * 1024 ||
-        !const ['epub', 'txt', 'webp', 'otf', 'ttf'].contains(extension)) {
+        !const [
+          'epub',
+          'txt',
+          'webp',
+          'otf',
+          'ttf',
+          'png',
+        ].contains(extension)) {
       throw const FormatException('올바르지 않은 파일 정보입니다.');
     }
   }
@@ -138,6 +152,9 @@ class CatalogItem {
       license = json['license'] as String,
       category = json['category'] as String? ?? '기타',
       source = json['source'] as String? ?? '',
+      preview = json['preview'] is Map<String, dynamic>
+          ? CatalogAsset.fromJson(json['preview'] as Map<String, dynamic>)
+          : null,
       version = json['version'] as int,
       assets = (json['assets'] as Map<String, dynamic>).map(
         (key, value) =>
@@ -150,6 +167,12 @@ class CatalogItem {
         assets.isEmpty ||
         assets.length > 9) {
       throw const FormatException('올바르지 않은 콘텐츠 정보입니다.');
+    }
+    if (preview != null &&
+        (kind != 'font' ||
+            preview!.extension != 'png' ||
+            preview!.size > 128 * 1024)) {
+      throw const FormatException('올바르지 않은 미리보기 정보입니다.');
     }
     for (final entry in assets.entries) {
       final asset = entry.value;
@@ -171,6 +194,7 @@ class CatalogItem {
   final String id, kind, title, author, description, license, category, source;
   final int version;
   final Map<String, CatalogAsset> assets;
+  final CatalogAsset? preview;
   String get bookId => 'catalog_${id}_$version';
   String get fontId => 'remote_$id';
   int get totalSize => assets.values.fold(0, (sum, asset) => sum + asset.size);
@@ -299,9 +323,10 @@ class ReaderCatalog {
     CatalogItem item,
     String slot,
     Directory directory,
-    void Function(int) received,
-  ) async {
-    final asset = item.assets[slot]!;
+    void Function(int) received, {
+    CatalogAsset? previewAsset,
+  }) async {
+    final asset = previewAsset ?? item.assets[slot]!;
     await directory.create(recursive: true);
     final target = File('${directory.path}/${asset.filename}');
     if (await target.exists() &&
@@ -369,6 +394,20 @@ class ReaderCatalog {
       await sink?.close();
       if (await temporary.exists()) await temporary.delete();
     }
+  }
+
+  Future<Uint8List?> fontPreview(CatalogItem item) async {
+    final preview = item.preview;
+    if (item.kind != 'font' || preview == null) return null;
+    final root = await _root();
+    final file = await _download(
+      item,
+      'preview',
+      Directory('${root.path}/previews'),
+      (_) {},
+      previewAsset: preview,
+    );
+    return file.readAsBytes();
   }
 
   Future<void> install(
