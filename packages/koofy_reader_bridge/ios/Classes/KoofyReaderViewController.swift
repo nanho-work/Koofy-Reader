@@ -20,6 +20,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private var layoutGeneration = 0
     private var captureGeneration = 0
     private var isReady = false
+    private var renderFailed = false
     private var hasSentReady = false
     private var isClosing = false
     private var isRotating = false
@@ -206,6 +207,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         invalidatePageTurns()
         needsTurnRestoration = false
         isReady = false
+        renderFailed = false
         captureGeneration += 1
         renderGeneration += 1
         captureTask?.cancel()
@@ -258,7 +260,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 // available-width check, preserving the engine's pagination.
                 readiumCSSRSProperties: .init(
                     colCount: !preferences.scroll && preferences.columnCount != 1 && canShowSpread ? .two : .one,
-                    overrides: ["--RS__colWidth": "auto"])) )
+                    // Safari needs a non-auto width to fragment a single column.
+                    // Only spreads need to override Readium's width floor.
+                    overrides: !preferences.scroll && preferences.columnCount != 1 && canShowSpread
+                        ? ["--RS__colWidth": "auto"] : [:])) )
     }
 
     private func epubPreferences() -> EPUBPreferences {
@@ -376,12 +381,13 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
-        guard let current = self.navigator, current === navigator, !isClosing, !isRotating,
+        guard let current = self.navigator, current === navigator, !isClosing, !isRotating, !renderFailed,
               !programmaticMovePending, current.viewport != nil else { return }
         capture(locator, from: current)
     }
 
     private func capture(_ fallback: Locator, from current: EPUBNavigatorViewController) {
+        guard !renderFailed, !isClosing, navigator === current else { return }
         // Readium can repeat its last location while an image turn is in flight.
         // The main viewport has not moved until our commit; do not cancel that turn.
         if turnBusy && !turnCommitInFlight { return }
@@ -414,7 +420,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 }
                 snapshot = result
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, self.captureGeneration == token,
+                      self.renderGeneration == rendering, !self.renderFailed else { return }
                 self.finishNavigation(.failure(error))
                 self.report(error, code: "anchor_capture_failed", fatal: !self.hasSentReady)
                 return
@@ -433,7 +440,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                    let locator = try? Locator(jsonString: raw) { exact = locator }
             }
             guard !Task.isCancelled, self.captureGeneration == token,
-                  self.renderGeneration == rendering, self.navigator === current else { return }
+                  self.renderGeneration == rendering, self.navigator === current,
+                  !self.renderFailed, !self.isClosing else { return }
             if self.turnBusy && !self.turnCommitInFlight { return }
             if !self.turnCommitInFlight, let controller = self.pageTurnController,
                !controller.frames.matchesViewport(exact) {
@@ -450,7 +458,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 // for another delegate notification or committing the wrong page.
                 do { try await Task.sleep(nanoseconds: 40_000_000) }
                 catch { return }
-                guard self.captureGeneration == token, self.renderGeneration == rendering,
+                guard !Task.isCancelled, self.captureGeneration == token, self.renderGeneration == rendering,
                       self.navigator === current, !self.isClosing else { return }
                 self.capture(fallback, from: current)
                 return
@@ -550,6 +558,28 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     private func report(_ error: Error, code: String, fatal: Bool) {
+        if fatal {
+            // A terminal deadline must stop restoration, not just hide its spinner.
+            // Invalidate in-flight work before notifying any completion handlers.
+            renderFailed = true
+            isReady = false
+            captureGeneration += 1
+            renderGeneration += 1
+            moveOperation += 1
+            captureTask?.cancel()
+            captureTask = nil
+            moveTask?.cancel()
+            moveTask = nil
+            readyTimeout?.cancel()
+            readyTimeout = nil
+            restorationAnchor = nil
+            programmaticMovePending = false
+            needsTurnRestoration = false
+            turnCommitInFlight = false
+            turnBusy = false
+            invalidatePageTurns()
+            finishNavigation(.failure(error))
+        }
         let message = (error as? PigeonError)?.message ?? "책을 처리하지 못했습니다: \(error.localizedDescription)"
         let effectiveCode = (error as? PigeonError)?.code ?? code
         sequence += 1
@@ -693,7 +723,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                         controller.rebase()
                     } else {
                         self.invalidatePageTurns()
-                        if case let .failure(error) = result, !self.isClosing, !self.needsTurnRestoration {
+                        if case let .failure(error) = result, !self.isClosing, !self.renderFailed, !self.needsTurnRestoration {
                             if !self.isReady {
                                 self.needsTurnRestoration = true
                                 self.resumeForeground()
@@ -780,7 +810,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     @objc private func resumeForeground() {
-        guard !isClosing else { return }
+        guard !isClosing, !renderFailed else { return }
         bannerFooter?.resume()
         if needsTurnRestoration {
             needsTurnRestoration = false

@@ -18,6 +18,142 @@ final class RunnerTests: XCTestCase {
         try FileManager.default.removeItem(at: directory)
     }
 
+    @MainActor
+    func testTxtPaginationAndScrollRoundTrip() async throws {
+        let file = try await makeEPUB(txtStyle: true)
+        let ready = expectation(description: "TXT reader ready")
+        var events: [ReaderEvent] = []
+        let paged = ReaderPreferences(fontScale: 1, columnCount: 0, scroll: false,
+            theme: "light", pageTurnStyle: "instant", fontId: "maplestory")
+        let reader = KoofyReaderViewController(request: ReaderLaunchRequest(protocolVersion: 1,
+            sessionId: "txt-pages", sessionGeneration: 1, publicationId: "txt", contentRevision: "1",
+            filePath: file.path, title: "TXT pagination", preferences: paged),
+            journal: try ReaderCheckpointStore(directory: directory.appendingPathComponent("journal"))) { event in
+                if event.kind == "ready", !events.contains(where: { $0.kind == "ready" }) { ready.fulfill() }
+                events.append(event)
+                if event.kind == "error" { XCTFail(event.message ?? "Reader error") }
+            }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let presenter = try XCTUnwrap(scene.windows.first { $0.isKeyWindow }?.rootViewController)
+        let navigation = UINavigationController(rootViewController: reader)
+        navigation.modalPresentationStyle = .fullScreen
+        presenter.present(navigation, animated: false)
+        defer { navigation.dismiss(animated: false) }
+        await fulfillment(of: [ready], timeout: 35)
+        func active() throws -> EPUBNavigatorViewController {
+            try XCTUnwrap(reader.children.compactMap { $0 as? EPUBNavigatorViewController }.first)
+        }
+        func x() async throws -> Double {
+            let value = try await active().evaluateJavaScript("scrollX").get()
+            return try XCTUnwrap(value as? NSNumber).doubleValue
+        }
+        func waitForX(differentFrom before: Double) async throws -> Double {
+            for _ in 0..<100 {
+                let value = try await x()
+                if abs(value - before) > 1 { return value }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            XCTFail("Page input did not move the visible viewport")
+            return try await x()
+        }
+        let current = try active()
+        let width = try await current.evaluateJavaScript("getComputedStyle(document.documentElement).columnWidth").get()
+        if reader.view.bounds.width < 700 {
+            XCTAssertNotEqual(width as? String, "auto", "Single-column Safari must retain Readium's explicit width")
+        }
+        let fragmented = try await current.evaluateJavaScript("document.documentElement.scrollWidth > innerWidth * 2").get()
+        XCTAssertEqual(fragmented as? Bool, true)
+        let start = try await x()
+        reader.requestPageTurn(forward: true)
+        let next = try await waitForX(differentFrom: start)
+        XCTAssertGreaterThan(next, start)
+        // Wait for the native location checkpoint before the next input.
+        try await Task.sleep(nanoseconds: 500_000_000)
+        reader.requestPageTurn(forward: false)
+        let previous = try await waitForX(differentFrom: next)
+        XCTAssertEqual(previous, start, accuracy: 1)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let middle = Locator(href: try XCTUnwrap(current.currentLocation).href,
+            mediaType: .xhtml, locations: .init(fragments: ["p60"]))
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            do { try reader.go(to: middle) { c.resume(with: $0) } }
+            catch { c.resume(throwing: error) }
+        }
+        let anchor = try XCTUnwrap(events.last?.locatorJson)
+        for scrolling in [true, false] {
+            var value = paged
+            value.scroll = scrolling
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                do { try reader.apply(value) { c.resume(with: $0) } }
+                catch { c.resume(throwing: error) }
+            }
+            XCTAssertEqual(events.last?.locatorJson, anchor)
+            let visible = try await paragraphSixtyIsVisible(in: reader)
+            XCTAssertTrue(visible, "Mode switch must restore the same paragraph")
+        }
+        let restored = try await x()
+        reader.requestPageTurn(forward: true)
+        let advanced = try await waitForX(differentFrom: restored)
+        XCTAssertGreaterThan(advanced, restored)
+    }
+
+    @MainActor
+    func testRenderTimeoutStopsAnchorRetriesAndLateCallbacks() async throws {
+        let file = try await makeEPUB(txtStyle: true)
+        let failed = expectation(description: "Unreachable anchor reaches render deadline")
+        var events: [ReaderEvent] = []
+        // Valid resource, but a stale text anchor that cannot become visible.
+        let anchor = "{\"href\":\"EPUB/chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"koofyText\":{\"cssSelector\":\"#missing\",\"textNodeIndex\":0,\"charOffset\":0}}}"
+        let reader = KoofyReaderViewController(request: ReaderLaunchRequest(protocolVersion: 1,
+            sessionId: "timeout", sessionGeneration: 1, publicationId: "timeout", contentRevision: "1",
+            filePath: file.path, title: "Timeout", initialLocatorJson: anchor,
+            preferences: ReaderPreferences(fontScale: 1, columnCount: 1, scroll: false, theme: "light")),
+            journal: try ReaderCheckpointStore(directory: directory.appendingPathComponent("journal"))) { event in
+                events.append(event)
+                if event.errorCode == "render_timeout" { failed.fulfill() }
+            }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let presenter = try XCTUnwrap(scene.windows.first { $0.isKeyWindow }?.rootViewController)
+        let navigation = UINavigationController(rootViewController: reader)
+        navigation.modalPresentationStyle = .fullScreen
+        presenter.present(navigation, animated: false)
+        defer { navigation.dismiss(animated: false) }
+        var instrumented: EPUBNavigatorViewController?
+        for _ in 0..<100 {
+            if let candidate = reader.children.compactMap({ $0 as? EPUBNavigatorViewController }).first,
+               candidate.viewport != nil {
+                let result = await candidate.evaluateJavaScript("""
+                (() => {
+                window.__anchorReads = 0;
+                const originalQuery = document.querySelector.bind(document);
+                document.querySelector = function(s) {
+                  if (s === '#missing') window.__anchorReads++;
+                  return originalQuery(s);
+                };
+                return true;
+                })();
+                """)
+                if case .success = result { instrumented = candidate; break }
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let current = try XCTUnwrap(instrumented)
+        await fulfillment(of: [failed], timeout: 35)
+        let before = try await current.evaluateJavaScript("window.__anchorReads").get() as? NSNumber
+        XCTAssertGreaterThan(try XCTUnwrap(before).intValue, 1, "Test must exercise repeated anchor restoration")
+        let eventCount = events.count
+        let location = try XCTUnwrap(current.currentLocation)
+        // A late engine notification must not restart capture or mark the reader ready.
+        reader.navigator(current, locationDidChange: location)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let after = try await current.evaluateJavaScript("window.__anchorReads").get() as? NSNumber
+        XCTAssertEqual(before, after, "Timeout must cancel the active retry loop")
+        XCTAssertEqual(events.count, eventCount)
+        XCTAssertFalse(events.contains { $0.kind == "ready" })
+        XCTAssertThrowsError(try reader.apply(ReaderPreferences(fontScale: 1, columnCount: 1,
+            scroll: true, theme: "light")) { _ in XCTFail("Failed reader cannot accept settings") })
+    }
+
     func testOldAcknowledgementCannotDeleteNewLocation() throws {
         let journal = try ReaderCheckpointStore(directory: directory)
         try journal.write(event(sequence: 1))
@@ -657,7 +793,7 @@ final class RunnerTests: XCTestCase {
         return result as? Bool ?? false
     }
 
-    private func makeEPUB(longParagraph: Bool = false, chapterBoundary: Bool = false, fontFaces: Bool = false, paragraphCount: Int = 120) async throws -> URL {
+    private func makeEPUB(longParagraph: Bool = false, chapterBoundary: Bool = false, fontFaces: Bool = false, paragraphCount: Int = 120, txtStyle: Bool = false) async throws -> URL {
         let file = directory.appendingPathComponent("reader-fixture.epub")
         let paragraphs = (1...paragraphCount).map { index in
             let bold = fontFaces ? "<strong>굵은 글씨 Bold</strong>" : ""
@@ -682,6 +818,20 @@ final class RunnerTests: XCTestCase {
                 return (path, text)
             }
             entries.append(("EPUB/second.xhtml", "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"ko\"><head><title>두 번째 장</title></head><body>\(paragraphs)</body></html>"))
+        }
+        if txtStyle {
+            entries = entries.map { path, text in
+                if path == "EPUB/package.opf" {
+                    return (path, text.replacingOccurrences(of: "<dc:language>ko</dc:language>", with: "<dc:language>und</dc:language>"))
+                }
+                if path == "EPUB/chapter.xhtml" {
+                    return (path, text.replacingOccurrences(of: "lang=\"ko\"", with: "lang=\"und\"")
+                        .replacingOccurrences(of: "</head>", with: "<style>body{line-height:1.6;}p{white-space:pre-wrap;margin:0;}</style></head>")
+                        .replacingOccurrences(of: "<body>", with: "<body><section>")
+                        .replacingOccurrences(of: "</body>", with: "</section></body>"))
+                }
+                return (path, text)
+            }
         }
         let archive = try await Archive(url: file, accessMode: .create)
         for (path, text) in entries {
