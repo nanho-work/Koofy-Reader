@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:koofy_reader/core/storage/library_mutations.dart';
+import 'package:koofy_reader/features/native_reader/data/reading_publication_preparer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/data/book_cover_store.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
-import 'package:xml/xml.dart';
 
 final bookRepositoryProvider = Provider<BookRepository>(
   (ref) => LocalBookRepository(ref.watch(localStorageProvider)),
@@ -28,8 +29,17 @@ abstract class BookRepository {
 }
 
 class LocalBookRepository implements BookRepository {
-  LocalBookRepository(this._storage, {BookCoverStore? covers})
-    : _covers = covers ?? BookCoverStore(_storage);
+  LocalBookRepository(
+    this._storage, {
+    BookCoverStore? covers,
+    Future<Directory> Function()? sourceDirectory,
+  }) : _covers = covers ?? BookCoverStore(_storage),
+       _sourceDirectory = sourceDirectory ?? _defaultSourceDirectory;
+
+  final Future<Directory> Function() _sourceDirectory;
+  static Future<Directory> _defaultSourceDirectory() async => Directory(
+    '${(await getApplicationSupportDirectory()).path}/library_sources',
+  );
 
   final LocalStorage _storage;
   final BookCoverStore _covers;
@@ -51,28 +61,29 @@ class LocalBookRepository implements BookRepository {
   ];
 
   @override
-  Future<List<Book>> getBooks() async {
+  Future<List<Book>> getBooks() => LibraryMutations.run(() async {
     final local = await _loadLocalBooks();
     final hiddenIds = await _loadHiddenBookIds();
     final visibleSamples = _books
         .where((book) => !hiddenIds.contains(book.id))
         .toList(growable: false);
     return _covers.apply([...local, ...visibleSamples]);
-  }
+  });
 
   @override
-  Future<void> setBookCover(String bookId, String imagePath) async {
-    if (!(await getBooks()).any((book) => book.id == bookId)) {
-      throw StateError('표지를 바꿀 책을 찾지 못했습니다.');
-    }
-    await _covers.setImage(bookId, imagePath);
-  }
+  Future<void> setBookCover(String bookId, String imagePath) =>
+      LibraryMutations.run(() async {
+        if (!(await getBooks()).any((book) => book.id == bookId)) {
+          throw StateError('표지를 바꿀 책을 찾지 못했습니다.');
+        }
+        await _covers.setImage(bookId, imagePath);
+      });
 
   @override
   Future<void> resetBookCover(String bookId) => _covers.reset(bookId);
 
   @override
-  Future<Book?> importBookFile(String path) async {
+  Future<Book?> importBookFile(String path) => LibraryMutations.run(() async {
     final file = File(path);
     if (!await file.exists()) {
       return null;
@@ -86,10 +97,12 @@ class LocalBookRepository implements BookRepository {
     }
 
     final localBooks = await _loadLocalBooks();
-    final duplicate = localBooks.any((book) => book.localPath == path);
-    if (duplicate) {
-      return localBooks.firstWhere((book) => book.localPath == path);
-    }
+    final duplicate = localBooks
+        .where(
+          (book) => book.localPath == path || book.importSourcePath == path,
+        )
+        .firstOrNull;
+    if (duplicate != null) return duplicate;
 
     final fileName = _fileNameFromPath(path);
     var title = fileName.replaceAll(
@@ -99,8 +112,19 @@ class LocalBookRepository implements BookRepository {
     var author = '내 파일';
     final description = isEpub ? '로컬 파일에서 가져온 EPUB' : '로컬 파일에서 가져온 텍스트';
 
+    final maximum = isEpub
+        ? AppConstants.maxEpubBytes
+        : AppConstants.maxTxtBytes;
+    final length = await file.length();
+    if (length <= 0 || length > maximum) {
+      throw FormatException('비어 있지 않은 ${isEpub ? 40 : 20}MB 이하의 파일을 선택해 주세요.');
+    }
+    final bytes = await file.readAsBytes();
+    final metadata = await ReadingPublicationPreparer.inspectImport(
+      bytes,
+      isEpub ? 'epub' : 'txt',
+    );
     if (isEpub) {
-      final metadata = await _readEpubMetadata(file);
       if (metadata.title != null && metadata.title!.trim().isNotEmpty) {
         title = metadata.title!.trim();
       }
@@ -109,21 +133,29 @@ class LocalBookRepository implements BookRepository {
       }
     }
 
+    final directory = await _sourceDirectory();
+    await directory.create(recursive: true);
+    final ownedDirectory = await directory.createTemp('book-');
+    final owned = File(
+      '${ownedDirectory.path}/source.${isEpub ? 'epub' : 'txt'}',
+    );
+    await owned.writeAsBytes(bytes, flush: true);
     final imported = Book.localFile(
       id: 'local_${DateTime.now().microsecondsSinceEpoch}',
       title: title.isEmpty ? '가져온 책' : title,
       author: author,
       description: description,
-      localPath: path,
+      localPath: owned.path,
+      importSourcePath: path,
     );
 
     final next = [imported, ...localBooks];
     await _saveLocalBooks(next);
     return imported;
-  }
+  });
 
   @override
-  Future<void> saveDownloadedBook(Book book) async {
+  Future<void> saveDownloadedBook(Book book) => LibraryMutations.run(() async {
     if (!book.isLocalFile ||
         book.localPath == null ||
         !await File(book.localPath!).exists()) {
@@ -134,28 +166,29 @@ class LocalBookRepository implements BookRepository {
       book,
       ...current.where((existing) => existing.id != book.id),
     ]);
-  }
+  });
 
   @override
-  Future<bool> removeBookFromLibrary(String bookId) async {
-    final localDeleted = await deleteLocalBook(bookId);
-    if (localDeleted) {
-      return true;
-    }
-    final sampleExists = _books.any((book) => book.id == bookId);
-    if (!sampleExists) {
-      return false;
-    }
-    final hiddenIds = await _loadHiddenBookIds();
-    if (hiddenIds.add(bookId)) {
-      await _saveHiddenBookIds(hiddenIds);
-    }
-    await _covers.reset(bookId);
-    return true;
-  }
+  Future<bool> removeBookFromLibrary(String bookId) =>
+      LibraryMutations.run(() async {
+        final localDeleted = await deleteLocalBook(bookId);
+        if (localDeleted) {
+          return true;
+        }
+        final sampleExists = _books.any((book) => book.id == bookId);
+        if (!sampleExists) {
+          return false;
+        }
+        final hiddenIds = await _loadHiddenBookIds();
+        if (hiddenIds.add(bookId)) {
+          await _saveHiddenBookIds(hiddenIds);
+        }
+        await _covers.reset(bookId);
+        return true;
+      });
 
   @override
-  Future<bool> deleteLocalBook(String bookId) async {
+  Future<bool> deleteLocalBook(String bookId) => LibraryMutations.run(() async {
     final localBooks = await _loadLocalBooks();
     final exists = localBooks.any((book) => book.id == bookId);
     if (!exists) {
@@ -166,7 +199,7 @@ class LocalBookRepository implements BookRepository {
     await _saveLocalBooks(next);
     await _covers.reset(bookId);
     return true;
-  }
+  });
 
   String _fileNameFromPath(String path) {
     final parts = path.split(RegExp(r'[\\/]'));
@@ -175,26 +208,29 @@ class LocalBookRepository implements BookRepository {
 
   Future<List<Book>> _loadLocalBooks() async {
     final raw = await _storage.getString(AppConstants.localBooksKey);
-    if (raw == null || raw.trim().isEmpty) {
-      return const [];
+    final backup = await _storage.getString(AppConstants.localBooksBackupKey);
+    if ((raw == null || raw.isEmpty) && (backup == null || backup.isEmpty)) {
+      return [];
     }
-    final decoded = _decodeLocalBooks(raw);
-    if (decoded != null) {
-      return decoded;
-    }
-
-    final backupRaw = await _storage.getString(
-      AppConstants.localBooksBackupKey,
-    );
-    if (backupRaw == null || backupRaw.trim().isEmpty) {
-      return const [];
-    }
-    final recovered = _decodeLocalBooks(backupRaw);
+    final decoded = raw == null || raw.isEmpty ? null : _decodeLocalBooks(raw);
+    if (decoded != null) return decoded;
+    final recovered = backup == null || backup.isEmpty
+        ? null
+        : _decodeLocalBooks(backup);
     if (recovered != null) {
-      await _storage.setString(AppConstants.localBooksKey, backupRaw);
+      if (raw != null && raw.isNotEmpty) {
+        await _storage.setString(
+          'library_corrupt_${DateTime.now().microsecondsSinceEpoch}',
+          raw,
+        );
+      }
+      await _storage.setString(AppConstants.localBooksKey, backup!);
       return recovered;
     }
-    return const [];
+    // Do not mistake damaged data for an empty library and overwrite both copies.
+    throw const FormatException(
+      '서재 목록이 손상되어 변경을 중단했습니다. 기존 기록은 보존했습니다. 백업 파일과 저장 공간을 확인해 주세요.',
+    );
   }
 
   Future<void> _saveLocalBooks(List<Book> books) async {
@@ -231,126 +267,23 @@ class LocalBookRepository implements BookRepository {
       if (json is! List) {
         return null;
       }
-      return json
-          .whereType<Map>()
-          .map((item) => item.map((key, value) => MapEntry('$key', value)))
-          .map(Book.fromJson)
-          .whereType<Book>()
-          .where((book) => book.sourceType == BookSourceType.localFile)
-          .toList();
+      final result = <Book>[];
+      final ids = <String>{};
+      for (final item in json) {
+        if (item is! Map<String, dynamic>) return null;
+        final book = Book.fromJson(item);
+        if (book == null ||
+            !book.isLocalFile ||
+            book.localPath == null ||
+            book.localPath!.isEmpty ||
+            !ids.add(book.id)) {
+          return null;
+        }
+        result.add(book);
+      }
+      return result;
     } catch (_) {
       return null;
     }
   }
-
-  Future<_EpubMetadata> _readEpubMetadata(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
-      final filesByPath = <String, ArchiveFile>{};
-      for (final entry in archive.files) {
-        if (!entry.isFile) continue;
-        filesByPath[_normalizePath(entry.name)] = entry;
-      }
-
-      final opfPath = _resolveOpfPath(filesByPath);
-      if (opfPath == null) {
-        return const _EpubMetadata();
-      }
-      final opfFile = filesByPath[opfPath];
-      if (opfFile == null) {
-        return const _EpubMetadata();
-      }
-
-      final opfXml = utf8.decode(opfFile.content, allowMalformed: true);
-      final opfDoc = XmlDocument.parse(opfXml);
-
-      String? title;
-      for (final element in _elementsByName(opfDoc, 'title')) {
-        final value = element.innerText.trim();
-        if (value.isNotEmpty) {
-          title = value;
-          break;
-        }
-      }
-
-      String? author;
-      for (final element in _elementsByName(opfDoc, 'creator')) {
-        final value = element.innerText.trim();
-        if (value.isNotEmpty) {
-          author = value;
-          break;
-        }
-      }
-
-      return _EpubMetadata(title: title, author: author);
-    } catch (_) {
-      return const _EpubMetadata();
-    }
-  }
-
-  String? _resolveOpfPath(Map<String, ArchiveFile> filesByPath) {
-    const containerPath = 'meta-inf/container.xml';
-    final container = filesByPath[containerPath];
-    if (container != null) {
-      try {
-        final containerXml = utf8.decode(
-          container.content,
-          allowMalformed: true,
-        );
-        final doc = XmlDocument.parse(containerXml);
-        final rootfiles = doc.findAllElements('rootfile');
-        for (final rootfile in rootfiles) {
-          final fullPath = rootfile.getAttribute('full-path');
-          if (fullPath == null || fullPath.trim().isEmpty) {
-            continue;
-          }
-          final normalized = _normalizePath(fullPath);
-          if (filesByPath.containsKey(normalized)) {
-            return normalized;
-          }
-        }
-      } catch (_) {
-        // Continue with fallback below.
-      }
-    }
-
-    for (final path in filesByPath.keys) {
-      if (path.endsWith('.opf')) {
-        return path;
-      }
-    }
-    return null;
-  }
-
-  Iterable<XmlElement> _elementsByName(XmlDocument doc, String localName) {
-    return doc.descendants.whereType<XmlElement>().where(
-      (element) => element.name.local.toLowerCase() == localName,
-    );
-  }
-
-  String _normalizePath(String path) {
-    final normalized = path.replaceAll('\\', '/').toLowerCase();
-    final segments = <String>[];
-    for (final segment in normalized.split('/')) {
-      if (segment.isEmpty || segment == '.') {
-        continue;
-      }
-      if (segment == '..') {
-        if (segments.isNotEmpty) {
-          segments.removeLast();
-        }
-        continue;
-      }
-      segments.add(segment);
-    }
-    return segments.join('/');
-  }
-}
-
-class _EpubMetadata {
-  const _EpubMetadata({this.title, this.author});
-
-  final String? title;
-  final String? author;
 }

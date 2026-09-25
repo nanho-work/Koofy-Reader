@@ -801,12 +801,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       onMore: () => group != null
                           ? _groupMenu(group)
                           : _bookMenu(book, state, status(book)),
-                      statusLabel: group != null
-                          ? '${group.bookIds.length}권'
-                          : progressError
+                      statusLabel: progressError
                           ? '읽기 기록 확인 필요'
                           : progressLoading
                           ? '기록 불러오는 중'
+                          : group != null
+                          ? '완독 ${group.bookIds.where((id) => ref.read(libraryCompletionProvider).valueOrNull?[id] == true).length}/${group.bookIds.length}권'
                           : switch (status(book)) {
                               LibraryBookStatus.finished => '완독',
                               LibraryBookStatus.unread => '아직 읽지 않음',

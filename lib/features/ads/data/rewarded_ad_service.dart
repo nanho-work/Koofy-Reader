@@ -31,47 +31,48 @@ final rewardedAdServiceProvider = Provider<RewardedAdService>((ref) {
 });
 
 class RewardedAdService {
-  RewardedAdService({Future<void> Function()? onReward})
-    : _onReward = onReward ?? _noop;
+  RewardedAdService({
+    Future<void> Function()? onReward,
+    Future<bool> Function()? initialize,
+    LevelPlayRewardedAd Function()? createAd,
+  }) : _initialize = initialize ?? LevelPlayService.instance.initialize,
+       _createAd =
+           createAd ??
+           (() => LevelPlayRewardedAd(adUnitId: LevelPlayIds.rewarded)),
+       _callbacks = RewardCallbacks(onReward ?? _noop);
   static Future<void> _noop() async {}
-  final Future<void> Function() _onReward;
-  final List<RewardAttempt> _attempts = [];
+  final Future<bool> Function() _initialize;
+  final LevelPlayRewardedAd Function() _createAd;
+  final RewardCallbacks _callbacks;
+  LevelPlayRewardedAd? _ad;
   bool _showing = false;
   bool _disposed = false;
 
   Future<bool?> show() async {
     if (_showing || _disposed) return null;
     _showing = true;
-    _attempts.removeWhere((attempt) => attempt.isDisposed);
-    RewardAttempt? pending;
     try {
-      if (!await LevelPlayService.instance.initialize() || _disposed) {
-        return null;
-      }
-      final ad = LevelPlayRewardedAd(adUnitId: LevelPlayIds.rewarded);
-      final attempt = RewardAttempt(ad: ad, onReward: _onReward);
-      pending = attempt;
-      _attempts.add(attempt);
-      ad.setListener(attempt);
+      if (!await _initialize() || _disposed) return null;
+      final ad = _ad ??= _createAd()..setListener(_callbacks);
+      final attempt = _callbacks.begin();
       await ad.loadAd();
       if (!await attempt.loaded.future.timeout(
         const Duration(seconds: 30),
         onTimeout: () => false,
       )) {
-        await attempt.dispose();
-        _attempts.remove(attempt);
+        _callbacks.finish(attempt);
+        // Keep the shared listener/ad alive for delayed rewards from a previous
+        // impression. A load failure creates no additional native ad object.
         return null;
       }
       if (_disposed || !await ad.isAdReady()) {
-        await attempt.dispose();
+        _callbacks.finish(attempt);
         return null;
       }
       await ad.showAd();
-      // Closing settles the UI only. The attempt remains registered so that a
-      // reward arriving AFTER close still persists, even off the settings page.
       return await attempt.closed.future;
     } catch (error) {
-      if (pending != null) await pending.dispose();
+      _callbacks.cancelCurrent();
       debugPrint('LevelPlay reward unavailable: $error');
       return null;
     } finally {
@@ -81,89 +82,119 @@ class RewardedAdService {
 
   void dispose() {
     _disposed = true;
-    for (final attempt in _attempts) {
-      unawaited(attempt.dispose());
-    }
-    _attempts.clear();
+    _callbacks.dispose();
+    final ad = _ad;
+    _ad = null;
+    if (ad != null) unawaited(ad.dispose());
   }
 }
 
-/// One listener per ad object associates delayed/duplicate callbacks with the
-/// correct viewing; a later viewing cannot consume the earlier one's reward.
-class RewardAttempt implements LevelPlayRewardedAdListener {
-  RewardAttempt({required this.ad, required this.onReward});
-  final LevelPlayRewardedAd ad;
-  final Future<void> Function() onReward;
+class RewardAttempt {
   final loaded = Completer<bool>();
   final closed = Completer<bool>();
-  Future<void>? _grant;
+  String? auctionId;
+}
+
+/// One reusable native ad. Rewards belong to auction IDs, not the currently
+/// open dialog: the SDK may deliver a reward after close or during a later load.
+/// Only small deduplication IDs survive a completed impression; no per-view ad
+/// objects, listeners or completed futures accumulate.
+class RewardCallbacks implements LevelPlayRewardedAdListener {
+  RewardCallbacks(this.onReward);
+  final Future<void> Function() onReward;
+  final _rewarded = <String>{};
+  final _grants = <String, Future<void>>{};
+  Future<void> _rewardQueue = Future<void>.value();
+  RewardAttempt? _current;
   bool _disposed = false;
-  bool _isClosed = false;
-  bool get isDisposed => _disposed;
-  Future<void> dispose() async {
-    if (_disposed) return;
+
+  RewardAttempt begin() {
+    cancelCurrent();
+    return _current = RewardAttempt();
+  }
+
+  void finish(RewardAttempt attempt, [bool rewarded = false]) {
+    if (!attempt.loaded.isCompleted) attempt.loaded.complete(false);
+    if (!attempt.closed.isCompleted) attempt.closed.complete(rewarded);
+    if (identical(_current, attempt)) _current = null;
+  }
+
+  void cancelCurrent() {
+    final attempt = _current;
+    if (attempt != null) finish(attempt);
+  }
+
+  void dispose() {
     _disposed = true;
-    if (!loaded.isCompleted) loaded.complete(false);
-    if (!closed.isCompleted) closed.complete(false);
-    await ad.dispose();
+    cancelCurrent();
   }
 
   @override
   void onAdRewarded(LevelPlayReward reward, LevelPlayAdInfo adInfo) {
-    if (_disposed || _grant != null) return;
-    _grant = onReward();
-    unawaited(
-      _grant!
-          .then((_) async {
-            if (_isClosed) {
-              if (!closed.isCompleted) closed.complete(true);
-              await dispose();
-            }
-          })
-          .catchError((Object error) {
-            debugPrint('Reward persistence failed: $error');
-          }),
+    final id = adInfo.auctionId;
+    if (_disposed || id.isEmpty || !_rewarded.add(id)) return;
+    // Serialize persistence so two late callbacks cannot race the entitlement.
+    final grant = _rewardQueue.then((_) => onReward());
+    _grants[id] = grant;
+    _rewardQueue = grant.then(
+      (_) {
+        _grants.remove(id);
+      },
+      onError: (Object error, StackTrace stack) {
+        _grants.remove(id);
+        _rewarded.remove(id);
+        debugPrint('Reward persistence failed: $error');
+      },
     );
   }
 
   @override
   void onAdClosed(LevelPlayAdInfo adInfo) {
-    _isClosed = true;
-    final grant = _grant;
+    final attempt = _current;
+    if (attempt == null || attempt.auctionId != adInfo.auctionId) return;
+    final grant = _grants[adInfo.auctionId];
     if (grant == null) {
-      if (!closed.isCompleted) closed.complete(false);
+      finish(attempt, _rewarded.contains(adInfo.auctionId));
     } else {
       unawaited(
-        grant
-            .then((_) async {
-              if (!closed.isCompleted) closed.complete(true);
-              await dispose();
-            })
-            .catchError((Object error) {
-              if (!closed.isCompleted) closed.completeError(error);
-            }),
+        grant.then(
+          (_) => finish(attempt, true),
+          onError: (Object error, StackTrace stack) => finish(attempt),
+        ),
       );
     }
   }
 
   @override
   void onAdLoaded(LevelPlayAdInfo adInfo) {
-    if (!loaded.isCompleted) loaded.complete(true);
+    final attempt = _current;
+    if (attempt != null && !attempt.loaded.isCompleted) {
+      attempt.loaded.complete(true);
+    }
   }
 
   @override
   void onAdLoadFailed(LevelPlayAdError error) {
-    if (!loaded.isCompleted) loaded.complete(false);
+    final attempt = _current;
+    if (attempt != null && !attempt.loaded.isCompleted) {
+      attempt.loaded.complete(false);
+    }
   }
 
   @override
   void onAdDisplayFailed(LevelPlayAdError error, LevelPlayAdInfo adInfo) {
-    if (!closed.isCompleted) closed.complete(false);
-    unawaited(dispose());
+    final attempt = _current;
+    if (attempt != null &&
+        (attempt.auctionId == null || attempt.auctionId == adInfo.auctionId)) {
+      finish(attempt);
+    }
   }
 
   @override
-  void onAdDisplayed(LevelPlayAdInfo adInfo) {}
+  void onAdDisplayed(LevelPlayAdInfo adInfo) {
+    _current?.auctionId = adInfo.auctionId;
+  }
+
   @override
   void onAdClicked(LevelPlayAdInfo adInfo) {}
   @override

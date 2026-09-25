@@ -69,16 +69,17 @@ final class ReaderSettingsViewController: UITableViewController {
     }
 
     private func settingIndex(_ path: IndexPath) -> Int {
-        path.section == 2 ? path.row + 2 : path.section == 3 ? 5 : path.section
+        path.section == 2 ? path.row + 2 : path.section == 3 ? path.row + 6 : path.section == 4 ? 5 : path.section
     }
-    override func numberOfSections(in tableView: UITableView) -> Int { 4 }
+    override func numberOfSections(in tableView: UITableView) -> Int { 5 }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 3 ? fontIds.count : section == 2 ? 3 : 1
+        section == 4 ? fontIds.count : (section == 2 || section == 3) ? 3 : 1
     }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        ["글자 크기", "배경", "읽기 방식", "글꼴"][section]
+        ["글자 크기", "배경", "읽기 방식", "본문 간격", "글꼴"][section]
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
+        if section == 3 { return "기본은 책의 원래 설정입니다. 줄·문단 간격을 지정하면 출판사 문단 스타일 일부가 바뀔 수 있습니다. 두 페이지에서는 좌우 여백과 중앙 간격이 함께 조절됩니다." }
         guard section == 2 else { return nil }
         return preferences.scroll
             ? "연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다."
@@ -120,6 +121,26 @@ final class ReaderSettingsViewController: UITableViewController {
             plus.isEnabled = !busy && preferences.fontScale < 3
             let stack = UIStackView(arrangedSubviews: [minus, value, plus])
             stack.distribution = .fillEqually
+            control = stack
+        } else if setting >= 6 {
+            let labels = [["기본", "촘촘", "보통", "넉넉"], ["기본", "없음", "보통", "넓게"], ["기본", "좁게", "보통", "넓게"]]
+            let values: [[Double?]] = [[nil, 1.2, 1.5, 1.8], [nil, 0, 0.5, 1], [nil, 0.5, 1, 1.5]]
+            let selected = [preferences.lineHeight, preferences.paragraphSpacing, preferences.pageMargins][setting - 6]
+            let segment = UISegmentedControl(items: labels[setting - 6])
+            segment.tag = setting + 1
+            segment.selectedSegmentIndex = values[setting - 6].firstIndex(of: selected) ?? UISegmentedControl.noSegment
+            segment.selectedSegmentTintColor = palette.background
+            segment.setTitleTextAttributes([.foregroundColor: palette.foreground], for: .normal)
+            segment.isEnabled = !busy
+            segment.addTarget(self, action: #selector(selected(_:)), for: .valueChanged)
+            let label = UILabel()
+            label.text = ["줄간격", "문단 간격", "페이지 여백"][setting - 6]
+            label.textColor = palette.foreground
+            label.font = .preferredFont(forTextStyle: .subheadline)
+            label.adjustsFontForContentSizeCategory = true
+            segment.accessibilityLabel = label.text
+            let stack = UIStackView(arrangedSubviews: [label, segment])
+            stack.axis = .vertical; stack.spacing = 8
             control = stack
         } else {
             let labels = [["밝게", "종이색", "어둡게"], ["페이지 넘김", "연속 스크롤"], ["자동", "한 페이지", "두 페이지"], ["바로 넘기기", "책장 넘기기"]]
@@ -170,6 +191,9 @@ final class ReaderSettingsViewController: UITableViewController {
         guard !(preferences.scroll && (control.tag == 4 || control.tag == 5)) else { return }
         update {
             switch control.tag {
+            case 7: $0.lineHeight = [nil, 1.2, 1.5, 1.8][control.selectedSegmentIndex]
+            case 8: $0.paragraphSpacing = [nil, 0, 0.5, 1][control.selectedSegmentIndex]
+            case 9: $0.pageMargins = [nil, 0.5, 1, 1.5][control.selectedSegmentIndex]
             case 2: $0.theme = ["light", "sepia", "dark"][control.selectedSegmentIndex]
             case 3: $0.scroll = control.selectedSegmentIndex == 1
             case 5: $0.pageTurnStyle = control.selectedSegmentIndex == 1 ? "curl" : "instant"

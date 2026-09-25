@@ -54,6 +54,86 @@ void main() {
     await gateway.controller.close();
   });
 
+  ReaderEvent issue(String book) => ReaderEvent(
+    protocolVersion: 1,
+    sessionId: 'broken-file',
+    sessionGeneration: 0,
+    publicationId: book,
+    contentRevision: '',
+    sequence: 0,
+    kind: 'recoveryIssue',
+    message: 'damaged',
+  );
+
+  test(
+    'damaged journal for another book does not prevent healthy recovery and opening',
+    () async {
+      final session = await store.beginSession('book', 'r1');
+      gateway.pending.addAll([
+        issue('damaged'),
+        checkpoint(session, href: 'healthy.xhtml'),
+      ]);
+      await coordinator.open(
+        publicationId: 'book',
+        contentRevision: 'r1',
+        filePath: '/book.epub',
+        title: 'book',
+      );
+      expect(gateway.request!.initialLocatorJson, contains('healthy.xhtml'));
+      expect(gateway.acknowledged, ['${session.id}:1']);
+    },
+  );
+  test(
+    'unknown session for another book remains unacknowledged but does not block opening',
+    () async {
+      gateway.pending.add(
+        checkpoint(const ReaderSessionIdentity(id: 'missing', generation: 99))
+          ..publicationId = 'other',
+      );
+      await coordinator.open(
+        publicationId: 'book',
+        contentRevision: 'r1',
+        filePath: '/book.epub',
+        title: 'book',
+      );
+      expect(gateway.request, isNotNull);
+      expect(gateway.acknowledged, isEmpty);
+    },
+  );
+  test(
+    'own and unknown damaged records block safely after recovering healthy books',
+    () async {
+      final session = await store.beginSession('book', 'r1');
+      gateway.pending.addAll([
+        issue(''),
+        checkpoint(session, href: 'healthy.xhtml'),
+      ]);
+      await expectLater(
+        coordinator.open(
+          publicationId: 'book',
+          contentRevision: 'r1',
+          filePath: '/book.epub',
+          title: 'book',
+        ),
+        throwsStateError,
+      );
+      expect(gateway.request, isNull);
+      expect(gateway.acknowledged, ['${session.id}:1']);
+      gateway.pending.clear();
+      gateway.pending.add(issue('book'));
+      await expectLater(
+        coordinator.open(
+          publicationId: 'book',
+          contentRevision: 'r1',
+          filePath: '/book.epub',
+          title: 'book',
+        ),
+        throwsStateError,
+      );
+      await expectLater(coordinator.recoverCheckpoints(), throwsStateError);
+    },
+  );
+
   test(
     'backup recovers pending native checkpoints without opening a book',
     () async {

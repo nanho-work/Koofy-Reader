@@ -21,6 +21,11 @@ class MemoryBackupStorage implements LocalStorage {
   final ints = <String, int>{};
   String? failOnce;
   @override
+  Future<void> remove(String key) async {
+    strings.remove(key);
+  }
+
+  @override
   Future<String?> getString(String key) async => strings[key];
   @override
   Future<void> setString(String key, String value) async {
@@ -51,7 +56,11 @@ class BackupFixture {
       storage,
       directory: () async => Directory('${root.path}/book_covers'),
     );
-    books = LocalBookRepository(storage, covers: covers);
+    books = LocalBookRepository(
+      storage,
+      covers: covers,
+      sourceDirectory: () async => Directory('${root.path}/library_sources'),
+    );
     groups = BookGroupRepository(storage);
     preparer = ReadingPublicationPreparer(
       storageDirectory: Directory('${root.path}/publications'),
@@ -119,7 +128,10 @@ void main() {
         locatorJson: '{"href":"chapter.xhtml","locations":{"progression":0.5}}',
         preferences: defaultReaderPreferences()
           ..theme = 'sepia'
-          ..fontScale = 1.4,
+          ..fontScale = 1.4
+          ..lineHeight = 1.5
+          ..paragraphSpacing = 0.5
+          ..pageMargins = 1.5,
       ),
     );
     await source.groups.create('소설 묶음', [b.id, a.id]);
@@ -175,6 +187,9 @@ void main() {
       expect(position.bookmarksJson, contains('다시 읽을 문장'));
       expect(position.preferences.theme, 'sepia');
       expect(position.preferences.fontScale, 1.4);
+      expect(position.preferences.lineHeight, 1.5);
+      expect(position.preferences.paragraphSpacing, 0.5);
+      expect(position.preferences.pageMargins, 1.5);
       final group = (await target.groups.load()).single;
       expect(group.bookIds, (await source.groups.load()).single.bookIds);
       expect(group.showMemberCovers, isTrue);

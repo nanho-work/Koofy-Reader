@@ -26,7 +26,14 @@ class LegacyReaderArchive {
   Future<Map<String, String>> backup() async {
     final existing = await storage.getString(backupKey);
     if (existing != null) {
-      return (jsonDecode(existing) as Map).cast<String, String>();
+      try {
+        return Map<String, String>.from(jsonDecode(existing) as Map);
+      } catch (_) {
+        // Keep the exact damaged snapshot, then rebuild from untouched legacy
+        // keys. A failed quarantine write stops migration rather than losing it.
+        final digest = sha256.convert(utf8.encode(existing));
+        await storage.setString('${backupKey}_corrupt_$digest', existing);
+      }
     }
     final entries = <String, String>{};
     for (final prefix in [

@@ -18,6 +18,9 @@ class ReaderPreferences {
     required this.theme,
     this.pageTurnStyle,
     this.fontId,
+    this.lineHeight,
+    this.paragraphSpacing,
+    this.pageMargins,
   });
   double fontScale;
   int columnCount;
@@ -29,6 +32,11 @@ class ReaderPreferences {
 
   /// Null or 'default' preserves the publication's original font selection.
   String? fontId;
+
+  /// Null preserves publisher defaults. Units: line multiple, rem, margin scale.
+  double? lineHeight;
+  double? paragraphSpacing;
+  double? pageMargins;
 }
 
 class ReaderLaunchRequest {

@@ -156,7 +156,10 @@ void main() {
       author: '김작가',
       category: '역사',
     );
-    final catalog = FakeReaderCatalog([item]);
+    final catalog = FakeReaderCatalog([
+      item,
+      catalogFixture(2, title: '다른 소설', category: '소설'),
+    ]);
     await pumpCatalog(tester, catalog);
     expect(find.text('김작가 · 역사'), findsOneWidget);
     expect(find.byType(Card), findsNothing);
@@ -168,9 +171,14 @@ void main() {
     expect(catalog.installed, isEmpty);
     await tester.tap(find.byTooltip('닫기'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, '역사'));
+    final category = find.widgetWithText(ChoiceChip, '역사');
+    await tester.ensureVisible(category);
     await tester.pumpAndSettle();
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(category).selected, isTrue);
     expect(find.text('새로운 역사책'), findsOneWidget);
+    expect(find.text('다른 소설'), findsNothing);
   });
 
   testWidgets('fonts use compact name and icon rows with details on name tap', (

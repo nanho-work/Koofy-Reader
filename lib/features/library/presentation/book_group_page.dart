@@ -65,7 +65,10 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
     final books = ref.watch(booksProvider).valueOrNull ?? [];
     final reading = ref.watch(libraryReadingStateProvider);
     final states = reading.valueOrNull ?? {};
-    final completion = ref.watch(libraryCompletionProvider).valueOrNull ?? {};
+    final completionAsync = ref.watch(libraryCompletionProvider);
+    final completion = completionAsync.valueOrNull ?? {};
+    final progressLoading = reading.isLoading || completionAsync.isLoading;
+    final progressError = reading.hasError || completionAsync.hasError;
     final matches =
         groups.valueOrNull?.where((g) => g.id == widget.groupId).toList() ?? [];
     final group = matches.isEmpty ? null : matches.first;
@@ -93,10 +96,20 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                   states[a.id]?.lastReadAt?.millisecondsSinceEpoch ?? 0,
                 ),
           );
+    final finishedCount = members
+        .where((b) => status(b) == LibraryBookStatus.finished)
+        .length;
+    final activeIndex = recent.isEmpty
+        ? null
+        : members.indexOf(recent.first) + 1;
+    final unread = members
+        .where((b) => status(b) == LibraryBookStatus.unread)
+        .toList();
     final canOpen =
         reading.hasValue &&
         !reading.hasError &&
-        !reading.isLoading &&
+        !progressLoading &&
+        !progressError &&
         !_opening;
     return Theme(
       data: KoofyTheme.forBrightness(MediaQuery.platformBrightnessOf(context)),
@@ -159,10 +172,34 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
-                                '${members.length}권의 책\n순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.',
+                                progressLoading
+                                    ? '읽기 기록 불러오는 중'
+                                    : progressError
+                                    ? '읽기 기록 확인 필요'
+                                    : '총 ${members.length}권 · 완독 $finishedCount권\n${activeIndex != null
+                                          ? '$activeIndex권을 읽는 중'
+                                          : members.isNotEmpty && finishedCount == members.length
+                                          ? '모든 권을 완독했어요'
+                                          : finishedCount > 0 && unread.isNotEmpty
+                                          ? '${members.indexOf(unread.first) + 1}권부터 이어 읽어보세요'
+                                          : '아직 읽기 전이에요'}',
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (!progressLoading &&
+                            !progressError &&
+                            members.isNotEmpty)
+                          Semantics(
+                            label: '총 ${members.length}권 중 $finishedCount권 완독',
+                            child: LinearProgressIndicator(
+                              value: finishedCount / members.length,
+                            ),
+                          ),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: Text('순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.'),
                         ),
                         const SizedBox(height: 16),
                         SwitchListTile(
@@ -209,16 +246,30 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             icon: const Icon(Icons.menu_book_outlined),
                             label: Text('${recent.first.title} · 이어 읽기'),
                           ),
+                        if (recent.isEmpty && unread.isNotEmpty)
+                          FilledButton.icon(
+                            key: const ValueKey('group-start'),
+                            onPressed: canOpen
+                                ? () => _open(
+                                    unread.first,
+                                    states[unread.first.id],
+                                  )
+                                : null,
+                            icon: const Icon(Icons.menu_book_outlined),
+                            label: Text('${unread.first.title} · 읽기 시작'),
+                          ),
                         OutlinedButton.icon(
                           onPressed: () => widget.onAdd(group),
                           icon: const Icon(Icons.add),
                           label: const Text('묶음에 책 추가'),
                         ),
-                        if (reading.isLoading) const LinearProgressIndicator(),
-                        if (reading.hasError)
+                        if (progressLoading) const LinearProgressIndicator(),
+                        if (progressError)
                           TextButton(
-                            onPressed: () =>
-                                ref.invalidate(libraryReadingStateProvider),
+                            onPressed: () {
+                              ref.invalidate(libraryReadingStateProvider);
+                              ref.invalidate(libraryCompletionProvider);
+                            },
                             child: const Text('읽기 기록 다시 불러오기'),
                           ),
                         if (members.isEmpty)
@@ -272,15 +323,15 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                               ),
                         title: Text('${index + 1}. ${book.title}'),
                         subtitle: Text(
-                          reading.hasError
+                          progressError
                               ? '읽기 기록 확인 필요'
-                              : reading.isLoading
+                              : progressLoading
                               ? '기록 불러오는 중'
                               : switch (status(book)) {
                                   LibraryBookStatus.finished => '완독',
                                   LibraryBookStatus.unread => '아직 읽지 않음',
                                   LibraryBookStatus.reading =>
-                                    state?.progressLabel ?? '읽는 중',
+                                    '읽는 중 · ${state?.progressLabel ?? '위치 저장됨'}',
                                 },
                         ),
                         onTap: canOpen ? () => _open(book, state) : null,

@@ -16,6 +16,8 @@ final class ReaderCheckpointStore {
 
     func write(_ event: ReaderEvent) throws {
         let url = fileURL(event.sessionId)
+        let identity = try JSONSerialization.data(withJSONObject: ["publicationId": event.publicationId])
+        try identity.write(to: url.appendingPathExtension("identity"), options: .atomic)
         let bytes = try JSONEncoder().encode(Checkpoint(event))
         if let previous = try? Data(contentsOf: url),
            (try? JSONDecoder().decode(Checkpoint.self, from: previous)) != nil {
@@ -33,7 +35,21 @@ final class ReaderCheckpointStore {
         )
         let roots = Set(paths.filter { $0.pathExtension == "json" || $0.pathExtension == "previous" }
             .map { $0.pathExtension == "previous" ? $0.deletingPathExtension() : $0 })
-        return try roots.compactMap { try read($0)?.event }.sorted {
+        return roots.compactMap { url -> ReaderEvent? in
+            do { return try read(url)?.event }
+            catch {
+                let publication = [url.appendingPathExtension("identity"), url].compactMap { candidate -> String? in
+                    guard let data = try? Data(contentsOf: candidate),
+                          let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                          let id = json["publicationId"] as? String, !id.isEmpty else { return nil }
+                    return id
+                }.first ?? ""
+                return ReaderEvent(protocolVersion: 1, sessionId: url.lastPathComponent,
+                    sessionGeneration: 0, publicationId: publication, contentRevision: "",
+                    sequence: 0, kind: "recoveryIssue", errorCode: "checkpoint_corrupt",
+                    message: "읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다.")
+            }
+        }.sorted {
             ($0.sessionGeneration, $0.sequence) < ($1.sessionGeneration, $1.sequence)
         }
     }
@@ -50,6 +66,10 @@ final class ReaderCheckpointStore {
         }
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
+        }
+        let identity = url.appendingPathExtension("identity")
+        if FileManager.default.fileExists(atPath: identity.path) {
+            try FileManager.default.removeItem(at: identity)
         }
     }
 
@@ -93,6 +113,9 @@ private struct Checkpoint: Codable {
     let theme: String?
     let pageTurnStyle: String?
     let fontId: String?
+    let lineHeight: Double?
+    let paragraphSpacing: Double?
+    let pageMargins: Double?
     let errorCode: String?
     let message: String?
 
@@ -112,6 +135,9 @@ private struct Checkpoint: Codable {
         theme = event.preferences?.theme
         pageTurnStyle = event.preferences?.pageTurnStyle
         fontId = event.preferences?.fontId
+        lineHeight = event.preferences?.lineHeight
+        paragraphSpacing = event.preferences?.paragraphSpacing
+        pageMargins = event.preferences?.pageMargins
         errorCode = event.errorCode
         message = event.message
     }
@@ -120,7 +146,8 @@ private struct Checkpoint: Codable {
         var preferences: ReaderPreferences?
         if let fontScale, let columnCount, let scroll, let theme {
             preferences = ReaderPreferences(fontScale: fontScale, columnCount: columnCount, scroll: scroll,
-                theme: theme, pageTurnStyle: pageTurnStyle, fontId: fontId)
+                theme: theme, pageTurnStyle: pageTurnStyle, fontId: fontId,
+                lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, pageMargins: pageMargins)
         }
         return ReaderEvent(protocolVersion: protocolVersion, sessionId: sessionId,
             sessionGeneration: sessionGeneration, publicationId: publicationId,

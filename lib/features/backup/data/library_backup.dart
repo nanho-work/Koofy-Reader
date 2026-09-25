@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:koofy_reader/core/storage/library_mutations.dart';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -49,92 +50,98 @@ class LibraryBackupService {
     return raw == null || raw.trim().isEmpty ? [] : jsonDecode(raw) as List;
   }
 
-  Future<Uint8List> export({void Function(String)? progress}) async {
-    final allBooks = await books.getBooks();
-    final allGroups = await groups.load();
-    final payload = <String, Uint8List>{};
-    final hashes = <String, String>{};
-    var total = 0;
-    String add(Uint8List bytes, String extension) {
-      total += bytes.length;
-      if (total > maxBytes) {
-        throw const FormatException('한 번에 백업할 수 있는 용량은 100MB입니다.');
-      }
-      if (payload.length >= 4000) {
-        throw const FormatException('백업 파일 항목이 너무 많습니다.');
-      }
-      final name = 'payload/${payload.length}.$extension';
-      payload[name] = bytes;
-      hashes[name] = sha256.convert(bytes).toString();
-      return name;
-    }
-
-    final records = <Map<String, dynamic>>[];
-    final coverEntries = <String, String>{};
-    for (final book in allBooks) {
-      progress?.call('${records.length + 1}/${allBooks.length}권 백업 준비 중');
-      final json = book.toJson()
-        ..remove('localPath')
-        ..remove('coverPath');
-      if (book.isLocalFile) {
-        try {
-          final source = await preparer.backupSource(book);
-          json['source'] = add(source.bytes, source.extension);
-        } catch (error) {
-          throw FormatException(
-            '“${book.title}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ($error)',
-          );
+  Future<Uint8List> export({void Function(String)? progress}) =>
+      LibraryMutations.run(() async {
+        final allBooks = await books.getBooks();
+        final allGroups = await groups.load();
+        final payload = <String, Uint8List>{};
+        final hashes = <String, String>{};
+        var total = 0;
+        String add(Uint8List bytes, String extension) {
+          total += bytes.length;
+          if (total > maxBytes) {
+            throw const FormatException('한 번에 백업할 수 있는 용량은 100MB입니다.');
+          }
+          if (payload.length >= 4000) {
+            throw const FormatException('백업 파일 항목이 너무 많습니다.');
+          }
+          final name = 'payload/${payload.length}.$extension';
+          payload[name] = bytes;
+          hashes[name] = sha256.convert(bytes).toString();
+          return name;
         }
-      }
-      records.add(json);
-    }
-    final groupBooks = await covers.apply(
-      allGroups.map((g) => g.displayBook).toList(),
-    );
-    for (final book in [...allBooks, ...groupBooks]) {
-      final path = book.coverPath;
-      if (path == null) continue;
-      final file = File(path);
-      if (!await file.exists()) {
-        continue; // A missing cover is already rendered as a title cover.
-      }
-      if (await file.length() > BookCoverStore.maxBytes) {
-        throw const FormatException('표지 이미지가 너무 큽니다.');
-      }
-      coverEntries[book.id] = add(await file.readAsBytes(), 'png');
-    }
-    final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
-    final manifest = <String, dynamic>{
-      'format': 'koofy-reader-backup',
-      'version': 1,
-      'createdAt': DateTime.now().toUtc().toIso8601String(),
-      'books': records,
-      'groups': allGroups.map((g) => g.toJson()).toList(),
-      'covers': coverEntries,
-      'files': hashes,
-      'reader': await reader.exportBackup(ids),
-      'completion': await LibraryCompletionRepository(storage).load(),
-      'hidden': await _hiddenBooks(),
-    };
-    final encoded = utf8.encode(jsonEncode(manifest));
-    if (encoded.length > 5 * 1024 * 1024 || total + encoded.length > maxBytes) {
-      throw const FormatException('백업 정보가 100MB 제한을 초과했습니다.');
-    }
-    return Isolate.run(() {
-      final archive = Archive()
-        ..addFile(ArchiveFile('manifest.json', encoded.length, encoded));
-      for (final entry in payload.entries) {
-        archive.addFile(
-          ArchiveFile(entry.key, entry.value.length, entry.value),
+
+        final records = <Map<String, dynamic>>[];
+        final coverEntries = <String, String>{};
+        for (final book in allBooks) {
+          progress?.call('${records.length + 1}/${allBooks.length}권 백업 준비 중');
+          final json = book.toJson()
+            ..remove('localPath')
+            ..remove('importSourcePath')
+            ..remove('coverPath');
+          if (book.isLocalFile) {
+            try {
+              final source = await preparer.backupSource(book);
+              json['source'] = add(source.bytes, source.extension);
+            } catch (error) {
+              throw FormatException(
+                '“${book.title}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ($error)',
+              );
+            }
+          }
+          records.add(json);
+        }
+        final groupBooks = await covers.apply(
+          allGroups.map((g) => g.displayBook).toList(),
         );
-      }
-      final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
-      if (bytes.length > maxBytes) {
-        throw const FormatException('백업 파일이 100MB를 초과합니다.');
-      }
-      return bytes;
-    });
-  }
+        for (final book in [...allBooks, ...groupBooks]) {
+          final path = book.coverPath;
+          if (path == null) continue;
+          final file = File(path);
+          if (!await file.exists()) {
+            continue; // A missing cover is already rendered as a title cover.
+          }
+          if (await file.length() > BookCoverStore.maxBytes) {
+            throw const FormatException('표지 이미지가 너무 큽니다.');
+          }
+          coverEntries[book.id] = add(await file.readAsBytes(), 'png');
+        }
+        final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
+        final manifest = <String, dynamic>{
+          'format': 'koofy-reader-backup',
+          'version': 1,
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'books': records,
+          'groups': allGroups.map((g) => g.toJson()).toList(),
+          'covers': coverEntries,
+          'files': hashes,
+          'reader': await reader.exportBackup(ids),
+          'completion': await LibraryCompletionRepository(storage).load(),
+          'hidden': await _hiddenBooks(),
+        };
+        final encoded = utf8.encode(jsonEncode(manifest));
+        if (encoded.length > 5 * 1024 * 1024 ||
+            total + encoded.length > maxBytes) {
+          throw const FormatException('백업 정보가 100MB 제한을 초과했습니다.');
+        }
+        return _encodeArchive(encoded, payload);
+      });
+
+  static Future<Uint8List> _encodeArchive(
+    List<int> encoded,
+    Map<String, Uint8List> payload,
+  ) => Isolate.run(() {
+    final archive = Archive()
+      ..addFile(ArchiveFile('manifest.json', encoded.length, encoded));
+    for (final entry in payload.entries) {
+      archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
+    }
+    final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+    if (bytes.length > maxBytes) {
+      throw const FormatException('백업 파일이 100MB를 초과합니다.');
+    }
+    return bytes;
+  });
 
   static Future<LibraryBackup> read(File file) async {
     if (await file.length() > maxBytes) {
@@ -274,7 +281,7 @@ class LibraryBackupService {
     return LibraryBackup(manifest, files);
   }
 
-  Future<int> restore(LibraryBackup backup) async {
+  Future<int> restore(LibraryBackup backup) => LibraryMutations.run(() async {
     final manifest = backup.manifest;
     final current = await books.getBooks();
     final currentIds = current.map((b) => b.id).toSet();
@@ -298,6 +305,7 @@ class LibraryBackupService {
         await file.writeAsBytes(backup.files[source]!, flush: true);
         json['localPath'] = file.path;
         json.remove('coverPath');
+        json.remove('importSourcePath');
         json.remove('source');
         local.add(json);
         restored.add(id);
@@ -335,7 +343,7 @@ class LibraryBackupService {
           continue;
         }
         final bytes = backup.files[entry.value]!;
-        final name = '${md5.convert(bytes)}.png';
+        final name = '${md5.convert(utf8.encode('${stage.path}:$id'))}.png';
         await File('${coverDir.path}/$name').writeAsBytes(bytes, flush: true);
         pending[key] = name;
       }
@@ -368,7 +376,12 @@ class LibraryBackupService {
         );
       } catch (_) {
         for (final key in written.reversed) {
-          await storage.setString(key, previous[key] ?? '');
+          final value = previous[key];
+          if (value == null) {
+            await storage.remove(key);
+          } else {
+            await storage.setString(key, value);
+          }
         }
         rethrow;
       }
@@ -378,5 +391,5 @@ class LibraryBackupService {
       // may fail. Never delete a file that a partially committed index references.
       rethrow;
     }
-  }
+  });
 }

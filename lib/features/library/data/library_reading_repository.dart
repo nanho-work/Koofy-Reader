@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:koofy_reader/core/storage/library_mutations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/domain/library_reading_state.dart';
@@ -58,5 +59,7 @@ class LibraryCompletionRepository {
   };
 
   Future<void> setFinished(String bookId, bool finished) =>
-      storage.setString('$prefix$bookId', '$finished');
+      LibraryMutations.run(
+        () => storage.setString('$prefix$bookId', '$finished'),
+      );
 }

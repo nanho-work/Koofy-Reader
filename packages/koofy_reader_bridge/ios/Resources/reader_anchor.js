@@ -26,6 +26,15 @@
     return parts.join(' > ');
   };
   const charEnd = (text, offset) => offset + (text.codePointAt(offset) > 0xffff ? 2 : 1);
+  // Readium reports the start of the viewport, so a final page need not be 100%.
+  // Inspect the visible viewport instead; the host also checks the final spine item.
+  const resourceEnd = () => {
+    const root = document.scrollingElement || document.documentElement;
+    if (!root || width <= 0 || height <= 0) return false;
+    return root.scrollWidth > width + 2
+      ? Math.abs(window.scrollX) + width >= root.scrollWidth - 2
+      : window.scrollY + height >= root.scrollHeight - 2;
+  };
   let anchorVisible = null;
   try {
     const point = anchor && anchor.locations && anchor.locations.koofyText;
@@ -89,7 +98,7 @@
     if (offset >= node.length || !visible(range(node, offset, charEnd(node.data, offset)))) continue;
     const css = selector(node.parentElement);
     const end = charEnd(node.data, offset);
-    return JSON.stringify({anchorVisible, locations: {
+    return JSON.stringify({anchorVisible, resourceEnd: resourceEnd(), locations: {
       cssSelector: css,
       koofyText: {cssSelector: css, textNodeIndex: Array.prototype.indexOf.call(node.parentNode.childNodes, node), charOffset: offset}
     }, text: {
@@ -98,5 +107,5 @@
       after: node.data.slice(end, end + 48)
     }});
   }
-  return JSON.stringify({anchorVisible});
+  return JSON.stringify({anchorVisible, resourceEnd: resourceEnd()});
 })(__KOOFY_ANCHOR__)

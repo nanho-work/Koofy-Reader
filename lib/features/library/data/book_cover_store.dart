@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:koofy_reader/core/storage/library_mutations.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -39,7 +40,10 @@ class BookCoverStore {
     }).toList();
   }
 
-  Future<void> setImage(String bookId, String sourcePath) async {
+  Future<void> setImage(
+    String bookId,
+    String sourcePath,
+  ) => LibraryMutations.run(() async {
     final source = File(sourcePath);
     final size = await source.length();
     if (size == 0 || size > maxBytes) {
@@ -91,18 +95,20 @@ class BookCoverStore {
       rethrow;
     }
     await _deleteOwnedFile(directory, previous);
-  }
+  });
 
-  Future<void> reset(String bookId) async {
+  Future<void> reset(String bookId) => LibraryMutations.run(() async {
     final previous = await _storage.getString(_key(bookId));
     await _storage.setString(_key(bookId), '');
     if (previous != null && _fileName.hasMatch(previous)) {
       await _deleteOwnedFile(await _directory(), previous);
     }
-  }
+  });
 
   Future<void> _deleteOwnedFile(Directory directory, String? name) async {
     if (name == null || !_fileName.hasMatch(name)) return;
+    final references = await _storage.getStringEntriesByPrefix(_prefix);
+    if (references.values.contains(name)) return;
     try {
       await File('${directory.path}/$name').delete();
     } on FileSystemException {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:koofy_reader/core/storage/library_mutations.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
@@ -47,13 +48,8 @@ class BookGroupRepository {
   BookGroupRepository(this.storage);
   final LocalStorage storage;
   static const storageKey = 'library_book_groups_v1';
-  Future<void> _pending = Future.value();
-
-  Future<T> _serial<T>(Future<T> Function() operation) {
-    final result = _pending.then((_) => operation());
-    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
-    return result;
-  }
+  Future<T> _serial<T>(Future<T> Function() operation) =>
+      LibraryMutations.run(operation);
 
   List<BookGroup> _decode(String? raw) {
     if (raw == null || raw.isEmpty) return [];
@@ -75,8 +71,9 @@ class BookGroupRepository {
     return groups;
   }
 
-  Future<List<BookGroup>> load() async =>
-      _decode(await storage.getString(storageKey));
+  Future<List<BookGroup>> load() => LibraryMutations.run(
+    () async => _decode(await storage.getString(storageKey)),
+  );
 
   Future<GroupChange> _change(
     void Function(List<BookGroup>) edit, {

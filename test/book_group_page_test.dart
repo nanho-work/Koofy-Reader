@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
+import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/presentation/book_group_page.dart';
 import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dart';
@@ -243,6 +244,76 @@ void main() {
     expect((await repository.load()).single.bookIds.last, 'b0');
     expect(tester.takeException(), isNull);
   });
+  testWidgets(
+    'summary counts explicit completion and resumes unfinished member',
+    (tester) async {
+      await tester.runAsync(() async {
+        await create();
+        await LibraryCompletionRepository(
+          SharedPrefsLocalStorage(),
+        ).setFinished('b0', true);
+      });
+      await shelf_test.pumpLibrary(
+        tester,
+        books: shelf_test.demoBooks.take(3).toList(),
+        realCompletion: true,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is BookTile && widget.statusLabel == '완독 1/3권',
+        ),
+        findsOneWidget,
+      );
+      await openGroup(tester);
+      expect(find.text('총 3권 · 완독 1권\n2권을 읽는 중'), findsOneWidget);
+      expect(find.text('작은 생활 · 이어 읽기'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('fully completed group does not invent a new resume target', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await create();
+      for (final id in ['b0', 'b1', 'b2']) {
+        await LibraryCompletionRepository(
+          SharedPrefsLocalStorage(),
+        ).setFinished(id, true);
+      }
+    });
+    await shelf_test.pumpLibrary(
+      tester,
+      books: shelf_test.demoBooks.take(3).toList(),
+      realCompletion: true,
+    );
+    await tester.pumpAndSettle();
+    await openGroup(tester);
+    expect(find.text('총 3권 · 완독 3권\n모든 권을 완독했어요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('group-continue')), findsNothing);
+    expect(find.byKey(const ValueKey('group-start')), findsNothing);
+  });
+
+  testWidgets('unread group starts the first member in saved order', (
+    tester,
+  ) async {
+    await tester.runAsync(create);
+    final routes = <RouteSettings>[];
+    await shelf_test.pumpLibrary(
+      tester,
+      books: shelf_test.demoBooks.take(3).toList(),
+      states: () async => {},
+      routes: routes,
+    );
+    await tester.pumpAndSettle();
+    await openGroup(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('group-start')));
+    await tester.tap(find.byKey(const ValueKey('group-start')));
+    await tester.pumpAndSettle();
+    expect((routes.last.arguments as Book).id, 'b0');
+  });
+
   for (final size in [const Size(320, 700), const Size(840, 900)]) {
     testWidgets('group detail fits $size with large text', (tester) async {
       await tester.runAsync(create);

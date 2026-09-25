@@ -6,9 +6,10 @@ import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:koofy_reader/features/native_reader/data/reading_publication_preparer.dart';
 
 class FailingBookRepository extends LocalBookRepository {
-  FailingBookRepository(super.storage);
+  FailingBookRepository(super.storage, {super.sourceDirectory});
   @override
   Future<Book?> importBookFile(String path) {
     if (path.endsWith('broken.txt')) {
@@ -20,13 +21,51 @@ class FailingBookRepository extends LocalBookRepository {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('unsafe and oversized EPUBs cannot enter the library', () async {
+    SharedPreferences.setMockInitialValues({});
+    final directory = await Directory.systemTemp.createTemp(
+      'koofy-import-validation-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = LocalBookRepository(
+      SharedPrefsLocalStorage(),
+      sourceDirectory: () async => Directory('${directory.path}/owned'),
+    );
+    final unsafe = await File(
+      'docs/audits/2026-09-25/remote-resource-fixture.epub',
+    ).copy('${directory.path}/unsafe.epub');
+    await expectLater(
+      repository.importBookFile(unsafe.path),
+      throwsA(
+        isA<ReadingPublicationPreparationException>().having(
+          (e) => e.code,
+          'code',
+          'active_content',
+        ),
+      ),
+    );
+    final huge = File('${directory.path}/huge.epub');
+    final handle = await huge.open(mode: FileMode.write);
+    await handle.truncate(40 * 1024 * 1024 + 1);
+    await handle.close();
+    await expectLater(
+      repository.importBookFile(huge.path),
+      throwsFormatException,
+    );
+    expect((await repository.getBooks()).where((b) => b.isLocalFile), isEmpty);
+    expect(await Directory('${directory.path}/owned').exists(), false);
+  });
+
   test(
     'batch keeps all ten books, skips duplicates and continues after failures',
     () async {
       SharedPreferences.setMockInitialValues({});
       final directory = await Directory.systemTemp.createTemp('koofy-batch-');
       addTearDown(() => directory.delete(recursive: true));
-      final repository = FailingBookRepository(SharedPrefsLocalStorage());
+      final repository = FailingBookRepository(
+        SharedPrefsLocalStorage(),
+        sourceDirectory: () async => Directory('${directory.path}/owned'),
+      );
       final files = <BookImportFile>[];
       for (var i = 1; i <= 10; i++) {
         final name = '$i화.txt';

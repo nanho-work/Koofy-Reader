@@ -7,6 +7,11 @@ class MemoryPrivacyStorage implements LocalStorage {
   final data = <String, String>{};
   bool fail = false;
   @override
+  Future<void> remove(String key) async {
+    data.remove(key);
+  }
+
+  @override
   Future<String?> getString(String key) async => data[key];
   @override
   Future<void> setString(String key, String value) async {

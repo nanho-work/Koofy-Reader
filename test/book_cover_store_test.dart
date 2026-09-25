@@ -33,6 +33,7 @@ void main() {
     storage = SharedPrefsLocalStorage();
     repository = LocalBookRepository(
       storage,
+      sourceDirectory: () async => Directory('${temporary.path}/owned'),
       covers: BookCoverStore(storage, directory: () async => coversDirectory),
     );
     final recorder = ui.PictureRecorder();
@@ -95,7 +96,11 @@ void main() {
       final restored = (await restarted.getBooks()).firstWhere(
         (b) => b.id == book.id,
       );
-      expect(restored.localPath, text.path);
+      expect(restored.localPath, isNot(text.path));
+      expect(
+        await File(restored.localPath!).readAsString(),
+        await text.readAsString(),
+      );
       expect(restored.title, book.title);
       expect(restored.coverPath, startsWith(coversDirectory.path));
       final codec = await ui.instantiateImageCodec(

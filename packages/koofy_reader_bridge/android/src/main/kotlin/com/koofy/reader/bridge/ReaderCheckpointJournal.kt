@@ -21,6 +21,17 @@ internal class ReaderCheckpointJournal(filesDir: File) {
             "Only reader state snapshots belong in the recovery journal"
         }
         val target = file(event.sessionId)
+        // Independent identity lets a damaged snapshot block only its own book.
+        val identity = AtomicFile(File(target.baseFile.path + ".identity"))
+        val identityOutput = identity.startWrite()
+        try {
+            identityOutput.write(JSONObject().put("publicationId", event.publicationId)
+                .toString().toByteArray(Charsets.UTF_8))
+            identity.finishWrite(identityOutput)
+        } catch (error: Exception) {
+            identity.failWrite(identityOutput)
+            throw error
+        }
         val output = target.startWrite()
         try {
             output.write(encode(event).toString().toByteArray(Charsets.UTF_8))
@@ -36,7 +47,20 @@ internal class ReaderCheckpointJournal(filesDir: File) {
         return directory.listFiles().orEmpty()
             .filter { it.name.endsWith(".json") || it.name.endsWith(".json.bak") }
             .map { it.path.removeSuffix(".bak") }.distinct()
-            .map { decode(JSONObject(String(AtomicFile(File(it)).readFully(), Charsets.UTF_8))) }
+            .map { path ->
+                try {
+                    decode(JSONObject(String(AtomicFile(File(path)).readFully(), Charsets.UTF_8)))
+                } catch (_: Exception) {
+                    val publication = sequenceOf(path + ".identity", path).mapNotNull { candidate ->
+                        runCatching { JSONObject(String(AtomicFile(File(candidate)).readFully(), Charsets.UTF_8))
+                            .optString("publicationId").takeIf { it.isNotBlank() } }.getOrNull()
+                    }.firstOrNull() ?: ""
+                    ReaderEvent(protocolVersion = 1, sessionId = File(path).name,
+                        sessionGeneration = 0, publicationId = publication, contentRevision = "",
+                        sequence = 0, kind = "recoveryIssue", errorCode = "checkpoint_corrupt",
+                        message = "읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다.")
+                }
+            }
             .sortedWith(compareBy({ it.sessionGeneration }, { it.sequence }))
     }
 
@@ -44,7 +68,10 @@ internal class ReaderCheckpointJournal(filesDir: File) {
         val target = file(sessionId)
         if (!target.baseFile.exists() && !File(target.baseFile.path + ".bak").exists()) return
         val event = decode(JSONObject(String(target.readFully(), Charsets.UTF_8)))
-        if (event.sessionId == sessionId && event.sequence == sequence) target.delete()
+        if (event.sessionId == sessionId && event.sequence == sequence) {
+            target.delete()
+            AtomicFile(File(target.baseFile.path + ".identity")).delete()
+        }
     }
 
     private fun encode(event: ReaderEvent) = JSONObject().apply {
@@ -68,6 +95,9 @@ internal class ReaderCheckpointJournal(filesDir: File) {
                 put("theme", preferences.theme)
                 put("pageTurnStyle", preferences.pageTurnStyle ?: "instant")
                 put("fontId", preferences.fontId ?: "default")
+                put("lineHeight", preferences.lineHeight)
+                put("paragraphSpacing", preferences.paragraphSpacing)
+                put("pageMargins", preferences.pageMargins)
             })
         }
     }
@@ -86,12 +116,16 @@ internal class ReaderCheckpointJournal(filesDir: File) {
             bookmarksJson = json.optionalString("bookmarksJson"),
             preferences = json.optJSONObject("preferences")?.let {
                 ReaderPreferences(it.getDouble("fontScale"), it.getLong("columnCount"),
-                    it.getBoolean("scroll"), it.getString("theme"), it.optionalString("pageTurnStyle"), it.optionalString("fontId"))
+                    it.getBoolean("scroll"), it.getString("theme"), it.optionalString("pageTurnStyle"), it.optionalString("fontId"),
+                    it.optionalDouble("lineHeight"), it.optionalDouble("paragraphSpacing"), it.optionalDouble("pageMargins"))
             },
             errorCode = json.optionalString("errorCode"),
             message = json.optionalString("message"),
         )
     }
+
+    private fun JSONObject.optionalDouble(key: String): Double? =
+        if (has(key) && !isNull(key)) getDouble(key) else null
 
     private fun JSONObject.optionalString(key: String): String? =
         if (has(key) && !isNull(key)) getString(key) else null

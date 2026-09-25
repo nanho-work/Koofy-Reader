@@ -25,6 +25,53 @@ ReaderEvent checkpoint(
 );
 
 void main() {
+  test('spacing survives native codec and can reset to publisher defaults', () {
+    final preferences = defaultReaderPreferences()
+      ..lineHeight = 1.8
+      ..paragraphSpacing = 0.5
+      ..pageMargins = 1.5;
+    final decoded = ReaderPreferences.decode(preferences.encode());
+    final restored = preferencesFromJson(preferencesToJson(decoded));
+    expect(restored.lineHeight, 1.8);
+    expect(restored.paragraphSpacing, 0.5);
+    expect(restored.pageMargins, 1.5);
+    restored.lineHeight = restored.paragraphSpacing = restored.pageMargins =
+        null;
+    final reset = preferencesFromJson(preferencesToJson(restored));
+    expect(reset.lineHeight, isNull);
+    expect(reset.paragraphSpacing, isNull);
+    expect(reset.pageMargins, isNull);
+  });
+
+  test(
+    'invalid spacing cannot overwrite the saved location or appearance',
+    () async {
+      final store = NativeReaderStore(NativeDatabase.memory());
+      addTearDown(store.close);
+      final session = await store.beginSession('book', 'r1');
+      await store.acceptCheckpoint(checkpoint(session));
+      for (final invalid in [
+        defaultReaderPreferences()..lineHeight = double.nan,
+        defaultReaderPreferences()..lineHeight = 0.9,
+        defaultReaderPreferences()..paragraphSpacing = -1,
+        defaultReaderPreferences()..pageMargins = 3,
+      ]) {
+        await expectLater(
+          store.acceptCheckpoint(
+            checkpoint(session, sequence: 2, href: 'wrong.xhtml')
+              ..preferences = invalid,
+          ),
+          throwsFormatException,
+        );
+        final saved = await store.loadPosition('book', 'r1');
+        expect(saved.locatorJson, contains('chapter.xhtml'));
+        expect(saved.preferences.lineHeight, isNull);
+        expect(saved.preferences.paragraphSpacing, isNull);
+        expect(saved.preferences.pageMargins, isNull);
+      }
+    },
+  );
+
   test(
     'legacy preference JSON defaults to instant without changing layout',
     () {
@@ -36,6 +83,9 @@ void main() {
       expect(preferences.fontScale, 1.4);
       expect(preferences.columnCount, 2);
       expect(preferences.theme, 'sepia');
+      expect(preferences.lineHeight, isNull);
+      expect(preferences.paragraphSpacing, isNull);
+      expect(preferences.pageMargins, isNull);
     },
   );
 
@@ -183,7 +233,10 @@ void main() {
         ..theme = 'dark'
         ..scroll = true
         ..columnCount = 2
-        ..pageTurnStyle = 'curl';
+        ..pageTurnStyle = 'curl'
+        ..lineHeight = 1.8
+        ..paragraphSpacing = 0.5
+        ..pageMargins = 1.5;
       await store.acceptCheckpoint(checkpoint(first)..preferences = custom);
       final other = await store.loadPosition('other', 'r1');
       expect(other.locatorJson, isNull);

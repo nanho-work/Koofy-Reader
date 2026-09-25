@@ -56,6 +56,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private var chromeVisible = true
     private var navigationHistory: [Locator] = []
     private var returnItem: UIBarButtonItem?
+    private var nextPageItem: UIBarButtonItem?
+    private var atBookEnd = false
     private var bookmarksJson: String
 
     init(request: ReaderLaunchRequest, journal: ReaderCheckpointStore, sendEvent: @escaping (ReaderEvent) -> Void) {
@@ -70,7 +72,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     required init?(coder: NSCoder) { fatalError("Use init(request:journal:sendEvent:)") }
 
     static func validate(_ preferences: ReaderPreferences) throws {
-        guard preferences.fontScale.isFinite, (0.5...3.0).contains(preferences.fontScale),
+        func valid(_ value: Double?, _ range: ClosedRange<Double>) -> Bool {
+            value.map { $0.isFinite && range.contains($0) } ?? true
+        }
+        guard valid(preferences.lineHeight, 1...2), valid(preferences.paragraphSpacing, 0...2), valid(preferences.pageMargins, 0.5...2),
+              preferences.fontScale.isFinite, (0.5...3.0).contains(preferences.fontScale),
               (0...2).contains(preferences.columnCount),
               ["light", "sepia", "dark"].contains(preferences.theme),
               ["instant", "curl"].contains(preferences.pageTurnStyle ?? "instant"),
@@ -108,6 +114,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         progress.font = .preferredFont(forTextStyle: .caption1)
         progress.adjustsFontForContentSizeCategory = true
         progress.textAlignment = .center
+        progress.numberOfLines = 2
+        progress.lineBreakMode = .byTruncatingTail
+        progress.widthAnchor.constraint(lessThanOrEqualToConstant: 140).isActive = true
         progress.text = "책을 여는 중"
         progress.accessibilityIdentifier = "reader.progress"
         progressItem = UIBarButtonItem(customView: progress)
@@ -117,6 +126,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         previous.accessibilityIdentifier = "reader.previous"
         let next = UIBarButtonItem(title: "다음", style: .plain, target: self, action: #selector(nextTapped))
         next.accessibilityIdentifier = "reader.next"
+        nextPageItem = next
         toolbar.items = [returnButton, previous, .flexibleSpace(), progressItem, .flexibleSpace(), next]
         spinner.translatesAutoresizingMaskIntoConstraints = false
         body.addSubview(spinner)
@@ -288,7 +298,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         let palette = ReaderPalette.forTheme(preferences.theme)
         return EPUBPreferences(backgroundColor: Color(uiColor: palette.background),
             columnCount: columns, fontFamily: readerFonts?.family(preferences.fontId), fontSize: preferences.fontScale,
-            publisherStyles: true, scroll: preferences.scroll,
+            lineHeight: preferences.lineHeight, pageMargins: preferences.pageMargins,
+            paragraphSpacing: preferences.paragraphSpacing,
+            publisherStyles: preferences.lineHeight == nil && preferences.paragraphSpacing == nil, scroll: preferences.scroll,
             textColor: Color(uiColor: palette.foreground),
             theme: Theme(rawValue: preferences.theme) ?? .light)
     }
@@ -494,7 +506,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             self.isReady = true
             self.spinner.stopAnimating()
             self.readyTimeout?.cancel()
-            self.progress.text = String(format: "%.1f%%", (fallback.locations.totalProgression ?? 0) * 100)
+            self.atBookEnd = snapshot["resourceEnd"] as? Bool == true &&
+                self.publication?.readingOrder.firstIndexWithHREF(fallback.href) == (self.publication?.readingOrder.count ?? 0) - 1
+            let offerNext = self.atBookEnd && self.request.nextBookTitle != nil
+            self.nextPageItem?.title = offerNext ? "이어서 읽기" : "다음"
+            self.nextPageItem?.accessibilityLabel = offerNext ? "다음 권 \(self.request.nextBookTitle ?? "") 이어서 읽기" : "다음 페이지"
+            self.progress.text = self.atBookEnd
+                ? self.request.nextBookTitle.map { "마지막 페이지\n다음: \($0)" } ?? "마지막 페이지"
+                : String(format: "%.1f%%", (fallback.locations.totalProgression ?? 0) * 100)
             self.progress.sizeToFit()
             do {
                 let kind = self.hasSentReady ? (wasReady ? "locationChanged" : self.pendingKind) : "ready"
@@ -652,6 +671,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         requestPageTurn(forward: false)
     }
     @objc private func nextTapped() {
+        if atBookEnd && request.nextBookTitle != nil { nextBookTapped(); return }
         requestPageTurn(forward: true)
     }
 
@@ -915,7 +935,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     @objc private func nextBookTapped() {
-        guard isReady, !isClosing, let title = request.nextBookTitle else { return }
+        guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let title = request.nextBookTitle else { return }
         let alert = UIAlertController(title: "다음 권 읽기", message: title, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "취소", style: .cancel))
         alert.addAction(UIAlertAction(title: "열기", style: .default) { [weak self] _ in

@@ -183,6 +183,40 @@ final class RunnerTests: XCTestCase {
         XCTAssertTrue(try journal.pending().isEmpty)
     }
 
+    func testCorruptJournalKeepsIdentityAndDoesNotHideHealthyBooks() throws {
+        let journal = try ReaderCheckpointStore(directory: directory)
+        try journal.write(event(sequence: 1))
+        let damaged = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory,
+            includingPropertiesForKeys: nil).first { $0.pathExtension == "json" })
+        try Data("truncated".utf8).write(to: damaged)
+        var healthy = event(sequence: 2)
+        healthy.sessionId = "healthy-session"
+        healthy.publicationId = "healthy-book"
+        try journal.write(healthy)
+        let pending = try journal.pending()
+        XCTAssertEqual(pending.count, 2)
+        XCTAssertEqual(pending.first { $0.kind == "recoveryIssue" }?.publicationId, "publication")
+        XCTAssertEqual(pending.first { $0.kind != "recoveryIssue" }, healthy)
+        try journal.acknowledge(sessionId: healthy.sessionId, sequence: healthy.sequence)
+        XCTAssertEqual(try journal.pending().map(\.kind), ["recoveryIssue"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: damaged.path))
+    }
+
+    func testCorruptLegacyJournalWithoutIdentityRemainsVisible() throws {
+        let journal = try ReaderCheckpointStore(directory: directory)
+        try journal.write(event(sequence: 1))
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let identity = try XCTUnwrap(files.first { $0.pathExtension == "identity" })
+        try FileManager.default.removeItem(at: identity)
+        let damaged = try XCTUnwrap(files.first { $0.pathExtension == "json" })
+        try Data("truncated".utf8).write(to: damaged)
+        let pending = try journal.pending()
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(pending.first?.publicationId, "")
+        XCTAssertEqual(pending.first?.kind, "recoveryIssue")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: damaged.path))
+    }
+
     func testAnotherSessionAcknowledgementDoesNotDeleteRecord() throws {
         let journal = try ReaderCheckpointStore(directory: directory)
         try journal.write(event(sequence: 1))

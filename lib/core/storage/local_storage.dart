@@ -6,6 +6,7 @@ final localStorageProvider = Provider<LocalStorage>(
 );
 
 abstract class LocalStorage {
+  Future<void> remove(String key);
   Future<String?> getString(String key);
   Future<void> setString(String key, String value);
   Future<int?> getInt(String key);
@@ -18,6 +19,13 @@ class SharedPrefsLocalStorage implements LocalStorage {
       SharedPreferences.getInstance();
 
   Future<SharedPreferences> get _prefs async => _prefsFuture;
+
+  @override
+  Future<void> remove(String key) async {
+    if (!await (await _prefs).remove(key)) {
+      throw StateError('기록을 복구하지 못했습니다. 저장 공간을 확인해 주세요.');
+    }
+  }
 
   @override
   Future<String?> getString(String key) async {

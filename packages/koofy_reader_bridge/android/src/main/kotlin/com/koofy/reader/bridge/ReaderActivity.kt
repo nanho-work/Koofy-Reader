@@ -94,6 +94,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private val navigationHistory = java.util.ArrayDeque<Locator>()
     private var toolsNavigationCompleted: (() -> Unit)? = null
     private lateinit var returnButton: Button
+    private var atBookEnd = false
+    private var nextBookButton: Button? = null
     private var initialTarget: Locator? = null
     private var restoreTarget: Locator? = null
     private var restoreIssued = false
@@ -188,19 +190,22 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             text = "책을 여는 중…"
             gravity = Gravity.CENTER
             textSize = 12f
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setTextColor(Color.rgb(60, 50, 40))
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         navigation.addView(button("다음") { pageTurns?.request(true) })
         session.request.nextBookTitle?.let { title ->
-            navigation.addView(button("다음 권") {
-                if (session.ready && !session.closing) {
+            nextBookButton = button("다음 권") {
+                if (toolsReady()) {
                     AlertDialog.Builder(this).setTitle("다음 권 읽기")
                         .setMessage(title)
                         .setPositiveButton("열기") { _, _ -> closeReader(nextBook = true) }
                         .setNegativeButton("취소", null).show()
                 }
-            })
+            }
+            navigation.addView(nextBookButton)
         }
         page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
         bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, beforeResize = {
@@ -403,6 +408,13 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     append("이 장 ${pageIndex + 1} / $totalPages")
                     if (hingeFallback) append(" · 한쪽 화면")
                 }
+                atBookEnd = snapshot.optBoolean("resourceEnd", false) &&
+                    publication?.readingOrder?.lastOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
+                nextBookButton?.text = if (atBookEnd) "이어서 읽기" else "다음 권"
+                if (atBookEnd) {
+                    status.text = session.request.nextBookTitle?.let { "마지막 페이지\n다음: $it" } ?: "마지막 페이지"
+                    nextBookButton?.contentDescription = "다음 권 ${session.request.nextBookTitle} 이어서 읽기"
+                } else nextBookButton?.contentDescription = "다음 권 ${session.request.nextBookTitle}"
                 emit(kind)
                 if (target != null) {
                     val completed = toolsNavigationCompleted
@@ -520,6 +532,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             textColor = org.readium.r2.navigator.preferences.Color(palette.foreground),
             fontSize = p.fontScale,
             fontFamily = readerFonts.family(p.fontId),
+            lineHeight = p.lineHeight,
+            paragraphSpacing = p.paragraphSpacing,
+            pageMargins = p.pageMargins,
+            publisherStyles = p.lineHeight == null && p.paragraphSpacing == null,
             columnCount = readerColumns(),
             scroll = p.scroll,
             theme = when (p.theme) { "dark" -> Theme.DARK; "light" -> Theme.LIGHT; else -> Theme.SEPIA },

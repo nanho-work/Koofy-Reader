@@ -51,7 +51,7 @@ class ReaderCheckpointJournalTest {
 
     @Test fun atomicBackupIsRecoveredAfterInterruptedReplacement() {
         journal.write(event("session-a", 1))
-        val file = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single()
+        val file = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single { it.extension == "json" }
         assertTrue(file.renameTo(File(file.path + ".bak")))
         file.writeText("incomplete write")
         assertEquals(1L, ReaderCheckpointJournal(root).pending().single().sequence)
@@ -70,7 +70,7 @@ class ReaderCheckpointJournalTest {
         journal.write(state.copy(preferences = state.preferences!!.copy(pageTurnStyle = "curl", fontId = "maplestory")))
         assertEquals("curl", ReaderCheckpointJournal(root).pending().single().preferences!!.pageTurnStyle)
         assertEquals("maplestory", ReaderCheckpointJournal(root).pending().single().preferences!!.fontId)
-        val file = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single()
+        val file = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single { it.extension == "json" }
         val legacy = org.json.JSONObject(file.readText())
         legacy.getJSONObject("preferences").remove("pageTurnStyle")
         legacy.getJSONObject("preferences").remove("fontId")
@@ -79,6 +79,30 @@ class ReaderCheckpointJournalTest {
         assertEquals("instant", recovered.preferences!!.pageTurnStyle ?: "instant")
         assertEquals("default", recovered.preferences!!.fontId ?: "default")
         assertEquals(state.locatorJson, recovered.locatorJson)
+    }
+
+    @Test fun corruptRecordDoesNotHideHealthyRecordsAndKeepsBookIdentity() {
+        journal.write(event("bad", 1))
+        val bad = File(root, "koofy-reader-checkpoints-v1").listFiles()!!.single { it.extension == "json" }
+        bad.writeText("truncated")
+        journal.write(event("good", 2).copy(publicationId = "book-b"))
+        val pending = ReaderCheckpointJournal(root).pending()
+        assertEquals(2, pending.size)
+        assertEquals("book-a", pending.single { it.kind == "recoveryIssue" }.publicationId)
+        assertEquals("good", pending.single { it.kind != "recoveryIssue" }.sessionId)
+        assertTrue(bad.exists())
+        journal.acknowledge("good", 2)
+        assertEquals("recoveryIssue", journal.pending().single().kind)
+    }
+
+    @Test fun legacyCorruptionWithoutIdentityRemainsVisibleAndIsNotDeleted() {
+        journal.write(event("bad", 1))
+        val files = File(root, "koofy-reader-checkpoints-v1").listFiles()!!
+        files.single { it.extension == "identity" }.delete()
+        val bad = files.single { it.extension == "json" }
+        bad.writeText("truncated")
+        assertEquals("", journal.pending().single().publicationId)
+        assertTrue(bad.exists())
     }
 
     private fun event(id: String, sequence: Long) = ReaderEvent(

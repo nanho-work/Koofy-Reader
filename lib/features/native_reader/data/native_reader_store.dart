@@ -384,9 +384,14 @@ class NativeReaderStore extends GeneratedDatabase {
 }
 
 String preferencesToJson(ReaderPreferences value) {
-  if (!value.fontScale.isFinite ||
+  bool invalid(double? number, double min, double max) =>
+      number != null && (!number.isFinite || number < min || number > max);
+  if (invalid(value.lineHeight, 1, 2) ||
+      invalid(value.paragraphSpacing, 0, 2) ||
+      invalid(value.pageMargins, 0.5, 2) ||
+      !value.fontScale.isFinite ||
       value.fontScale < 0.5 ||
-      value.fontScale > 4 ||
+      value.fontScale > 3 ||
       !const [0, 1, 2].contains(value.columnCount) ||
       !const ['light', 'sepia', 'dark'].contains(value.theme) ||
       !const ['instant', 'curl'].contains(value.pageTurnStyle ?? 'instant') ||
@@ -405,6 +410,9 @@ String preferencesToJson(ReaderPreferences value) {
     'theme': value.theme,
     'pageTurnStyle': value.pageTurnStyle ?? 'instant',
     'fontId': value.fontId ?? 'default',
+    'lineHeight': value.lineHeight,
+    'paragraphSpacing': value.paragraphSpacing,
+    'pageMargins': value.pageMargins,
   });
 }
 
@@ -417,6 +425,9 @@ ReaderPreferences preferencesFromJson(String source) {
     theme: json['theme'] as String,
     pageTurnStyle: json['pageTurnStyle'] as String? ?? 'instant',
     fontId: json['fontId'] as String? ?? 'default',
+    lineHeight: (json['lineHeight'] as num?)?.toDouble(),
+    paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble(),
+    pageMargins: (json['pageMargins'] as num?)?.toDouble(),
   );
   preferencesToJson(preferences);
   return preferences;

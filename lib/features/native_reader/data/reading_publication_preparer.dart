@@ -50,6 +50,39 @@ class ReadingPublicationPreparer {
   static const int maxTextBytes = 20 * 1024 * 1024;
   static const int maxEpubBytes = 40 * 1024 * 1024;
 
+  /// Import and opening enforce the same supported content policy, before the
+  /// library commits a file. Heavy validation and XML parsing stay off the UI.
+  static Future<({String? title, String? author})> inspectImport(
+    Uint8List bytes,
+    String extension,
+  ) => Isolate.run(() {
+    _checkSourceSize(bytes.length, extension);
+    if (extension == 'txt') {
+      _decodeUnicode(bytes);
+      return (title: null, author: null);
+    }
+    _validateEpub(bytes);
+    final archive = ZipDecoder().decodeBytes(bytes);
+    final files = {for (final f in archive.files) f.name: f};
+    final container = XmlDocument.parse(
+      _decodeUnicode(
+        Uint8List.fromList(files['META-INF/container.xml']!.content),
+      ),
+    );
+    final path = _localReference(
+      '',
+      _elements(container, 'rootfile').first.getAttribute('full-path')!,
+    );
+    final opf = XmlDocument.parse(
+      _decodeUnicode(Uint8List.fromList(files[path]!.content)),
+    );
+    String? field(String name) => _elements(
+      opf,
+      name,
+    ).map((e) => e.innerText.trim()).where((s) => s.isNotEmpty).firstOrNull;
+    return (title: field('title'), author: field('creator'));
+  });
+
   /// Prefer the source; fall back to the verified retained copy if a picker cache expired.
   Future<({Uint8List bytes, String extension})> backupSource(Book book) async {
     final source = await _readSource(book);

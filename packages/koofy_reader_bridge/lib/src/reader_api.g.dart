@@ -47,6 +47,9 @@ class ReaderPreferences {
     required this.theme,
     this.pageTurnStyle,
     this.fontId,
+    this.lineHeight,
+    this.paragraphSpacing,
+    this.pageMargins,
   });
 
   double fontScale;
@@ -63,6 +66,13 @@ class ReaderPreferences {
   /// Null or 'default' preserves the publication's original font selection.
   String? fontId;
 
+  /// Null preserves publisher defaults. Units: line multiple, rem, margin scale.
+  double? lineHeight;
+
+  double? paragraphSpacing;
+
+  double? pageMargins;
+
   List<Object?> _toList() {
     return <Object?>[
       fontScale,
@@ -71,6 +81,9 @@ class ReaderPreferences {
       theme,
       pageTurnStyle,
       fontId,
+      lineHeight,
+      paragraphSpacing,
+      pageMargins,
     ];
   }
 
@@ -86,6 +99,9 @@ class ReaderPreferences {
       theme: result[3]! as String,
       pageTurnStyle: result[4] as String?,
       fontId: result[5] as String?,
+      lineHeight: result[6] as double?,
+      paragraphSpacing: result[7] as double?,
+      pageMargins: result[8] as double?,
     );
   }
 

@@ -1,0 +1,120 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:koofy_reader/core/constants/app_constants.dart';
+import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
+import 'package:koofy_reader/features/backup/data/library_backup.dart';
+import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
+import '/Users/choenamho/Documents/GitHub/Koofy-Reader/test/library_backup_test.dart' as fixtures;
+
+class BarrierStorage extends fixtures.MemoryBackupStorage {
+  final ready = Completer<void>();
+  int reads = 0;
+  @override
+  Future<String?> getString(String key) async {
+    final snapshot = strings[key];
+    if (key == AppConstants.localBooksKey && reads < 2) {
+      reads++;
+      if (reads == 2) ready.complete();
+      await ready.future;
+    }
+    return snapshot;
+  }
+}
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('AUDIT: imported unread source disappears when picker file expires', () async {
+    final f = fixtures.BackupFixture(await Directory.systemTemp.createTemp('koofy-audit-'));
+    try {
+      final file = await File('${f.root.path}/a.txt').writeAsString('책 내용');
+      final book = (await f.books.importBookFile(file.path))!;
+      await file.delete();
+      expect((await f.books.getBooks()).any((b) => b.id == book.id), isTrue);
+      await expectLater(f.preparer.prepare(book: book), throwsA(anything));
+    } finally { await f.dispose(); }
+  });
+  test('AUDIT: concurrent library commits drop one book', () async {
+    final root = await Directory.systemTemp.createTemp('koofy-audit-');
+    try {
+      final storage = BarrierStorage();
+      final repo = LocalBookRepository(storage);
+      final a = await File('${root.path}/a.txt').writeAsString('a');
+      final b = await File('${root.path}/b.txt').writeAsString('b');
+      await Future.wait([
+        repo.importBookFile(a.path),
+        repo.saveDownloadedBook(Book.localFile(id:'cloud_b',title:'b',author:'a',description:'',localPath:b.path)),
+      ]);
+      final rows = jsonDecode(storage.strings[AppConstants.localBooksKey]!) as List;
+      expect(rows.length, 1, reason:'Both operations succeeded but only one entry remains.');
+    } finally { await root.delete(recursive:true); }
+  });
+  test('AUDIT: unreadable index is overwritten as an empty library', () async {
+    final f = fixtures.BackupFixture(await Directory.systemTemp.createTemp('koofy-audit-'));
+    try {
+      f.storage.strings[AppConstants.localBooksKey] = '{broken-primary';
+      f.storage.strings[AppConstants.localBooksBackupKey] = '{broken-backup';
+      final file = await File('${f.root.path}/new.txt').writeAsString('new');
+      await f.books.importBookFile(file.path);
+      expect(jsonDecode(f.storage.strings[AppConstants.localBooksKey]!), hasLength(1));
+      expect(f.storage.strings.values.any((v) => v.contains('broken-')), isFalse);
+    } finally { await f.dispose(); }
+  });
+  Future<({fixtures.BackupFixture source, fixtures.BackupFixture target, String id, String groupId, LibraryBackup backup})> setup() async {
+    final source = fixtures.BackupFixture(await Directory.systemTemp.createTemp('koofy-audit-source-'));
+    final target = fixtures.BackupFixture(await Directory.systemTemp.createTemp('koofy-audit-target-'));
+    final a = (await source.books.importBookFile((await File('${source.root.path}/a.txt').writeAsString('a')).path))!;
+    final b = (await source.books.importBookFile((await File('${source.root.path}/b.txt').writeAsString('b')).path))!;
+    await source.groups.create('묶음',[a.id,b.id]);
+    final groupId = (await source.groups.load()).single.id;
+    await LibraryCompletionRepository(source.storage).setFinished(a.id,true);
+    final dir = await Directory('${source.root.path}/book_covers').create();
+    const name = '0123456789abcdef0123456789abcdef.png';
+    await File('${dir.path}/$name').writeAsBytes(base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='));
+    for (final id in [a.id, groupId]) {
+      source.storage.strings['library_cover_${base64Url.encode(utf8.encode(id))}'] = name;
+    }
+    return (source:source,target:target,id:a.id,groupId:groupId,backup:LibraryBackupService.decode(await source.service.export()));
+  }
+  test('AUDIT: resetting restored book cover deletes group cover file', () async {
+    final f = await setup();
+    try {
+      await f.target.service.restore(f.backup);
+      final group = (await f.target.groups.load()).single;
+      final display = (await f.target.covers.apply([group.displayBook])).single;
+      expect(await File(display.coverPath!).exists(),isTrue);
+      await f.target.covers.reset(f.id);
+      expect(await File(display.coverPath!).exists(),isFalse);
+    } finally { await f.source.dispose(); await f.target.dispose(); }
+  });
+  test('AUDIT: failed restore then retry loses completion and covers', () async {
+    final f = await setup();
+    try {
+      f.target.storage.failOnce = AppConstants.hiddenBooksKey;
+      await expectLater(f.target.service.restore(f.backup),throwsA(anything));
+      await f.target.service.restore(f.backup);
+      expect((await LibraryCompletionRepository(f.target.storage).load())[f.id],isNull);
+      final book = (await f.target.books.getBooks()).firstWhere((b)=>b.id==f.id);
+      expect(book.coverPath,isNull);
+    } finally { await f.source.dispose(); await f.target.dispose(); }
+  });
+  test('AUDIT: Dart accepts font scale rejected by native readers', () {
+    final value = defaultReaderPreferences()..fontScale = 3.5;
+    expect(preferencesFromJson(preferencesToJson(value)).fontScale,3.5);
+  });
+  test('AUDIT: server accepted remote EPUB is rejected by app', () async {
+    final f = fixtures.BackupFixture(await Directory.systemTemp.createTemp('koofy-audit-'));
+    try {
+      final book = (await f.books.importBookFile('/tmp/koofy-audit-remote.epub'))!;
+      try {
+        await f.preparer.prepare(book: book);
+        fail('App unexpectedly accepted remote EPUB');
+      } catch (e) {
+        expect(e.toString(),contains('외부 리소스'));
+      }
+    } finally { await f.dispose(); }
+  });
+
+}

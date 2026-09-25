@@ -90,7 +90,11 @@ data class ReaderPreferences (
   /** Null is the legacy default, equivalent to 'instant'. */
   val pageTurnStyle: String? = null,
   /** Null or 'default' preserves the publication's original font selection. */
-  val fontId: String? = null
+  val fontId: String? = null,
+  /** Null preserves publisher defaults. Units: line multiple, rem, margin scale. */
+  val lineHeight: Double? = null,
+  val paragraphSpacing: Double? = null,
+  val pageMargins: Double? = null
 )
  {
   companion object {
@@ -101,7 +105,10 @@ data class ReaderPreferences (
       val theme = pigeonVar_list[3] as String
       val pageTurnStyle = pigeonVar_list[4] as String?
       val fontId = pigeonVar_list[5] as String?
-      return ReaderPreferences(fontScale, columnCount, scroll, theme, pageTurnStyle, fontId)
+      val lineHeight = pigeonVar_list[6] as Double?
+      val paragraphSpacing = pigeonVar_list[7] as Double?
+      val pageMargins = pigeonVar_list[8] as Double?
+      return ReaderPreferences(fontScale, columnCount, scroll, theme, pageTurnStyle, fontId, lineHeight, paragraphSpacing, pageMargins)
     }
   }
   fun toList(): List<Any?> {
@@ -112,6 +119,9 @@ data class ReaderPreferences (
       theme,
       pageTurnStyle,
       fontId,
+      lineHeight,
+      paragraphSpacing,
+      pageMargins,
     )
   }
   override fun equals(other: Any?): Boolean {

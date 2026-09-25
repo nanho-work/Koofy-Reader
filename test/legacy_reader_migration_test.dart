@@ -16,6 +16,29 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'corrupt legacy snapshot is preserved before rebuilding from raw keys',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        LegacyReaderArchive.backupKey: '{broken snapshot',
+        'reader_progress_book': '{"contentOffset":123}',
+      });
+      final storage = SharedPrefsLocalStorage();
+      final restored = await LegacyReaderArchive(storage).backup();
+      expect(restored['reader_progress_book'], '{"contentOffset":123}');
+      expect(
+        (await storage.getStringEntriesByPrefix(
+          '${LegacyReaderArchive.backupKey}_corrupt_',
+        )).values.single,
+        '{broken snapshot',
+      );
+      expect(
+        await storage.getString('reader_progress_book'),
+        '{"contentOffset":123}',
+      );
+    },
+  );
+
+  test(
     'cutover preserves raw records, malformed data and all books exactly once',
     () async {
       final original = {

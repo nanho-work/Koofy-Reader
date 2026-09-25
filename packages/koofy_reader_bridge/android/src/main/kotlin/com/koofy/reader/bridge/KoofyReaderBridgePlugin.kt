@@ -106,6 +106,9 @@ class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
 }
 
 internal fun validatePreferences(value: ReaderPreferences) {
+    require(value.lineHeight == null || (value.lineHeight.isFinite() && value.lineHeight in 1.0..2.0)) { "Invalid line height" }
+    require(value.paragraphSpacing == null || (value.paragraphSpacing.isFinite() && value.paragraphSpacing in 0.0..2.0)) { "Invalid paragraph spacing" }
+    require(value.pageMargins == null || (value.pageMargins.isFinite() && value.pageMargins in 0.5..2.0)) { "Invalid page margins" }
     require(value.fontScale.isFinite() && value.fontScale in 0.5..3.0) { "Invalid font scale" }
     require(value.columnCount in 0L..2L) { "Invalid column count" }
     require(value.theme in listOf("light", "sepia", "dark")) { "Invalid reader theme" }

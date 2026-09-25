@@ -68,14 +68,7 @@ class NativeReaderCoordinator {
     try {
       // Recovery must precede allocating a new durable session generation.
       await _queue;
-      final pending = await gateway.pendingCheckpoints();
-      pending.sort((a, b) {
-        final generation = a.sessionGeneration.compareTo(b.sessionGeneration);
-        return generation == 0 ? a.sequence.compareTo(b.sequence) : generation;
-      });
-      for (final event in pending) {
-        await _commit(event);
-      }
+      await _recover(publicationId: publicationId);
       final position = await store.loadPosition(publicationId, contentRevision);
       if (position.previousRevisionExists && resolveInitialLocator == null) {
         throw StateError('책의 내용이 변경되었습니다. 이전 읽기 위치를 확인해 주세요.');
@@ -128,17 +121,41 @@ class NativeReaderCoordinator {
     _opening = true;
     try {
       await _queue;
-      final pending = await gateway.pendingCheckpoints();
-      pending.sort((a, b) {
-        final generation = a.sessionGeneration.compareTo(b.sessionGeneration);
-        return generation == 0 ? a.sequence.compareTo(b.sequence) : generation;
-      });
-      for (final event in pending) {
-        await _commit(event);
-      }
+      await _recover();
     } finally {
       _opening = false;
     }
+  }
+
+  /// Recover healthy records even if another book has an unreadable journal.
+  /// Failed records are never acknowledged or deleted. Unknown old identities
+  /// still block opening: silently treating them as another book risks data loss.
+  Future<void> _recover({String? publicationId}) async {
+    final pending = await gateway.pendingCheckpoints();
+    pending.sort((a, b) {
+      final generation = a.sessionGeneration.compareTo(b.sessionGeneration);
+      return generation == 0 ? a.sequence.compareTo(b.sequence) : generation;
+    });
+    Object? blocking;
+    final failedBooks = <String>{};
+    for (final event in pending) {
+      if (failedBooks.contains(event.publicationId)) continue;
+      try {
+        if (event.kind == 'recoveryIssue') {
+          throw StateError(event.message ?? '읽기 복구 기록을 확인하지 못했습니다.');
+        }
+        await _commit(event);
+      } catch (error) {
+        failedBooks.add(event.publicationId);
+        if (publicationId == null ||
+            event.publicationId.isEmpty ||
+            publicationId == event.publicationId) {
+          blocking ??= error;
+        }
+        _errors.add(error);
+      }
+    }
+    if (blocking != null) throw blocking;
   }
 
   Future<void> dispose() async {

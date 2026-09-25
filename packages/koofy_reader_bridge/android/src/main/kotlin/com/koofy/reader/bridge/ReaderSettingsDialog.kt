@@ -107,6 +107,20 @@ internal class ReaderSettingsDialog(
                 .apply { setTextColor(colors.secondary) })
         }
         column.addView(label("두 페이지는 화면 너비가 충분할 때 적용됩니다.", 12f).apply { setTextColor(colors.secondary) })
+        column.addView(label("본문 간격", 17f))
+        val lines = listOf(null, 1.2, 1.5, 1.8)
+        choices("줄간격", listOf("기본", "촘촘", "보통", "넉넉"), lines.indexOf(p.lineHeight)) {
+            update(current().copy(lineHeight = lines[it]))
+        }
+        val paragraphs = listOf(null, 0.0, 0.5, 1.0)
+        choices("문단 간격", listOf("기본", "없음", "보통", "넓게"), paragraphs.indexOf(p.paragraphSpacing)) {
+            update(current().copy(paragraphSpacing = paragraphs[it]))
+        }
+        val margins = listOf(null, 0.5, 1.0, 1.5)
+        choices("페이지 여백", listOf("기본", "좁게", "보통", "넓게"), margins.indexOf(p.pageMargins)) {
+            update(current().copy(pageMargins = margins[it]))
+        }
+        column.addView(label("기본은 책의 원래 설정입니다. 줄·문단 간격을 지정하면 출판사 문단 스타일 일부가 바뀔 수 있습니다. 두 페이지에서는 좌우 여백과 중앙 간격이 함께 조절됩니다.", 12f).apply { setTextColor(colors.secondary) })
         column.addView(label("글꼴"))
         val selectedFont = (p.fontId ?: "default").takeIf { it in fontIds } ?: "default"
         fontIds.forEachIndexed { index, id ->
