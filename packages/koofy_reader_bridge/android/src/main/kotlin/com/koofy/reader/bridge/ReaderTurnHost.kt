@@ -10,6 +10,7 @@ import kotlin.math.abs
 
 /** Own horizontal streams before the Readium WebView starts its native pager. */
 internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
+    var onManualScroll: () -> Unit = {}
     var pageMode = true
     var selecting = false
     var blocked = false
@@ -48,6 +49,7 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.x - downX
                 val dy = event.y - downY
+                if (!pageMode && abs(dy) > slop) onManualScroll()
                 // A long press belongs to text selection; multiple fingers to the system.
                 if (pageMode && !selecting && event.pointerCount == 1 &&
                     (edgeStart || event.eventTime - downTime < ViewConfiguration.getLongPressTimeout()) &&

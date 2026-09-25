@@ -2,6 +2,7 @@ import UIKit
 
 /// Keeps settings open while the host applies preferences and restores its locator.
 final class ReaderSettingsViewController: UITableViewController {
+    var onSpeech: (() -> Void)?
     private var preferences: ReaderPreferences
     private let change: (ReaderPreferences, @escaping (Result<Void, Error>) -> Void) -> Void
     private let fontIds: [String]
@@ -25,10 +26,13 @@ final class ReaderSettingsViewController: UITableViewController {
         super.viewDidLoad()
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "완료", style: .done,
             target: self, action: #selector(closeSheet))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "듣기 설정", style: .plain, target: self, action: #selector(speechTapped))
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 60
         refresh()
     }
+
+    @objc private func speechTapped() { onSpeech?() }
 
     private func refresh() {
         let p = ReaderPalette.forTheme(preferences.theme)

@@ -18,6 +18,7 @@ internal class ReaderBannerFooter(
     private val host: Activity,
     private val unitId: String?,
     private var hiddenUntil: Long?,
+    private val onAdInteraction: () -> Unit = {},
     private val beforeResize: () -> Unit = {}
 ) : FrameLayout(host) {
     private val handler = Handler(Looper.getMainLooper())
@@ -132,10 +133,10 @@ internal class ReaderBannerFooter(
             }
             override fun onAdDisplayed(adInfo: LevelPlayAdInfo) {}
             override fun onAdDisplayFailed(adInfo: LevelPlayAdInfo, error: LevelPlayAdError) { onAdLoadFailed(error) }
-            override fun onAdClicked(adInfo: LevelPlayAdInfo) {}
-            override fun onAdExpanded(adInfo: LevelPlayAdInfo) {}
+            override fun onAdClicked(adInfo: LevelPlayAdInfo) { onAdInteraction() }
+            override fun onAdExpanded(adInfo: LevelPlayAdInfo) { onAdInteraction() }
             override fun onAdCollapsed(adInfo: LevelPlayAdInfo) {}
-            override fun onAdLeftApplication(adInfo: LevelPlayAdInfo) {}
+            override fun onAdLeftApplication(adInfo: LevelPlayAdInfo) { onAdInteraction() }
         })
         addView(ad, LayoutParams(dp(320), dp(50), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
         ad.loadAd()

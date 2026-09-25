@@ -17,6 +17,7 @@ final class ReaderBannerFooter: UIView {
     private var timer: Timer?
     private var previousWidth: CGFloat = 0
     private var trackingStatus = ATTrackingManager.trackingAuthorizationStatus
+    var onAdInteraction: (() -> Void)?
     var onHeightChanged: ((CGFloat) -> Void)?
     var desiredHeight: CGFloat {
         configured && Double(hiddenUntil ?? 0) / 1000 <= Date().timeIntervalSince1970 ? 66 : 0
@@ -149,6 +150,7 @@ final class ReaderBannerFooter: UIView {
             self.message.isHidden = false
             self.message.text = "광고를 불러오지 못했습니다."
         }
+        callbacks.interacted = { [weak self] in self?.onAdInteraction?() }
         listener = callbacks
         ad.setDelegate(callbacks)
         ad.translatesAutoresizingMaskIntoConstraints = false
@@ -167,6 +169,10 @@ final class ReaderBannerFooter: UIView {
 }
 
 private final class ReaderBannerListener: NSObject, LPMBannerAdViewDelegate {
+    var interacted: (() -> Void)?
+    func didClickAd(with adInfo: LPMAdInfo) { interacted?() }
+    func didExpandAd(with adInfo: LPMAdInfo) { interacted?() }
+    func didLeaveApp(with adInfo: LPMAdInfo) { interacted?() }
     var loaded: (() -> Void)?
     var failed: (() -> Void)?
     func didLoadAd(with adInfo: LPMAdInfo) { loaded?() }

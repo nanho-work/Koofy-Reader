@@ -173,6 +173,7 @@ internal class ReaderPageTurns(
         Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
     fun request(next: Boolean) {
+        (activity as? ReaderActivity)?.pauseSpeechForNavigation()
         if (state != "idle") { queuedRequest = next; return }
         if (!available()) return
         val rtl = navigator()?.settings?.value?.readingProgression == ReadingProgression.RTL
@@ -181,6 +182,7 @@ internal class ReaderPageTurns(
     }
 
     private fun begin(left: Boolean, y: Float) {
+        (activity as? ReaderActivity)?.pauseSpeechForNavigation()
         if (state != "idle" || !available()) return
         val rtl = navigator()?.settings?.value?.readingProgression == ReadingProgression.RTL
         forward = if (rtl) !left else left

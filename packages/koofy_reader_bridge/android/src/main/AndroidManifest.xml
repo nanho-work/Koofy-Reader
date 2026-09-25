@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+        <intent><action android:name="android.speech.tts.engine.INSTALL_TTS_DATA" /></intent>
+    </queries>
     <application>
         <activity
             android:name="com.koofy.reader.bridge.ReaderActivity"

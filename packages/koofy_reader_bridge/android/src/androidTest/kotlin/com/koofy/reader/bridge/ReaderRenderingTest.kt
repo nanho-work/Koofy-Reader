@@ -59,6 +59,165 @@ class ReaderRenderingTest {
         fixture.delete()
     }
 
+    @Test fun speechStopsOnBackgroundAndManualNavigationWithoutOverwritingReadingCheckpoint() {
+        launch()
+        val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+        val fake = TestSpeechEngine()
+        var speech: ReaderSpeech? = null
+        var visual = org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(targetLocator()))!!
+        val positions = mutableListOf<org.readium.r2.shared.publication.Locator>()
+        try {
+            scenario!!.onActivity { activity ->
+                val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+                val field = ReaderActivity::class.java.getDeclaredField("speech").apply { isAccessible = true }
+                (field.get(activity) as? ReaderSpeech)?.close()
+                speech = ReaderSpeech(activity, publication, ReaderRuntime.session!!.request, { visual }, { true }, {
+                    ReaderActivity::class.java.getDeclaredMethod("updateSpeechControls").apply { isAccessible = true }.invoke(activity)
+                }, { it?.let(positions::add) }, storage, { fake })
+                field.set(activity, speech)
+                speech!!.foreground(true)
+                speech!!.toggle()
+            }
+            awaitCondition("TTS did not start from the current text") { fake.spoken.isNotEmpty() }
+            assertTrue("TTS must begin at the visible paragraph, not chapter start: ${fake.spoken.first()}", fake.spoken.first().contains("060"))
+            val image = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            File(context.getExternalFilesDir(null), "speech-reader.png").outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            image.recycle()
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand("cp ${context.getExternalFilesDir(null)}/speech-reader.png /sdcard/Download/koofy-speech-reader.png")).use { it.readBytes() }
+            val checkpoint = ReaderRuntime.session!!.locatorJson
+            scenario!!.onActivity {
+                assertTrue(speech!!.playing)
+                speech!!.foreground(false)
+                assertFalse(speech!!.playing)
+                fake.deliverLateCompletion()
+            }
+            Thread.sleep(250)
+            val count = fake.spoken.size
+            scenario!!.onActivity { speech!!.foreground(true) }
+            Thread.sleep(250)
+            assertEquals("Foreground must never resume automatically", count, fake.spoken.size)
+            assertEquals("Audio checkpoint must not overwrite visual checkpoint", checkpoint, ReaderRuntime.session!!.locatorJson)
+            scenario!!.onActivity {
+                speech!!.selectVoice("local-ko")
+                speech!!.setSpeed(1.25)
+                speech!!.toggle()
+            }
+            awaitCondition("Explicit resume did not restart speech") { fake.spoken.size > count }
+            val manager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val competing = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())
+                .setOnAudioFocusChangeListener {}.build()
+            scenario!!.onActivity { manager.requestAudioFocus(competing) }
+            awaitCondition("Transient audio focus loss must pause speech") {
+                var paused = false; scenario!!.onActivity { paused = speech!!.playing == false }; paused
+            }
+            val interruptedCount = fake.spoken.size
+            scenario!!.onActivity { manager.abandonAudioFocusRequest(competing) }
+            Thread.sleep(200)
+            assertEquals("Audio focus gain must not resume", interruptedCount, fake.spoken.size)
+            scenario!!.onActivity {
+                speech!!.userNavigation()
+                assertFalse(speech!!.playing)
+                assertTrue(speech!!.fromVisible)
+                assertTrue(speech!!.hasSaved)
+                assertEquals(1.25, speech!!.speed, 0.001)
+                assertTrue(fake.stops > 0)
+                assertEquals(checkpoint, ReaderRuntime.session!!.locatorJson)
+                val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(it) as org.readium.r2.shared.publication.Publication
+                val changed = ReaderSpeech(it, publication, ReaderRuntime.session!!.request.copy(contentRevision = "changed"), { visual }, { true }, {}, {}, storage, { fake })
+                assertFalse("A changed book must not reuse an old audio checkpoint", changed.hasSaved)
+                changed.close()
+            }
+        } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
+    }
+
+    @Test fun speechInitializationCancelledByLeavingReaderNeverStartsLater() {
+        launch()
+        val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val entered = CountDownLatch(1)
+        val fake = TestSpeechEngine()
+        var speech: ReaderSpeech? = null
+        try {
+            scenario!!.onActivity { activity ->
+                val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+                speech = ReaderSpeech(activity, publication, ReaderRuntime.session!!.request,
+                    { org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(targetLocator())) }, { true }, {}, {}, storage,
+                    { entered.countDown(); gate.await(); fake })
+                speech!!.foreground(true); speech!!.toggle()
+            }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            scenario!!.onActivity { speech!!.foreground(false); gate.complete(Unit) }
+            Thread.sleep(250)
+            scenario!!.onActivity { assertFalse(speech!!.playing); assertFalse(speech!!.busy); speech!!.foreground(true) }
+            Thread.sleep(250)
+            assertTrue("Late initialization must never produce audio", fake.spoken.isEmpty())
+        } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
+    }
+
+    @Test fun speechStartsInLongParagraphAndResumesTheSameSentence() {
+        createFixture(fixture, longParagraph = true)
+        launch()
+        val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+        val fake = TestSpeechEngine()
+        var speech: ReaderSpeech? = null
+        var resolvedSkip = -1
+        val target = org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(targetLocator()).put("text", JSONObject()
+            .put("before", "페이지 시작은 문단 시작과 다릅니다. ")
+            .put("highlight", "긴 문단의 80 번째 문장입니다.")
+            .put("after", " 페이지 시작은 문단 시작과 다릅니다.")))!!
+        try {
+            scenario!!.onActivity { activity ->
+                val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+                speech = ReaderSpeech(activity, publication, ReaderRuntime.session!!.request, { target }, { true }, {}, {}, storage, { resolvedSkip = speechStart(publication, target).skip; fake })
+                speech!!.foreground(true); speech!!.toggle()
+            }
+            awaitCondition("TTS did not reach the selected sentence") { fake.spoken.isNotEmpty() }
+            assertTrue("Skipped sentences must never reach the speech engine (skip=$resolvedSkip): ${fake.spoken.first()}", fake.spoken.first().contains("80 번째"))
+            scenario!!.onActivity { speech!!.pause() }
+            Thread.sleep(100)
+            val count = fake.spoken.size
+            scenario!!.onActivity { speech!!.start(savedPosition = true) }
+            awaitCondition("Saved sentence did not resume") { fake.spoken.size > count }
+            assertEquals("Resume must not rewind to the paragraph start", fake.spoken.first(), fake.spoken.last())
+            var previousCount = fake.spoken.size
+            scenario!!.onActivity { speech!!.skip(true) }
+            awaitCondition("Next sentence did not play") { fake.spoken.size > previousCount }
+            assertTrue(fake.spoken.last().contains("페이지 시작은"))
+            scenario!!.onActivity { speech!!.pause() }
+            Thread.sleep(100)
+            previousCount = fake.spoken.size
+            scenario!!.onActivity { speech!!.start(savedPosition = true) }
+            awaitCondition("Repeated sentence did not resume") { fake.spoken.size > previousCount }
+            assertTrue(fake.spoken.last().contains("페이지 시작은"))
+            previousCount = fake.spoken.size
+            scenario!!.onActivity { speech!!.skip(true) }
+            awaitCondition("The sentence after resume did not play") { fake.spoken.size > previousCount }
+            assertTrue("Repeated quotes must retain their ordinal", fake.spoken.last().contains("81 번째"))
+        } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
+    }
+
+    private class TestSpeechEngine : ReaderSpeechEngine {
+        val spoken = java.util.concurrent.CopyOnWriteArrayList<String>()
+        var stops = 0
+        private var callback: org.readium.navigator.media.tts.TtsEngine.Listener<org.readium.navigator.media.tts.android.AndroidTtsEngine.Error>? = null
+        private var last: org.readium.navigator.media.tts.TtsEngine.RequestId? = null
+        override val voices = setOf(org.readium.navigator.media.tts.android.AndroidTtsEngine.Voice(
+            org.readium.navigator.media.tts.android.AndroidTtsEngine.Voice.Id("local-ko"), org.readium.r2.shared.util.Language("ko")))
+        override val settings = kotlinx.coroutines.flow.MutableStateFlow(org.readium.navigator.media.tts.android.AndroidTtsSettings(org.readium.r2.shared.util.Language("ko"), true, 1.0, 1.0, emptyMap()))
+        override fun submitPreferences(preferences: org.readium.navigator.media.tts.android.AndroidTtsPreferences) {
+            settings.value = settings.value.copy(speed = preferences.speed ?: 1.0, voices = preferences.voices.orEmpty())
+        }
+        override fun setListener(listener: org.readium.navigator.media.tts.TtsEngine.Listener<org.readium.navigator.media.tts.android.AndroidTtsEngine.Error>?) { callback = listener }
+        override fun speak(requestId: org.readium.navigator.media.tts.TtsEngine.RequestId, text: String, language: org.readium.r2.shared.util.Language?) {
+            last = requestId; spoken.add(text); callback?.onStart(requestId)
+        }
+        override fun stop() { stops++ }
+        override fun close() { stop(); callback = null }
+        fun deliverLateCompletion() { last?.let { callback?.onDone(it) } }
+    }
+
     @Test fun opensKnownParagraphTurnsPageAndRestoresAfterFontChange() {
         launch()
         awaitCondition("Initial paragraph p-060 was not rendered") { snapshot().visibleIds().contains("p-060") }
