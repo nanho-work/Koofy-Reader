@@ -141,7 +141,8 @@ data class ReaderLaunchRequest (
   val bannerAdUnitId: String? = null,
   val adHiddenUntilEpochMs: Long? = null,
   /** Optional next member in the user's saved group order. */
-  val nextBookTitle: String? = null
+  val nextBookTitle: String? = null,
+  val bookmarksJson: String? = null
 )
  {
   companion object {
@@ -158,7 +159,8 @@ data class ReaderLaunchRequest (
       val bannerAdUnitId = pigeonVar_list[9] as String?
       val adHiddenUntilEpochMs = pigeonVar_list[10] as Long?
       val nextBookTitle = pigeonVar_list[11] as String?
-      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle)
+      val bookmarksJson = pigeonVar_list[12] as String?
+      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle, bookmarksJson)
     }
   }
   fun toList(): List<Any?> {
@@ -175,6 +177,7 @@ data class ReaderLaunchRequest (
       bannerAdUnitId,
       adHiddenUntilEpochMs,
       nextBookTitle,
+      bookmarksJson,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -201,7 +204,8 @@ data class ReaderEvent (
   val locatorJson: String? = null,
   val preferences: ReaderPreferences? = null,
   val errorCode: String? = null,
-  val message: String? = null
+  val message: String? = null,
+  val bookmarksJson: String? = null
 )
  {
   companion object {
@@ -217,7 +221,8 @@ data class ReaderEvent (
       val preferences = pigeonVar_list[8] as ReaderPreferences?
       val errorCode = pigeonVar_list[9] as String?
       val message = pigeonVar_list[10] as String?
-      return ReaderEvent(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, sequence, kind, locatorJson, preferences, errorCode, message)
+      val bookmarksJson = pigeonVar_list[11] as String?
+      return ReaderEvent(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, sequence, kind, locatorJson, preferences, errorCode, message, bookmarksJson)
     }
   }
   fun toList(): List<Any?> {
@@ -233,6 +238,7 @@ data class ReaderEvent (
       preferences,
       errorCode,
       message,
+      bookmarksJson,
     )
   }
   override fun equals(other: Any?): Boolean {

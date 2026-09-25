@@ -7,8 +7,14 @@ class BookImportFile {
 }
 
 class BookImportResult {
-  const BookImportResult(this.added, this.existing, this.failedNames);
+  const BookImportResult(
+    this.added,
+    this.existing,
+    this.failedNames, {
+    this.addedIds = const [],
+  });
   final int added;
+  final List<String> addedIds;
   final int existing;
   final List<String> failedNames;
 }
@@ -22,6 +28,7 @@ Future<BookImportResult> importBooks(
 }) async {
   final knownIds = (await repository.getBooks()).map((b) => b.id).toSet();
   var added = 0;
+  final addedIds = <String>[];
   var existing = 0;
   final failed = <String>[];
   for (var index = 0; index < files.length; index++) {
@@ -35,6 +42,7 @@ Future<BookImportResult> importBooks(
         failed.add(file.name);
       } else if (knownIds.add(book.id)) {
         added++;
+        addedIds.add(book.id);
       } else {
         existing++;
       }
@@ -43,5 +51,10 @@ Future<BookImportResult> importBooks(
     }
     onProgress?.call(index + 1, files.length);
   }
-  return BookImportResult(added, existing, failed);
+  return BookImportResult(
+    added,
+    existing,
+    failed,
+    addedIds: List.unmodifiable(addedIds),
+  );
 }

@@ -114,6 +114,8 @@ void main() {
         contentRevision: revision,
         sequence: 1,
         kind: 'closed',
+        bookmarksJson:
+            '[{"id":"bookmark-1","label":"다시 읽을 문장","locator":{"href":"chapter.xhtml","type":"application/xhtml+xml"}}]',
         locatorJson: '{"href":"chapter.xhtml","locations":{"progression":0.5}}',
         preferences: defaultReaderPreferences()
           ..theme = 'sepia'
@@ -170,6 +172,7 @@ void main() {
       );
       final position = await target.reader.loadPosition(bookId, revision);
       expect(position.locatorJson, contains('"progression":0.5'));
+      expect(position.bookmarksJson, contains('다시 읽을 문장'));
       expect(position.preferences.theme, 'sepia');
       expect(position.preferences.fontScale, 1.4);
       final group = (await target.groups.load()).single;

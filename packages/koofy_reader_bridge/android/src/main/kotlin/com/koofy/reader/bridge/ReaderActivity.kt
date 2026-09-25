@@ -49,6 +49,8 @@ import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.epub.EpubLayout
 import org.readium.r2.shared.publication.presentation.presentation
 import org.readium.r2.shared.publication.services.isRestricted
+import org.readium.r2.shared.publication.services.search.searchServiceFactory
+import org.readium.r2.shared.publication.services.search.StringSearchService
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.Url
@@ -89,6 +91,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private var publication: Publication? = null
     private var navigator: EpubNavigatorFragment? = null
     private var lastLocator: Locator? = null
+    private val navigationHistory = java.util.ArrayDeque<Locator>()
+    private var toolsNavigationCompleted: (() -> Unit)? = null
+    private lateinit var returnButton: Button
     private var initialTarget: Locator? = null
     private var restoreTarget: Locator? = null
     private var restoreIssued = false
@@ -149,6 +154,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setPadding(dp(8), 0, dp(8), 0)
         }, LinearLayout.LayoutParams(0, -2, 1f))
         toolbar.addView(button("목차") { showContents() })
+        toolbar.addView(button("찾기") { showReaderTools() })
         toolbar.addView(button("독서 설정") { showSettings() })
         page.addView(toolbar, LinearLayout.LayoutParams(-1, dp(52)))
         container = FragmentContainerView(this).apply { id = View.generateViewId() }
@@ -173,6 +179,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         turnHost.addView(curlView, FrameLayout.LayoutParams(-1, -1))
         page.addView(turnHost, LinearLayout.LayoutParams(-1, 0, 1f))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        returnButton = button("↶") { returnToReading() }.apply {
+            contentDescription = "이동 전 위치로"; isEnabled = false
+        }
+        navigation.addView(returnButton)
         navigation.addView(button("이전") { pageTurns?.request(false) })
         status = TextView(this).apply {
             text = "책을 여는 중…"
@@ -243,6 +253,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     .getOrElse { throw IOException(it.message) }
                 val opener = PublicationOpener(DefaultPublicationParser(this@ReaderActivity, http, retriever, null))
                 opener.open(asset, allowUserInteraction = false, onCreatePublication = {
+                    servicesBuilder.searchServiceFactory = StringSearchService.createDefaultFactory()
                     // Readium's own scripts are required for layout. Publication scripts,
                     // event handlers, remote fetches and nested frames are denied by CSP.
                     container = TransformingContainer(org.readium.r2.shared.util.data.CompositeContainer(readerFonts.container(), container)) { url, resource ->
@@ -345,7 +356,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             if (navigator?.go(target, false) != true) fail("restore_failed", "읽던 위치를 복원하지 못했습니다.")
             return
         }
-        if (target != null && target.href != locator.href) return
+        if (target != null && target.href.removeFragment() != locator.href.removeFragment()) return
         val generation = ++captureGeneration
         val layout = layoutGeneration
         val reader = navigator ?: return
@@ -393,6 +404,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     if (hingeFallback) append(" · 한쪽 화면")
                 }
                 emit(kind)
+                if (target != null) {
+                    val completed = toolsNavigationCompleted
+                    toolsNavigationCompleted = null
+                    completed?.invoke()
+                }
                 pageTurns?.mainSettled()
             } catch (error: CancellationException) {
                 throw error
@@ -417,7 +433,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         pageTurns?.invalidate()
         beginRestore(locator)
         restoreIssued = true
-        check(navigator?.go(locator, false) == true) { "Could not navigate to the location" }
+        if (navigator?.go(locator, false) != true) {
+            restoreTimeout?.cancel()
+            restoreTarget = null
+            restoreIssued = false
+            error("Could not navigate to the location")
+        }
     }
 
     fun applyReaderPreferences(preferences: ReaderPreferences) {
@@ -546,6 +567,46 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
     }
 
+    private fun toolsReady() = session.ready && !session.closing && restoreTarget == null && captureJob?.isActive != true
+    private fun jumpFromTools(target: Locator) {
+        if (!toolsReady()) { Toast.makeText(this, "본문 위치 확인 후 다시 눌러 주세요.", Toast.LENGTH_SHORT).show(); return }
+        val source = lastLocator ?: return
+        try {
+            goToLocator(target.toJSON().toString())
+            toolsNavigationCompleted = {
+                navigationHistory.addLast(source)
+                if (navigationHistory.size > 20) navigationHistory.removeFirst()
+                returnButton.isEnabled = true
+            }
+        } catch (_: Exception) { Toast.makeText(this, "해당 위치로 이동하지 못했습니다.", Toast.LENGTH_SHORT).show() }
+    }
+    private fun returnToReading() {
+        if (!toolsReady() || navigationHistory.isEmpty()) return
+        try {
+            goToLocator(navigationHistory.last.toJSON().toString())
+            toolsNavigationCompleted = {
+                navigationHistory.removeLast()
+                returnButton.isEnabled = navigationHistory.isNotEmpty()
+            }
+        } catch (_: Exception) { Toast.makeText(this, "이전 위치로 돌아가지 못했습니다.", Toast.LENGTH_SHORT).show() }
+    }
+    private fun showReaderTools() {
+        if (!toolsReady()) return
+        val pub = publication ?: return
+        ReaderTools(this, lifecycleScope, pub, ReaderPalette.forTheme(session.preferences.theme), { if (toolsReady()) lastLocator else null },
+            { session.bookmarksJson }, { value, done ->
+                if (value.toByteArray(Charsets.UTF_8).size > 512 * 1024) { done(false) }
+                else {
+                    val previous = session.bookmarksJson
+                    session.bookmarksJson = value
+                    ReaderRuntime.emit(session.event("locationChanged")) { result ->
+                        if (result.isFailure) session.bookmarksJson = previous
+                        done(result.isSuccess)
+                    }
+                }
+            }, { jumpFromTools(it) }).show()
+    }
+
     private fun showContents() {
         if (!session.ready) return
         val links = publication?.tableOfContents.orEmpty().ifEmpty { publication?.readingOrder.orEmpty() }
@@ -556,10 +617,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         add(links)
         AlertDialog.Builder(this).setTitle("목차")
             .setItems(flattened.mapIndexed { index, link -> link.title ?: "${index + 1}장" }.toTypedArray()) { _, index ->
-                pageTurns?.invalidate()
-                restoreTarget = null
-                restoreTimeout?.cancel()
-                navigator?.go(flattened[index], false)
+                publication?.locatorFromLink(flattened[index])?.let { jumpFromTools(it) }
             }.setNegativeButton("닫기", null).show().also { dialog ->
                 val colors = ReaderPalette.forTheme(session.preferences.theme)
                 dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.background))
@@ -674,6 +732,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     private fun fail(code: String, message: String) {
+        toolsNavigationCompleted = null
         if (loadingFailed || isFinishing) return
         loadingFailed = true
         restoreTimeout?.cancel()

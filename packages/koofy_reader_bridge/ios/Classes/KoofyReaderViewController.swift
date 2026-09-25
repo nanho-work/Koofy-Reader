@@ -54,10 +54,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private let progress = UILabel()
     private var progressItem: UIBarButtonItem!
     private var chromeVisible = true
+    private var navigationHistory: [Locator] = []
+    private var returnItem: UIBarButtonItem?
+    private var bookmarksJson: String
 
     init(request: ReaderLaunchRequest, journal: ReaderCheckpointStore, sendEvent: @escaping (ReaderEvent) -> Void) {
         self.request = request
         self.preferences = request.preferences
+        self.bookmarksJson = request.bookmarksJson ?? "[]"
         self.journal = journal
         self.sendEvent = sendEvent
         super.init(nibName: nil, bundle: nil)
@@ -107,11 +111,13 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         progress.text = "책을 여는 중"
         progress.accessibilityIdentifier = "reader.progress"
         progressItem = UIBarButtonItem(customView: progress)
+        let returnButton = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"), style: .plain, target: self, action: #selector(returnToReading))
+        returnButton.accessibilityLabel = "이동 전 위치로"; returnButton.isEnabled = false; returnItem = returnButton
         let previous = UIBarButtonItem(title: "이전", style: .plain, target: self, action: #selector(previousTapped))
         previous.accessibilityIdentifier = "reader.previous"
         let next = UIBarButtonItem(title: "다음", style: .plain, target: self, action: #selector(nextTapped))
         next.accessibilityIdentifier = "reader.next"
-        toolbar.items = [previous, .flexibleSpace(), progressItem, .flexibleSpace(), next]
+        toolbar.items = [returnButton, previous, .flexibleSpace(), progressItem, .flexibleSpace(), next]
         spinner.translatesAutoresizingMaskIntoConstraints = false
         body.addSubview(spinner)
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -573,7 +579,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             sessionGeneration: request.sessionGeneration, publicationId: request.publicationId,
             contentRevision: request.contentRevision, sequence: sequence, kind: kind,
             locatorJson: try lastLocator?.jsonString(), preferences: preferences,
-            errorCode: nil, message: nil)
+            errorCode: nil, message: nil, bookmarksJson: bookmarksJson)
         try journal.write(event)
         return event
     }
@@ -895,7 +901,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         settings.accessibilityIdentifier = "reader.preferences"
         let contents = UIBarButtonItem(title: "목차", style: .plain, target: self, action: #selector(contentsTapped))
         contents.accessibilityIdentifier = "reader.contents"
-        navigationItem.rightBarButtonItems = [settings, contents]
+        let tools = UIBarButtonItem(image: UIImage(systemName: "magnifyingglass"), style: .plain, target: self, action: #selector(toolsTapped(_:)))
+        tools.accessibilityLabel = "본문 검색 · 책갈피"
+        navigationItem.rightBarButtonItems = [settings, contents, tools]
         if request.nextBookTitle != nil {
             let next = UIBarButtonItem(title: "다음 권", style: .plain,
                 target: self, action: #selector(nextBookTapped))
@@ -989,6 +997,77 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         toolbar.accessibilityElementsHidden = !chromeVisible
     }
 
+    private func jumpFromTools(_ target: Locator) {
+        guard isReady, !isClosing, !turnBusy, let source = lastLocator else { return }
+        do {
+            try go(to: target) { [weak self] result in
+                guard let self else { return }
+                if case .success = result {
+                    self.navigationHistory.append(source)
+                    if self.navigationHistory.count > 20 { self.navigationHistory.removeFirst() }
+                    self.returnItem?.isEnabled = true
+                } else if case let .failure(error) = result { self.report(error, code: "navigation_failed", fatal: false) }
+            }
+        } catch { report(error, code: "navigation_failed", fatal: false) }
+    }
+    @objc private func returnToReading() {
+        guard isReady, !isClosing, !turnBusy, let target = navigationHistory.last else { return }
+        do {
+            try go(to: target) { [weak self] result in
+                guard let self else { return }
+                if case .success = result { self.navigationHistory.removeLast(); self.returnItem?.isEnabled = !self.navigationHistory.isEmpty }
+                else if case let .failure(error) = result { self.report(error, code: "navigation_failed", fatal: false) }
+            }
+        } catch { report(error, code: "navigation_failed", fatal: false) }
+    }
+    private func saveBookmarks(_ rows: [ReaderBookmark]) throws {
+        let previous = bookmarksJson
+        bookmarksJson = try ReaderBookmark.encode(rows)
+        do { try persist(kind: "locationChanged") }
+        catch { bookmarksJson = previous; throw error }
+    }
+    private func presentTool(_ controller: UIViewController) {
+        (controller as? ReaderToolTableController)?.palette = ReaderPalette.forTheme(preferences.theme)
+        let sheet = UINavigationController(rootViewController: controller)
+        sheet.overrideUserInterfaceStyle = preferences.theme == "dark" ? .dark : .light
+        sheet.modalPresentationStyle = .pageSheet
+        present(sheet, animated: true)
+    }
+    @objc private func toolsTapped(_ sender: UIBarButtonItem) {
+        guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let publication else { return }
+        let menu = UIAlertController(title: "찾기 · 책갈피", message: nil, preferredStyle: .actionSheet)
+        menu.addAction(UIAlertAction(title: "본문 검색", style: .default) { [weak self] _ in
+            self?.presentTool(ReaderSearchViewController(publication: publication) { [weak self] location in self?.jumpFromTools(location) })
+        })
+        menu.addAction(UIAlertAction(title: "현재 위치에 책갈피 추가", style: .default) { [weak self] _ in self?.addBookmark() })
+        menu.addAction(UIAlertAction(title: "책갈피 목록", style: .default) { [weak self] _ in
+            guard let self else { return }
+            do { self.presentTool(ReaderBookmarksViewController(rows: try ReaderBookmark.decode(self.bookmarksJson), save: { [weak self] rows in try self?.saveBookmarks(rows) }, jump: { [weak self] location in self?.jumpFromTools(location) })) }
+            catch { self.report(error, code: "bookmarks_failed", fatal: false) }
+        })
+        menu.addAction(UIAlertAction(title: "닫기", style: .cancel))
+        menu.popoverPresentationController?.barButtonItem = sender
+        present(menu, animated: true)
+    }
+    private func addBookmark() {
+        guard isReady, !isClosing, let locator = lastLocator else { return }
+        do {
+            let rows = try ReaderBookmark.decode(bookmarksJson)
+            guard rows.count < 100 else { throw failure("bookmark_limit", "책갈피는 책마다 100개까지 저장할 수 있습니다.") }
+            guard !rows.contains(where: { $0.locator == locator }) else { throw failure("bookmark_exists", "이미 저장한 위치입니다.") }
+            let alert = UIAlertController(title: "책갈피 이름", message: nil, preferredStyle: .alert)
+            alert.addTextField { $0.text = String(ReaderBookmark.snippet(locator).prefix(120)) }
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+            alert.addAction(UIAlertAction(title: "저장", style: .default) { [weak self, weak alert] _ in
+                guard let self else { return }
+                let label = ReaderBookmark.label(alert?.textFields?.first?.text ?? "책갈피")
+                do { try self.saveBookmarks(rows + [ReaderBookmark(id: UUID().uuidString, label: label.isEmpty ? "책갈피" : label, locator: locator)]) }
+                catch { self.report(error, code: "bookmark_save_failed", fatal: false) }
+            })
+            present(alert, animated: true)
+        } catch { report(error, code: "bookmark_failed", fatal: false) }
+    }
+
     @objc private func contentsTapped() {
         guard isReady, let publication, presentedViewController == nil else { return }
         Task { [weak self] in
@@ -1001,10 +1080,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                     guard let self else { return }
                     Task {
                         guard let locator = await publication.locate(link) else { return }
-                        do { try self.go(to: locator) { [weak self] result in
-                            if case let .failure(error) = result { self?.report(error, code: "navigation_failed", fatal: false) }
-                        } }
-                        catch { self.report(error, code: "navigation_failed", fatal: false) }
+                        self.jumpFromTools(locator)
                     }
                 }
                 let sheet = UINavigationController(rootViewController: contents)

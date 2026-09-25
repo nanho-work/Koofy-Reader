@@ -45,6 +45,7 @@ class ReaderLaunchRequest {
     this.bannerAdUnitId,
     this.adHiddenUntilEpochMs,
     this.nextBookTitle,
+    this.bookmarksJson,
   });
   int protocolVersion;
   String sessionId;
@@ -62,6 +63,7 @@ class ReaderLaunchRequest {
 
   /// Optional next member in the user's saved group order.
   String? nextBookTitle;
+  String? bookmarksJson;
 }
 
 class ReaderEvent {
@@ -77,6 +79,7 @@ class ReaderEvent {
     this.preferences,
     this.errorCode,
     this.message,
+    this.bookmarksJson,
   });
   int protocolVersion;
   String sessionId;
@@ -89,6 +92,7 @@ class ReaderEvent {
   ReaderPreferences? preferences;
   String? errorCode;
   String? message;
+  String? bookmarksJson;
 }
 
 @HostApi()

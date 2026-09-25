@@ -100,6 +100,7 @@ class NativeReaderCoordinator {
             bannerAdUnitId: bannerAdUnitId,
             adHiddenUntilEpochMs: adHiddenUntilEpochMs,
             nextBookTitle: nextBookTitle,
+            bookmarksJson: position.bookmarksJson,
           ),
         );
       } catch (_) {

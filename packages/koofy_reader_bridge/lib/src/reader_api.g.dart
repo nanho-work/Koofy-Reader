@@ -121,6 +121,7 @@ class ReaderLaunchRequest {
     this.bannerAdUnitId,
     this.adHiddenUntilEpochMs,
     this.nextBookTitle,
+    this.bookmarksJson,
   });
 
   int protocolVersion;
@@ -149,6 +150,8 @@ class ReaderLaunchRequest {
   /// Optional next member in the user's saved group order.
   String? nextBookTitle;
 
+  String? bookmarksJson;
+
   List<Object?> _toList() {
     return <Object?>[
       protocolVersion,
@@ -163,6 +166,7 @@ class ReaderLaunchRequest {
       bannerAdUnitId,
       adHiddenUntilEpochMs,
       nextBookTitle,
+      bookmarksJson,
     ];
   }
 
@@ -184,6 +188,7 @@ class ReaderLaunchRequest {
       bannerAdUnitId: result[9] as String?,
       adHiddenUntilEpochMs: result[10] as int?,
       nextBookTitle: result[11] as String?,
+      bookmarksJson: result[12] as String?,
     );
   }
 
@@ -218,6 +223,7 @@ class ReaderEvent {
     this.preferences,
     this.errorCode,
     this.message,
+    this.bookmarksJson,
   });
 
   int protocolVersion;
@@ -242,6 +248,8 @@ class ReaderEvent {
 
   String? message;
 
+  String? bookmarksJson;
+
   List<Object?> _toList() {
     return <Object?>[
       protocolVersion,
@@ -255,6 +263,7 @@ class ReaderEvent {
       preferences,
       errorCode,
       message,
+      bookmarksJson,
     ];
   }
 
@@ -275,6 +284,7 @@ class ReaderEvent {
       preferences: result[8] as ReaderPreferences?,
       errorCode: result[9] as String?,
       message: result[10] as String?,
+      bookmarksJson: result[11] as String?,
     );
   }
 

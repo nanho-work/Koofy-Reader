@@ -1125,6 +1125,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
         );
       }
+      if (mounted && result.files.length > 1 && imported.addedIds.isNotEmpty) {
+        await _organizeImportedBooks(imported.addedIds);
+      }
     } catch (_) {
       _snack('책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요.');
     } finally {

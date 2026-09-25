@@ -11,10 +11,12 @@ class StoredReaderPosition {
     required this.locatorJson,
     required this.preferences,
     this.previousRevisionExists = false,
+    this.bookmarksJson = '[]',
   });
   final String? locatorJson;
   final ReaderPreferences preferences;
   final bool previousRevisionExists;
+  final String bookmarksJson;
 }
 
 class ReaderSessionIdentity {
@@ -52,7 +54,7 @@ class NativeReaderStore extends GeneratedDatabase {
       NativeReaderStore(NativeDatabase.createInBackground(file));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => const [];
@@ -72,11 +74,16 @@ class NativeReaderStore extends GeneratedDatabase {
         publication_id TEXT NOT NULL, content_revision TEXT NOT NULL,
         session_id TEXT NOT NULL, generation INTEGER NOT NULL,
         sequence INTEGER NOT NULL, locator_json TEXT,
-        preferences_json TEXT NOT NULL,
+        preferences_json TEXT NOT NULL, bookmarks_json TEXT NOT NULL DEFAULT '[]',
         PRIMARY KEY(publication_id, content_revision))''');
       await _createGlobalPreferences();
     },
     onUpgrade: (_, from, to) async {
+      if (from < 4) {
+        await customStatement(
+          "ALTER TABLE reader_positions ADD COLUMN bookmarks_json TEXT NOT NULL DEFAULT '[]'",
+        );
+      }
       if (from < 2) {
         // Existing sessions have no trustworthy wall-clock timestamp.
         await customStatement(
@@ -171,7 +178,7 @@ class NativeReaderStore extends GeneratedDatabase {
   ) async {
     final preferences = await _loadGlobalPreferences();
     final row = await customSelect(
-      'SELECT locator_json, preferences_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
+      'SELECT locator_json, preferences_json, bookmarks_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
       variables: [
         Variable.withString(publicationId),
         Variable.withString(revision),
@@ -193,6 +200,7 @@ class NativeReaderStore extends GeneratedDatabase {
     }
     return StoredReaderPosition(
       locatorJson: row.readNullable<String>('locator_json'),
+      bookmarksJson: row.read<String>('bookmarks_json'),
       preferences: preferences,
     );
   }
@@ -201,7 +209,7 @@ class NativeReaderStore extends GeneratedDatabase {
       transaction(() async {
         final rows = await customSelect(
           '''SELECT p.publication_id, p.content_revision,
-      p.locator_json, s.started_at FROM reader_positions p
+      p.locator_json, p.bookmarks_json, s.started_at FROM reader_positions p
       JOIN reader_sessions s ON p.session_id=s.session_id ORDER BY p.generation''',
         ).get();
         return {
@@ -213,6 +221,7 @@ class NativeReaderStore extends GeneratedDatabase {
                   'bookId': row.read<String>('publication_id'),
                   'revision': row.read<String>('content_revision'),
                   'locator': row.readNullable<String>('locator_json'),
+                  'bookmarks': row.read<String>('bookmarks_json'),
                   'openedAt': row.readNullable<int>('started_at'),
                 },
           ],
@@ -243,7 +252,7 @@ class NativeReaderStore extends GeneratedDatabase {
         [row['openedAt'], session.id],
       );
       await customStatement(
-        'INSERT INTO reader_positions VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO reader_positions VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           row['revision'],
@@ -252,6 +261,7 @@ class NativeReaderStore extends GeneratedDatabase {
           0,
           row['locator'],
           preferencesToJson(preferences),
+          validateBookmarksJson(row['bookmarks'] as String? ?? '[]'),
         ],
       );
     }
@@ -303,7 +313,7 @@ class NativeReaderStore extends GeneratedDatabase {
       }
     }
     final rows = await customSelect(
-      'SELECT generation, sequence, locator_json, preferences_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
+      'SELECT generation, sequence, locator_json, preferences_json, bookmarks_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
       variables: [
         Variable.withString(event.publicationId),
         Variable.withString(event.contentRevision),
@@ -323,6 +333,9 @@ class NativeReaderStore extends GeneratedDatabase {
                 rows.read<int>('sequence') >= event.sequence))) {
       return;
     }
+    final bookmarks = validateBookmarksJson(
+      event.bookmarksJson ?? rows?.read<String>('bookmarks_json') ?? '[]',
+    );
     final locator =
         event.locatorJson ?? rows?.readNullable<String>('locator_json');
     final preferences = event.preferences == null
@@ -350,12 +363,12 @@ class NativeReaderStore extends GeneratedDatabase {
     }
     await customStatement(
       '''INSERT INTO reader_positions
-      (publication_id, content_revision, session_id, generation, sequence, locator_json, preferences_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      (publication_id, content_revision, session_id, generation, sequence, locator_json, preferences_json, bookmarks_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(publication_id, content_revision) DO UPDATE SET
       session_id=excluded.session_id, generation=excluded.generation,
       sequence=excluded.sequence, locator_json=excluded.locator_json,
-      preferences_json=excluded.preferences_json''',
+      preferences_json=excluded.preferences_json, bookmarks_json=excluded.bookmarks_json''',
       [
         event.publicationId,
         event.contentRevision,
@@ -364,6 +377,7 @@ class NativeReaderStore extends GeneratedDatabase {
         event.sequence,
         locator,
         preferences,
+        bookmarks,
       ],
     );
   });
@@ -406,4 +420,30 @@ ReaderPreferences preferencesFromJson(String source) {
   );
   preferencesToJson(preferences);
   return preferences;
+}
+
+/// Validate snapshots both from native recovery and untrusted backup files.
+String validateBookmarksJson(String value) {
+  if (utf8.encode(value).length > 512 * 1024) {
+    throw const FormatException('책갈피가 너무 큽니다.');
+  }
+  final rows = jsonDecode(value);
+  if (rows is! List || rows.length > 100) {
+    throw const FormatException('책갈피 형식이 올바르지 않습니다.');
+  }
+  final ids = <String>{};
+  for (final row in rows) {
+    if (row is! Map ||
+        row['id'] is! String ||
+        (row['id'] as String).isEmpty ||
+        !ids.add(row['id'] as String) ||
+        row['label'] is! String ||
+        (row['label'] as String).length > 300 ||
+        row['locator'] is! Map ||
+        row['locator']['href'] is! String ||
+        (row['locator']['href'] as String).isEmpty) {
+      throw const FormatException('책갈피 위치가 올바르지 않습니다.');
+    }
+  }
+  return value;
 }

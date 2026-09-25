@@ -48,6 +48,14 @@ void main() {
         },
       );
       expect(result.added, 10);
+      expect(result.addedIds, hasLength(10));
+      expect(
+        result.addedIds.toSet(),
+        (await repository.getBooks())
+            .where((b) => b.isLocalFile)
+            .map((b) => b.id)
+            .toSet(),
+      );
       expect(result.existing, 1);
       expect(result.failedNames, ['broken.txt', 'cloud.txt']);
       expect(progress, List.generate(13, (i) => i + 1));
@@ -57,6 +65,7 @@ void main() {
       );
       final retry = await importBooks(repository, [files.first]);
       expect(retry.added, 0);
+      expect(retry.addedIds, isEmpty);
       expect(retry.existing, 1);
     },
   );

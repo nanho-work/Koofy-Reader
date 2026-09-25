@@ -118,6 +118,7 @@ internal class ReaderSession(val request: ReaderLaunchRequest) {
     var sequence = 0L
     var preferences = request.preferences
     var locatorJson = request.initialLocatorJson
+    var bookmarksJson = request.bookmarksJson ?: "[]"
     var ready = false
     var closing = false
     var closeRequested = false
@@ -131,6 +132,7 @@ internal class ReaderSession(val request: ReaderLaunchRequest) {
         sequence = ++sequence,
         kind = kind,
         locatorJson = locatorJson,
+        bookmarksJson = bookmarksJson,
         preferences = preferences,
         errorCode = errorCode,
         message = message,

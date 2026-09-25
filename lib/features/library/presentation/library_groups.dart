@@ -1,6 +1,57 @@
 part of 'library_page.dart';
 
 extension _LibraryGroups on _LibraryPageState {
+  Future<void> _organizeImportedBooks(List<String> ids) async {
+    if (ids.isEmpty || !mounted) return;
+    try {
+      await ref.read(booksProvider.future);
+      final groups = await ref.read(bookGroupsProvider.future);
+      if (!mounted) return;
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                title: Text('${ids.length}권을 가져왔어요'),
+                subtitle: const Text('묶음에 넣을 책과 순서를 다음 화면에서 확인하세요.'),
+              ),
+              if (ids.length >= 2)
+                ListTile(
+                  leading: const Icon(Icons.create_new_folder_outlined),
+                  title: const Text('새 묶음 만들기'),
+                  onTap: () => Navigator.pop(context, 'new'),
+                ),
+              for (final group in groups)
+                ListTile(
+                  leading: const Icon(Icons.library_books_outlined),
+                  title: Text(group.title),
+                  subtitle: const Text('이 묶음에 추가'),
+                  onTap: () => Navigator.pop(context, group.id),
+                ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('각각 보관'),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || choice == null) return;
+      if (choice == 'new') {
+        await _createGroup(initialIds: ids);
+      } else {
+        final group = groups.where((g) => g.id == choice).firstOrNull;
+        if (group != null) await _addGroupBooks(group, initialIds: ids);
+      }
+    } catch (_) {
+      _snack('책은 가져왔지만 묶음 목록을 불러오지 못했습니다. 서재에서 묶음으로 정리해 주세요.');
+    }
+  }
+
   List<Book> _ungroupedBooks() {
     final groups = ref.read(bookGroupsProvider).valueOrNull;
     if (groups == null || ref.read(bookGroupsProvider).hasError) {
@@ -51,7 +102,10 @@ extension _LibraryGroups on _LibraryPageState {
     }
   }
 
-  Future<void> _addGroupBooks(BookGroup group) async {
+  Future<void> _addGroupBooks(
+    BookGroup group, {
+    List<String> initialIds = const [],
+  }) async {
     if (_groupBusy) return;
     try {
       final books = _ungroupedBooks();
@@ -65,7 +119,11 @@ extension _LibraryGroups on _LibraryPageState {
             data: KoofyTheme.forBrightness(
               MediaQuery.platformBrightnessOf(context),
             ),
-            child: BookGroupEditor(books: books, creating: false),
+            child: BookGroupEditor(
+              books: books,
+              creating: false,
+              initialIds: initialIds,
+            ),
           ),
         ),
       );

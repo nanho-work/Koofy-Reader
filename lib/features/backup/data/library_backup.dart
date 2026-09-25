@@ -256,6 +256,7 @@ class LibraryBackupService {
           (row['openedAt'] != null && row['openedAt'] is! int)) {
         throw const FormatException('독서 기록이 올바르지 않습니다.');
       }
+      validateBookmarksJson(row['bookmarks'] as String? ?? '[]');
       final locator = row['locator'];
       if (locator != null) {
         final data = jsonDecode(locator as String);

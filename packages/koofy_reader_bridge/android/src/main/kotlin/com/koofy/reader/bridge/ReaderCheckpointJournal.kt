@@ -57,6 +57,7 @@ internal class ReaderCheckpointJournal(filesDir: File) {
         put("sequence", event.sequence)
         put("kind", event.kind)
         put("locatorJson", event.locatorJson)
+        put("bookmarksJson", event.bookmarksJson)
         put("errorCode", event.errorCode)
         put("message", event.message)
         event.preferences?.let { preferences ->
@@ -82,6 +83,7 @@ internal class ReaderCheckpointJournal(filesDir: File) {
             sequence = json.getLong("sequence"),
             kind = json.getString("kind"),
             locatorJson = json.optionalString("locatorJson"),
+            bookmarksJson = json.optionalString("bookmarksJson"),
             preferences = json.optJSONObject("preferences")?.let {
                 ReaderPreferences(it.getDouble("fontScale"), it.getLong("columnCount"),
                     it.getBoolean("scroll"), it.getString("theme"), it.optionalString("pageTurnStyle"), it.optionalString("fontId"))

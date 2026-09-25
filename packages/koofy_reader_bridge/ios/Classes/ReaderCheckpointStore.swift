@@ -86,6 +86,7 @@ private struct Checkpoint: Codable {
     let sequence: Int64
     let kind: String
     let locatorJson: String?
+    let bookmarksJson: String?
     let fontScale: Double?
     let columnCount: Int64?
     let scroll: Bool?
@@ -104,6 +105,7 @@ private struct Checkpoint: Codable {
         sequence = event.sequence
         kind = event.kind
         locatorJson = event.locatorJson
+        bookmarksJson = event.bookmarksJson
         fontScale = event.preferences?.fontScale
         columnCount = event.preferences?.columnCount
         scroll = event.preferences?.scroll
@@ -123,6 +125,6 @@ private struct Checkpoint: Codable {
         return ReaderEvent(protocolVersion: protocolVersion, sessionId: sessionId,
             sessionGeneration: sessionGeneration, publicationId: publicationId,
             contentRevision: contentRevision, sequence: sequence, kind: kind,
-            locatorJson: locatorJson, preferences: preferences, errorCode: errorCode, message: message)
+            locatorJson: locatorJson, preferences: preferences, errorCode: errorCode, message: message, bookmarksJson: bookmarksJson)
     }
 }

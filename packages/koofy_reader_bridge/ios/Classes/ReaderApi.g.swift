@@ -195,6 +195,7 @@ struct ReaderLaunchRequest: Hashable {
   var adHiddenUntilEpochMs: Int64? = nil
   /// Optional next member in the user's saved group order.
   var nextBookTitle: String? = nil
+  var bookmarksJson: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -211,6 +212,7 @@ struct ReaderLaunchRequest: Hashable {
     let bannerAdUnitId: String? = nilOrValue(pigeonVar_list[9])
     let adHiddenUntilEpochMs: Int64? = nilOrValue(pigeonVar_list[10])
     let nextBookTitle: String? = nilOrValue(pigeonVar_list[11])
+    let bookmarksJson: String? = nilOrValue(pigeonVar_list[12])
 
     return ReaderLaunchRequest(
       protocolVersion: protocolVersion,
@@ -224,7 +226,8 @@ struct ReaderLaunchRequest: Hashable {
       preferences: preferences,
       bannerAdUnitId: bannerAdUnitId,
       adHiddenUntilEpochMs: adHiddenUntilEpochMs,
-      nextBookTitle: nextBookTitle
+      nextBookTitle: nextBookTitle,
+      bookmarksJson: bookmarksJson
     )
   }
   func toList() -> [Any?] {
@@ -241,6 +244,7 @@ struct ReaderLaunchRequest: Hashable {
       bannerAdUnitId,
       adHiddenUntilEpochMs,
       nextBookTitle,
+      bookmarksJson,
     ]
   }
   static func == (lhs: ReaderLaunchRequest, rhs: ReaderLaunchRequest) -> Bool {
@@ -263,6 +267,7 @@ struct ReaderEvent: Hashable {
   var preferences: ReaderPreferences? = nil
   var errorCode: String? = nil
   var message: String? = nil
+  var bookmarksJson: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -278,6 +283,7 @@ struct ReaderEvent: Hashable {
     let preferences: ReaderPreferences? = nilOrValue(pigeonVar_list[8])
     let errorCode: String? = nilOrValue(pigeonVar_list[9])
     let message: String? = nilOrValue(pigeonVar_list[10])
+    let bookmarksJson: String? = nilOrValue(pigeonVar_list[11])
 
     return ReaderEvent(
       protocolVersion: protocolVersion,
@@ -290,7 +296,8 @@ struct ReaderEvent: Hashable {
       locatorJson: locatorJson,
       preferences: preferences,
       errorCode: errorCode,
-      message: message
+      message: message,
+      bookmarksJson: bookmarksJson
     )
   }
   func toList() -> [Any?] {
@@ -306,6 +313,7 @@ struct ReaderEvent: Hashable {
       preferences,
       errorCode,
       message,
+      bookmarksJson,
     ]
   }
   static func == (lhs: ReaderEvent, rhs: ReaderEvent) -> Bool {
