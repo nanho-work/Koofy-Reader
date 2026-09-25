@@ -82,6 +82,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var turnHost: ReaderTurnHost
     private lateinit var previewContainer: FragmentContainerView
     private lateinit var curlView: ReaderPageCurlView
+    private lateinit var spreadDivider: View
     internal var pageTurns: ReaderPageTurns? = null
         private set
     private lateinit var readerFonts: ReaderFonts
@@ -159,6 +160,16 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         curlView = ReaderPageCurlView(this)
         turnHost.addView(previewContainer, FrameLayout.LayoutParams(-1, -1))
         turnHost.addView(container, FrameLayout.LayoutParams(-1, -1))
+        spreadDivider = View(this).apply {
+            isClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
+        }
+        turnHost.addView(spreadDivider, FrameLayout.LayoutParams(dp(1), -1, Gravity.CENTER).apply {
+            topMargin = dp(24)
+            bottomMargin = dp(24)
+        })
         turnHost.addView(curlView, FrameLayout.LayoutParams(-1, -1))
         page.addView(turnHost, LinearLayout.LayoutParams(-1, 0, 1f))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -171,6 +182,16 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         navigation.addView(button("다음") { pageTurns?.request(true) })
+        session.request.nextBookTitle?.let { title ->
+            navigation.addView(button("다음 권") {
+                if (session.ready && !session.closing) {
+                    AlertDialog.Builder(this).setTitle("다음 권 읽기")
+                        .setMessage(title)
+                        .setPositiveButton("열기") { _, _ -> closeReader(nextBook = true) }
+                        .setNegativeButton("취소", null).show()
+                }
+            })
+        }
         page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
         bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, beforeResize = {
             if (session.ready && !session.closing) scheduleRelayout()
@@ -188,6 +209,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             if (width > 0 && height > 0 && (width != lastWidth || height != lastHeight)) {
                 lastWidth = width
                 lastHeight = height
+                updateSpreadDivider()
                 if (session.ready) scheduleRelayout()
             }
         }
@@ -449,23 +471,35 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
     }
 
-    private fun epubPreferences(): EpubPreferences {
+    private fun readerColumns(): ColumnCount {
         val p = session.preferences
         val usableWidth = if (::container.isInitialized && container.width > 0) container.width / resources.displayMetrics.density
             else resources.configuration.screenWidthDp.toFloat()
-        val columns = when {
+        return when {
             p.scroll || hingeFallback || usableWidth < 700 -> ColumnCount.ONE
             p.columnCount == 1L -> ColumnCount.ONE
             p.columnCount == 2L -> ColumnCount.TWO
             else -> ColumnCount.TWO
         }
+    }
+
+    private fun updateSpreadDivider() {
+        if (!::spreadDivider.isInitialized) return
+        spreadDivider.visibility = if (readerColumns() == ColumnCount.TWO) View.VISIBLE else View.GONE
+        val color = ReaderPalette.forTheme(session.preferences.theme).foreground
+        spreadDivider.setBackgroundColor((color and 0x00FFFFFF) or (24 shl 24))
+    }
+
+    private fun epubPreferences(): EpubPreferences {
+        val p = session.preferences
+        updateSpreadDivider()
         val palette = ReaderPalette.forTheme(p.theme)
         return EpubPreferences(
             backgroundColor = org.readium.r2.navigator.preferences.Color(palette.background),
             textColor = org.readium.r2.navigator.preferences.Color(palette.foreground),
             fontSize = p.fontScale,
             fontFamily = readerFonts.family(p.fontId),
-            columnCount = columns,
+            columnCount = readerColumns(),
             scroll = p.scroll,
             theme = when (p.theme) { "dark" -> Theme.DARK; "light" -> Theme.LIGHT; else -> Theme.SEPIA },
             verticalText = false,
@@ -487,6 +521,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     @Suppress("DEPRECATION")
     private fun applyChromeTheme() {
+        updateSpreadDivider()
         val palette = ReaderPalette.forTheme(session.preferences.theme)
         outer.setBackgroundColor(palette.background)
         page.setBackgroundColor(palette.background)
@@ -604,7 +639,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::turnHost.isInitialized) turnHost.selecting = false
     }
 
-    fun closeReader() {
+    fun closeReader(nextBook: Boolean = false) {
         if (!::session.isInitialized || session.closing) return
         session.closing = true
         pageTurns?.invalidate()
@@ -615,7 +650,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             // If closing follows a settled page callback, finish its DOM read.
             // During a relayout retain the canonical pre-layout anchor.
             captureJob?.join()
-            ReaderRuntime.emit(session.event("closed")) { result ->
+            ReaderRuntime.emit(session.event("closed", message = if (nextBook) "nextBook" else null)) { result ->
                 if (result.isSuccess) {
                     if (ReaderRuntime.session === session) ReaderRuntime.session = null
                     finish()
@@ -623,7 +658,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     session.closing = false
                     AlertDialog.Builder(this@ReaderActivity).setTitle("읽기 기록 저장 실패")
                         .setMessage("기기 저장 공간을 확인한 뒤 다시 시도해 주세요.")
-                        .setPositiveButton("다시 저장") { _, _ -> closeReader() }
+                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook) }
                         .setNegativeButton("계속 읽기", null).show()
                 }
             }

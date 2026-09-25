@@ -120,10 +120,104 @@ void main() {
       }
     },
   );
+  test(
+    'v2 upgrade adopts latest book settings without replacing any locator',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('koofy-v2-');
+      final file = File('${directory.path}/reader.sqlite');
+      final old = _V1ReaderStore(NativeDatabase(file));
+      await old.customStatement(
+        'ALTER TABLE reader_sessions ADD COLUMN started_at INTEGER',
+      );
+      await old.customStatement('INSERT INTO reader_counter VALUES (1, 2)');
+      for (var i = 1; i <= 2; i++) {
+        await old.customStatement(
+          'INSERT INTO reader_sessions VALUES (?, ?, ?, ?, ?)',
+          ['s$i', i, 'book$i', 'r1', i * 1000],
+        );
+        await old.customStatement(
+          'INSERT INTO reader_positions VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            'book$i',
+            'r1',
+            's$i',
+            i,
+            4,
+            '{"href":"book$i.xhtml"}',
+            preferencesToJson(
+              defaultReaderPreferences()..fontScale = i.toDouble(),
+            ),
+          ],
+        );
+      }
+      await old.customStatement('PRAGMA user_version=2');
+      await old.close();
+      final upgraded = NativeReaderStore(NativeDatabase(file));
+      try {
+        for (final id in ['book1', 'book2', 'new']) {
+          final position = await upgraded.loadPosition(id, 'r1');
+          expect(position.preferences.fontScale, 2);
+          expect(
+            position.locatorJson,
+            id == 'new' ? isNull : contains('$id.xhtml'),
+          );
+        }
+        expect(await upgraded.loadLibraryPositions(), hasLength(2));
+      } finally {
+        await upgraded.close();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
   group('checkpoint commits', () {
     late NativeReaderStore store;
     setUp(() => store = NativeReaderStore(NativeDatabase.memory()));
     tearDown(() => store.close());
+
+    test('appearance is global while locations remain book-specific', () async {
+      final first = await store.beginSession('book', 'r1');
+      final custom = defaultReaderPreferences()
+        ..fontScale = 1.5
+        ..fontId = 'maplestory'
+        ..theme = 'dark'
+        ..scroll = true
+        ..columnCount = 2
+        ..pageTurnStyle = 'curl';
+      await store.acceptCheckpoint(checkpoint(first)..preferences = custom);
+      final other = await store.loadPosition('other', 'r1');
+      expect(other.locatorJson, isNull);
+      expect(preferencesToJson(other.preferences), preferencesToJson(custom));
+      final next = await store.beginSession('other', 'r1');
+      await store.acceptCheckpoint(
+        checkpoint(next, href: 'other.xhtml')
+          ..publicationId = 'other'
+          ..preferences = (custom..theme = 'sepia'),
+      );
+      expect(
+        (await store.loadPosition('book', 'r1')).locatorJson,
+        contains('chapter.xhtml'),
+      );
+      expect(
+        (await store.loadPosition('book', 'r1')).preferences.theme,
+        'sepia',
+      );
+      expect(
+        (await store.loadPosition('book', 'r2')).preferences.theme,
+        'sepia',
+      );
+      await store.acceptCheckpoint(
+        checkpoint(first, sequence: 99, href: 'late.xhtml'),
+      );
+      expect(
+        (await store.loadPosition('book', 'r1')).preferences.theme,
+        'sepia',
+      );
+      expect(
+        (await store.loadPosition('other', 'r1')).locatorJson,
+        contains('other.xhtml'),
+      );
+    });
 
     test(
       'library summary chooses newest committed revision and excludes failed opens',
@@ -282,7 +376,7 @@ void main() {
             'other-book',
             'r1',
           )).preferences.pageTurnStyle,
-          'instant',
+          'curl',
         );
       },
     );
@@ -326,12 +420,18 @@ void main() {
     try {
       final first = NativeReaderStore(NativeDatabase(path));
       final oldSession = await first.beginSession('book', 'r1');
-      await first.acceptCheckpoint(checkpoint(oldSession));
+      await first.acceptCheckpoint(
+        checkpoint(oldSession)..preferences!.theme = 'dark',
+      );
       await first.close();
       final reopened = NativeReaderStore(NativeDatabase(path));
       try {
         final newSession = await reopened.beginSession('book', 'r1');
         expect(newSession.generation, greaterThan(oldSession.generation));
+        expect(
+          (await reopened.loadPosition('new-book', 'r1')).preferences.theme,
+          'dark',
+        );
         expect(
           (await reopened.loadPosition('book', 'r1')).locatorJson,
           contains('chapter.xhtml'),

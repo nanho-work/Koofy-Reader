@@ -164,3 +164,24 @@ test('delete blocks downloads, removes all versions and safely retries books and
     await bucket.file(neighbor).delete();
   }
 });
+
+
+test('admin categories persist, deduplicate and require super-admin', async () => {
+  const url = base + 'readerAdmin?action=categories';
+  assert.equal((await fetch(url)).status, 401);
+  assert.equal((await api('addCategory', { name: '역사' }, token('slimestrikeforce', false))).status, 403);
+  const first = await api('addCategory', { name: '  역사  ' });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert(first.body.categories.includes('역사'));
+  const second = await api('addCategory', { name: '역사' });
+  assert.deepEqual(second.body, first.body);
+  assert.equal((await api('addCategory', { name: '' })).status, 400);
+  const listed = await (await fetch(url, { headers: { Authorization: `Bearer ${token()}` } })).json();
+  assert.deepEqual(listed.categories, first.body.categories);
+  const created = await api('create', { kind: 'book', metadata: { title: '역사 이야기', author: 'Test', description: '', license: 'Test only', category: '역사' } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.category, '역사');
+  const { getFirestore } = require('firebase-admin/firestore');
+  await getFirestore().collection('readerSettings').doc('bookCategories').set({ names: Array.from({ length: 96 }, (_, i) => `분류${i}`) });
+  assert.equal((await api('addCategory', { name: '초과' })).status, 400);
+});

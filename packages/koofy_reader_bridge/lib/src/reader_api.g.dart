@@ -120,6 +120,7 @@ class ReaderLaunchRequest {
     required this.preferences,
     this.bannerAdUnitId,
     this.adHiddenUntilEpochMs,
+    this.nextBookTitle,
   });
 
   int protocolVersion;
@@ -145,6 +146,9 @@ class ReaderLaunchRequest {
 
   int? adHiddenUntilEpochMs;
 
+  /// Optional next member in the user's saved group order.
+  String? nextBookTitle;
+
   List<Object?> _toList() {
     return <Object?>[
       protocolVersion,
@@ -158,6 +162,7 @@ class ReaderLaunchRequest {
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookTitle,
     ];
   }
 
@@ -178,6 +183,7 @@ class ReaderLaunchRequest {
       preferences: result[8]! as ReaderPreferences,
       bannerAdUnitId: result[9] as String?,
       adHiddenUntilEpochMs: result[10] as int?,
+      nextBookTitle: result[11] as String?,
     );
   }
 

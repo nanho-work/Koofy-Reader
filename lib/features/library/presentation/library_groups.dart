@@ -10,7 +10,7 @@ extension _LibraryGroups on _LibraryPageState {
     return (ref.read(booksProvider).valueOrNull ?? <Book>[])
         .where((b) => !ids.contains(b.id))
         .toList()
-      ..sort((a, b) => a.title.compareTo(b.title));
+      ..sort((a, b) => compareBookTitles(a.title, b.title));
   }
 
   Future<void> _createGroup({

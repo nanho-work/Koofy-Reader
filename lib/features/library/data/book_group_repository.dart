@@ -140,6 +140,11 @@ class BookGroupRepository {
     final index = _index(groups, id);
     groups[index] = groups[index].copyWith(title: _title(title));
   });
+  Future<GroupChange> setMemberCovers(String id, bool show) =>
+      _change((groups) {
+        final index = _index(groups, id);
+        groups[index] = groups[index].copyWith(showMemberCovers: show);
+      });
   Future<GroupChange> takeOut(String id, String bookId) => _change((groups) {
     final index = _index(groups, id);
     groups[index] = groups[index].copyWith(

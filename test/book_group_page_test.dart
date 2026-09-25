@@ -61,6 +61,56 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets(
+    'member covers default off and toggle persists without hiding group cover',
+    (tester) async {
+      await tester.runAsync(create);
+      await shelf_test.pumpLibrary(
+        tester,
+        books: shelf_test.demoBooks.take(3).toList(),
+      );
+      await tester.pumpAndSettle();
+      await openGroup(tester);
+      final member = find.byKey(const ValueKey('group-book-b0'));
+      expect(
+        find.descendant(of: member, matching: find.byType(BookCover)),
+        findsNothing,
+      );
+      expect(find.byType(BookCover), findsOneWidget);
+      await tester.tap(find.widgetWithText(SwitchListTile, '묶음 안의 책 표지 표시'));
+      await tester.pumpAndSettle();
+      expect((await repository.load()).single.showMemberCovers, isTrue);
+      expect(
+        find.descendant(of: member, matching: find.byType(BookCover)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('explicit numeric sort updates the saved group order', (
+    tester,
+  ) async {
+    await tester.runAsync(create);
+    final books = [
+      for (var i = 0; i < 3; i++)
+        Book.asset(
+          id: 'b$i',
+          title: '소설 ${[10, 1, 2][i]}화',
+          author: '',
+          description: '',
+          assetPath: 'assets/books/sample_1.txt',
+        ),
+    ];
+    await shelf_test.pumpLibrary(tester, books: books, states: () async => {});
+    await tester.pumpAndSettle();
+    await openGroup(tester);
+    await tester.tap(find.text('제목·회차 순으로 정렬'));
+    await tester.pumpAndSettle();
+    expect((await repository.load()).single.bookIds, ['b1', 'b2', 'b0']);
+    expect((await repository.load()).single.showMemberCovers, isFalse);
+  });
+
   testWidgets('group resumes the original most recently read book', (
     tester,
   ) async {

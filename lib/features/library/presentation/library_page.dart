@@ -9,12 +9,14 @@ import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/features/library/domain/book_group.dart';
 import 'package:koofy_reader/features/library/presentation/book_group_editor.dart';
 import 'package:koofy_reader/features/library/presentation/book_group_page.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/domain/book_order.dart';
 import 'package:koofy_reader/features/library/domain/library_reading_state.dart';
 import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_services.dart';
@@ -38,6 +40,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   LibraryBookStatus? _filter;
   bool _titleSort = false;
   bool _importing = false;
+  String _importProgress = '가져오는 중…';
   bool _opening = false;
   bool _updatingCover = false;
   bool _groupBusy = false;
@@ -179,6 +182,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       for (final group in groupsAsync.requireValue) group.id: group,
     };
     final groupedIds = groups.values.expand((g) => g.bookIds).toSet();
+    final groupCovers = {
+      for (final group in groups.values)
+        if (group.coverPath != null)
+          for (final bookId in group.bookIds) bookId: group.coverPath!,
+    };
     for (final group in groups.values) {
       final memberStates =
           group.bookIds
@@ -252,7 +260,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             .toList()
           ..sort(
             (a, b) => _titleSort
-                ? a.title.compareTo(b.title)
+                ? compareBookTitles(a.title, b.title)
                 : _compareRecent(a, b, states),
           );
 
@@ -281,6 +289,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   recent.first,
                   states[recent.first.id]!,
                   canOpen,
+                  groupCoverPath: groupCovers[recent.first.id],
                 )
               : _welcome(context, empty: books.isEmpty),
         );
@@ -451,7 +460,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final time = (bState?.lastReadAt?.millisecondsSinceEpoch ?? 0).compareTo(
       aState?.lastReadAt?.millisecondsSinceEpoch ?? 0,
     );
-    return time != 0 ? time : a.title.compareTo(b.title);
+    return time != 0 ? time : compareBookTitles(a.title, b.title);
   }
 
   Widget _welcome(BuildContext context, {required bool empty}) => Column(
@@ -473,7 +482,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         FilledButton.icon(
           onPressed: _importing ? null : _importBook,
           icon: const Icon(Icons.add),
-          label: Text(_importing ? '가져오는 중…' : '첫 책 가져오기'),
+          label: Text(_importing ? _importProgress : '첫 책 가져오기'),
         ),
       ],
     ],
@@ -483,8 +492,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     BuildContext context,
     Book book,
     LibraryReadingState state,
-    bool canOpen,
-  ) {
+    bool canOpen, {
+    String? groupCoverPath,
+  }) {
     final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,7 +515,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   SizedBox(
                     width: 72,
                     height: 108,
-                    child: BookCover(book: book, compact: true),
+                    child: BookCover(
+                      // Resolve only the displayed image; resume still opens
+                      // the original member book with its own reading state.
+                      book: book.coverPath == null && groupCoverPath != null
+                          ? book.withCoverPath(groupCoverPath)
+                          : book,
+                      compact: true,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -612,7 +629,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     OutlinedButton.icon(
                       onPressed: _importing ? null : _importBook,
                       icon: const Icon(Icons.add, size: 18),
-                      label: Text(_importing ? '가져오는 중…' : '책 가져오기'),
+                      label: Text(_importing ? _importProgress : '책 가져오기'),
                     ),
                   ],
                 ),
@@ -1052,30 +1069,62 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       _snack('파일 가져오기는 Android · iOS 앱에서 이용해 주세요.');
       return;
     }
-    setState(() => _importing = true);
+    setState(() {
+      _importing = true;
+      _importProgress = '파일 선택 중…';
+    });
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['txt', 'epub'],
+        allowMultiple: true,
+        dialogTitle: '책 선택 (여러 파일 선택 가능)',
       );
-      if (!mounted || result == null) return;
-      final path = result.files.single.path;
-      if (path == null || path.isEmpty) {
-        _snack('파일 경로를 읽을 수 없습니다.');
-        return;
-      }
-      final book = await ref.read(bookRepositoryProvider).importBookFile(path);
+      if (!mounted || result == null || result.files.isEmpty) return;
+      setState(() => _importProgress = '가져오는 중 0/${result.files.length}');
+      final imported = await importBooks(
+        ref.read(bookRepositoryProvider),
+        result.files
+            .map((file) => BookImportFile(file.name, file.path))
+            .toList(),
+        onProgress: (completed, total) {
+          if (mounted) {
+            setState(() => _importProgress = '가져오는 중 $completed/$total');
+          }
+        },
+      );
       if (!mounted) return;
-      if (book == null) {
-        _snack('TXT 또는 EPUB 파일만 가져올 수 있습니다.');
-        return;
-      }
       ref.invalidate(booksProvider);
       setState(() {
         _filter = null;
         _search.clear();
       });
-      _snack('가져오기 완료: ${book.title}');
+      final summary =
+          '가져오기 완료: ${imported.added}권 추가'
+          '${imported.existing > 0 ? ' · 이미 등록된 책 ${imported.existing}권' : ''}';
+      if (imported.failedNames.isEmpty) {
+        _snack(summary);
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('가져오기 결과'),
+            content: SingleChildScrollView(
+              child: Text(
+                '$summary\n\n다음 ${imported.failedNames.length}개 파일은 가져오지 못했습니다. '
+                '파일이 기기에 내려받아져 있는지, TXT·EPUB 형식인지 확인해 주세요.\n\n'
+                '${imported.failedNames.join('\n')}',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (_) {
       _snack('책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요.');
     } finally {

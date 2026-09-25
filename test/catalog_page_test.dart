@@ -126,7 +126,7 @@ void main() {
       await pumpCatalog(tester, catalog);
       catalog.downloadGate = Completer<void>();
       await tester.tap(
-        find.byWidgetPredicate((widget) => widget is FilledButton),
+        find.byKey(ValueKey('book-download-${catalog.items.first.id}')),
       );
       await tester.pump();
       await tester.tap(find.text('글꼴'));
@@ -143,9 +143,35 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('도서'));
       await tester.pumpAndSettle();
-      expect(find.text('다운로드 완료'), findsOneWidget);
+      expect(find.byTooltip('도서 001 다운로드 완료'), findsOneWidget);
     },
   );
+
+  testWidgets('books show compact author/category rows and open full details', (
+    tester,
+  ) async {
+    final item = catalogFixture(
+      1,
+      title: '새로운 역사책',
+      author: '김작가',
+      category: '역사',
+    );
+    final catalog = FakeReaderCatalog([item]);
+    await pumpCatalog(tester, catalog);
+    expect(find.text('김작가 · 역사'), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
+    expect(find.text('출처·이용 조건'), findsNothing);
+    await tester.tap(find.text('새로운 역사책'));
+    await tester.pumpAndSettle();
+    expect(find.text('출처·이용 조건'), findsOneWidget);
+    expect(find.text(item.license), findsOneWidget);
+    expect(catalog.installed, isEmpty);
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, '역사'));
+    await tester.pumpAndSettle();
+    expect(find.text('새로운 역사책'), findsOneWidget);
+  });
 
   testWidgets('fonts use compact name and icon rows with details on name tap', (
     tester,

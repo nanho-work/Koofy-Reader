@@ -35,10 +35,16 @@ export function metadata(input: unknown): Metadata {
     requireValue(typeof value === 'string' && value.trim().length <= max && (!required || value.trim().length > 0), `${key} 입력을 확인해 주세요.`);
     return value.trim();
   }
-  const category = data.category === undefined ? '기타' : field('category', 40);
-  requireValue(['시', '소설', '에세이', '기타'].includes(category), '도서 분류를 확인해 주세요.');
+  const category = data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
   return { category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
+}
+export const defaultCategories = ['시', '소설', '에세이', '기타'];
+export function categoryName(value: unknown): string {
+  requireValue(typeof value === 'string', '도서 분류를 입력해 주세요.');
+  const name = value.normalize('NFC').trim();
+  requireValue(name.length > 0 && name.length <= 40 && !/[\u0000-\u001f\u007f]/.test(name), '도서 분류는 줄바꿈 없이 1~40자로 입력해 주세요.');
+  return name;
 }
 export function revision(value: unknown): number {
   const result = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;

@@ -50,6 +50,12 @@ class ReadingPublicationPreparer {
   static const int maxTextBytes = 20 * 1024 * 1024;
   static const int maxEpubBytes = 40 * 1024 * 1024;
 
+  /// Prefer the source; fall back to the verified retained copy if a picker cache expired.
+  Future<({Uint8List bytes, String extension})> backupSource(Book book) async {
+    final source = await _readSource(book);
+    return (bytes: source.bytes, extension: source.extension);
+  }
+
   Future<PreparedReadingPublication> prepare({required Book book}) async {
     final source = await _readSource(book);
     final title = book.title.trim().isEmpty ? '제목 없는 책' : book.title;

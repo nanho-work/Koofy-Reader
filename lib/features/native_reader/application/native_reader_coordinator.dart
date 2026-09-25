@@ -58,6 +58,7 @@ class NativeReaderCoordinator {
     required String title,
     String? bannerAdUnitId,
     int? adHiddenUntilEpochMs,
+    String? nextBookTitle,
     Future<String?> Function(StoredReaderPosition)? resolveInitialLocator,
   }) async {
     if (_opening || _activeSessionId != null) {
@@ -98,6 +99,7 @@ class NativeReaderCoordinator {
             preferences: position.preferences,
             bannerAdUnitId: bannerAdUnitId,
             adHiddenUntilEpochMs: adHiddenUntilEpochMs,
+            nextBookTitle: nextBookTitle,
           ),
         );
       } catch (_) {
@@ -116,6 +118,27 @@ class NativeReaderCoordinator {
   }
 
   Future<void> flush() => _queue;
+
+  /// Backup must include the native journal even before the first book is opened.
+  Future<void> recoverCheckpoints() async {
+    if (_opening || _activeSessionId != null) {
+      throw StateError('책을 닫은 뒤 백업을 이용해 주세요.');
+    }
+    _opening = true;
+    try {
+      await _queue;
+      final pending = await gateway.pendingCheckpoints();
+      pending.sort((a, b) {
+        final generation = a.sessionGeneration.compareTo(b.sessionGeneration);
+        return generation == 0 ? a.sequence.compareTo(b.sequence) : generation;
+      });
+      for (final event in pending) {
+        await _commit(event);
+      }
+    } finally {
+      _opening = false;
+    }
+  }
 
   Future<void> dispose() async {
     await _subscription.cancel();

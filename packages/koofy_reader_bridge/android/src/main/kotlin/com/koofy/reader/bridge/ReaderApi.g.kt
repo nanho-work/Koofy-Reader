@@ -137,9 +137,11 @@ data class ReaderLaunchRequest (
   val title: String,
   val initialLocatorJson: String? = null,
   val preferences: ReaderPreferences,
-  /** Uses the same test/production ID and reward expiry as the Flutter shell. */
+  /** LevelPlay viewer ad unit and the shared reward expiry. */
   val bannerAdUnitId: String? = null,
-  val adHiddenUntilEpochMs: Long? = null
+  val adHiddenUntilEpochMs: Long? = null,
+  /** Optional next member in the user's saved group order. */
+  val nextBookTitle: String? = null
 )
  {
   companion object {
@@ -155,7 +157,8 @@ data class ReaderLaunchRequest (
       val preferences = pigeonVar_list[8] as ReaderPreferences
       val bannerAdUnitId = pigeonVar_list[9] as String?
       val adHiddenUntilEpochMs = pigeonVar_list[10] as Long?
-      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs)
+      val nextBookTitle = pigeonVar_list[11] as String?
+      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle)
     }
   }
   fun toList(): List<Any?> {
@@ -171,6 +174,7 @@ data class ReaderLaunchRequest (
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookTitle,
     )
   }
   override fun equals(other: Any?): Boolean {

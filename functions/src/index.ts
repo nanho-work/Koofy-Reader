@@ -7,7 +7,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { ApiError, Content, assertRevision, bearer, id, kind, metadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { ApiError, Content, assertRevision, bearer, categoryName, defaultCategories, id, kind, metadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -15,6 +15,10 @@ const adminIdentity = initializeApp({ projectId: 'slimestrikeforce' }, 'existing
 const db = getFirestore(app);
 const bucket = getStorage(app).bucket();
 const contents = db.collection('readerContent');
+const categorySettings = db.collection('readerSettings').doc('bookCategories');
+function categoryList(data: FirebaseFirestore.DocumentData | undefined): string[] {
+  return [...new Set([...defaultCategories, ...(Array.isArray(data?.names) ? data.names.map(categoryName) : [])])];
+}
 const origins = defineString('READER_ADMIN_ORIGINS', { default: 'https://admin.koofy.co.kr,http://localhost:3000' });
 const options = { region: 'asia-northeast3', maxInstances: 3, minInstances: 0, concurrency: 1, serviceAccount: 'koofy-reader-api@koofy-reader.iam.gserviceaccount.com', memory: '512MiB' as const, timeoutSeconds: 120, invoker: 'public' as const };
 
@@ -105,7 +109,12 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     try { claims = await getAuth(adminIdentity).verifyIdToken(token); }
     catch { throw new ApiError(401, '관리자 인증이 만료되었거나 올바르지 않습니다. 다시 로그인해 주세요.'); }
     requireSuperAdmin({ superAdmin: claims.superAdmin });
-    if (request.method === 'GET') { response.json(await list(request.query.kind, request.query.after, false)); return; }
+    if (request.method === 'GET') {
+      if (request.query.action === 'categories') {
+        response.json({ categories: categoryList((await categorySettings.get()).data()) }); return;
+      }
+      response.json(await list(request.query.kind, request.query.after, false)); return;
+    }
     if (request.method !== 'POST') { response.status(405).json({ error: '지원하지 않는 요청입니다.' }); return; }
     if (request.query.action === 'upload') {
       const contentId = id(request.query.id), expected = revision(request.query.revision);
@@ -123,6 +132,20 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       return;
     }
     const data = body(request);
+    if (data.action === 'addCategory') {
+      const name = categoryName(data.name);
+      const categories = await db.runTransaction(async transaction => {
+        const current = categoryList((await transaction.get(categorySettings)).data());
+        if (current.includes(name)) return current;
+        requireValue(current.length < 100, '분류는 최대 100개까지 등록할 수 있습니다.');
+        const names = [...current, name];
+        const at = new Date().toISOString();
+        transaction.set(categorySettings, { names, updatedAt: at });
+        transaction.create(db.collection('readerAudit').doc(), { uid: claims.uid, action: 'addCategory', name, at });
+        return names;
+      });
+      response.json({ categories }); return;
+    }
     if (data.action === 'create') {
       const contentId = randomUUID().replaceAll('-', '');
       const item: Content = { id: contentId, kind: kind(data.kind), ...metadata(data.metadata), revision: 1, assets: {}, published: false, publishedContent: null, updatedAt: new Date().toISOString() };

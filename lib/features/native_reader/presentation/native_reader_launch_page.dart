@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
+import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/ads/config/levelplay_ids.dart';
 import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
@@ -40,6 +43,8 @@ class _NativeReaderLaunchPageState
   bool _leaveRequested = false;
   bool _closed = false;
   bool _popScheduled = false;
+  late Book _book = widget.book;
+  Book? _nextBook;
 
   @override
   void initState() {
@@ -72,7 +77,25 @@ class _NativeReaderLaunchPageState
           );
         }
       });
-      final publication = await services.preparer.prepare(book: widget.book);
+      final publication = await services.preparer.prepare(book: _book);
+      if (!mounted || _leaveRequested) return;
+      _nextBook = null;
+      try {
+        final groups = await ref.read(bookGroupsProvider.future);
+        if (!mounted || _leaveRequested) return;
+        final books = await ref.read(booksProvider.future);
+        for (final group in groups) {
+          final index = group.bookIds.indexOf(_book.id);
+          if (index >= 0 && index + 1 < group.bookIds.length) {
+            final nextId = group.bookIds[index + 1];
+            _nextBook = books.where((b) => b.id == nextId).firstOrNull;
+            break;
+          }
+        }
+      } catch (_) {
+        // Broken optional group metadata must not prevent reading this book.
+        _nextBook = null;
+      }
       if (!mounted || _leaveRequested) return;
       setState(() => _status = '읽던 위치를 불러오고 있습니다…');
       // Read storage afresh on every launch, including after earning a reward.
@@ -87,6 +110,7 @@ class _NativeReaderLaunchPageState
         contentRevision: publication.contentRevision,
         filePath: publication.filePath,
         title: publication.title,
+        nextBookTitle: _nextBook?.title,
         bannerAdUnitId: adsReady ? LevelPlayIds.readerBanner : null,
         adHiddenUntilEpochMs: ads.hiddenUntil?.millisecondsSinceEpoch,
         resolveInitialLocator: (position) =>
@@ -112,7 +136,7 @@ class _NativeReaderLaunchPageState
     StoredReaderPosition position,
   ) async {
     if (!mounted || _leaveRequested) throw const _LaunchCancelled();
-    if (widget.initialLocatorJson != null) {
+    if (_book.id == widget.book.id && widget.initialLocatorJson != null) {
       if (widget.initialContentRevision != publication.contentRevision) {
         throw StateError('책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요.');
       }
@@ -148,7 +172,7 @@ class _NativeReaderLaunchPageState
     }
     final record = await ref
         .read(legacyReaderArchiveProvider)
-        .loadBook(widget.book.id, support: services.supportDirectory);
+        .loadBook(_book.id, support: services.supportDirectory);
     if (!mounted || _leaveRequested) throw const _LaunchCancelled();
     if (record == null || !record.hasProgress) return null;
     final map = publication.textMap;
@@ -193,7 +217,7 @@ class _NativeReaderLaunchPageState
   }
 
   void _onEvent(ReaderEvent event) {
-    if (!mounted || event.publicationId != widget.book.id) return;
+    if (!mounted || event.publicationId != _book.id) return;
     switch (event.kind) {
       case 'ready':
         setState(() => _status = '책을 읽고 있습니다.');
@@ -201,7 +225,19 @@ class _NativeReaderLaunchPageState
         setState(() => _error = event.message ?? '독서 화면에서 오류가 발생했습니다.');
       case 'closed':
         setState(() => _closed = true);
-        if (_error == null) _returnToLibrary();
+        ref.invalidate(nativeLibraryPositionsProvider);
+        if (_error == null &&
+            event.message == 'nextBook' &&
+            _nextBook != null &&
+            !_leaveRequested) {
+          setState(() {
+            _book = _nextBook!;
+            _status = '다음 권을 준비하고 있습니다…';
+          });
+          unawaited(_open());
+        } else if (_error == null) {
+          _returnToLibrary();
+        }
     }
   }
 
@@ -249,7 +285,7 @@ class _NativeReaderLaunchPageState
       if (!didPop) unawaited(_leave());
     },
     child: Scaffold(
-      appBar: AppBar(title: Text(widget.book.title)),
+      appBar: AppBar(title: Text(_book.title)),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

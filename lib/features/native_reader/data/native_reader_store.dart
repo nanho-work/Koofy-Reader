@@ -52,7 +52,7 @@ class NativeReaderStore extends GeneratedDatabase {
       NativeReaderStore(NativeDatabase.createInBackground(file));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => const [];
@@ -74,6 +74,7 @@ class NativeReaderStore extends GeneratedDatabase {
         sequence INTEGER NOT NULL, locator_json TEXT,
         preferences_json TEXT NOT NULL,
         PRIMARY KEY(publication_id, content_revision))''');
+      await _createGlobalPreferences();
     },
     onUpgrade: (_, from, to) async {
       if (from < 2) {
@@ -82,8 +83,29 @@ class NativeReaderStore extends GeneratedDatabase {
           'ALTER TABLE reader_sessions ADD COLUMN started_at INTEGER',
         );
       }
+      if (from < 3) {
+        await _createGlobalPreferences();
+        // Preserve the last used appearance when upgrading from per-book settings.
+        await customStatement('''INSERT INTO reader_preferences
+          SELECT 1, generation, sequence, preferences_json FROM reader_positions
+          ORDER BY generation DESC, sequence DESC LIMIT 1''');
+      }
     },
   );
+
+  Future<void> _createGlobalPreferences() => customStatement('''
+    CREATE TABLE reader_preferences (
+      id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL,
+      sequence INTEGER NOT NULL, preferences_json TEXT NOT NULL)''');
+
+  Future<ReaderPreferences> _loadGlobalPreferences() async {
+    final row = await customSelect(
+      'SELECT preferences_json FROM reader_preferences WHERE id=1',
+    ).getSingleOrNull();
+    return row == null
+        ? defaultReaderPreferences()
+        : preferencesFromJson(row.read<String>('preferences_json'));
+  }
 
   Future<ReaderSessionIdentity> beginSession(
     String publicationId,
@@ -147,6 +169,7 @@ class NativeReaderStore extends GeneratedDatabase {
     String publicationId,
     String revision,
   ) async {
+    final preferences = await _loadGlobalPreferences();
     final row = await customSelect(
       'SELECT locator_json, preferences_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
       variables: [
@@ -164,15 +187,89 @@ class NativeReaderStore extends GeneratedDatabase {
       ).getSingleOrNull();
       return StoredReaderPosition(
         locatorJson: null,
-        preferences: defaultReaderPreferences(),
+        preferences: preferences,
         previousRevisionExists: previous != null,
       );
     }
     return StoredReaderPosition(
       locatorJson: row.readNullable<String>('locator_json'),
-      preferences: preferencesFromJson(row.read<String>('preferences_json')),
+      preferences: preferences,
     );
   }
+
+  Future<Map<String, dynamic>> exportBackup(Set<String> bookIds) =>
+      transaction(() async {
+        final rows = await customSelect(
+          '''SELECT p.publication_id, p.content_revision,
+      p.locator_json, s.started_at FROM reader_positions p
+      JOIN reader_sessions s ON p.session_id=s.session_id ORDER BY p.generation''',
+        ).get();
+        return {
+          'preferences': preferencesToJson(await _loadGlobalPreferences()),
+          'positions': [
+            for (final row in rows)
+              if (bookIds.contains(row.read<String>('publication_id')))
+                {
+                  'bookId': row.read<String>('publication_id'),
+                  'revision': row.read<String>('content_revision'),
+                  'locator': row.readNullable<String>('locator_json'),
+                  'openedAt': row.readNullable<int>('started_at'),
+                },
+          ],
+        };
+      });
+
+  /// Merge missing books' records only. Session identities are always allocated
+  /// locally, so an old native journal cannot overwrite restored reading state.
+  Future<void> mergeBackup(
+    Map<String, dynamic> backup,
+    Set<String> bookIds,
+    Future<void> Function() commitLibrary,
+  ) => transaction(() async {
+    final preferences = preferencesFromJson(backup['preferences'] as String);
+    final existingIds = (await customSelect(
+      'SELECT DISTINCT publication_id FROM reader_positions',
+    ).get()).map((r) => r.read<String>('publication_id')).toSet();
+    final existingPreferences = await customSelect(
+      'SELECT 1 FROM reader_preferences WHERE id=1',
+    ).getSingleOrNull();
+    for (final raw in backup['positions'] as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final id = row['bookId'] as String;
+      if (!bookIds.contains(id) || existingIds.contains(id)) continue;
+      final session = await beginSession(id, row['revision'] as String);
+      await customStatement(
+        'UPDATE reader_sessions SET started_at=? WHERE session_id=?',
+        [row['openedAt'], session.id],
+      );
+      await customStatement(
+        'INSERT INTO reader_positions VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          row['revision'],
+          session.id,
+          session.generation,
+          0,
+          row['locator'],
+          preferencesToJson(preferences),
+        ],
+      );
+    }
+    if (existingPreferences == null) {
+      // Remote font binaries are re-downloaded on the destination device.
+      if (preferences.fontId?.startsWith('remote_') == true) {
+        preferences.fontId = 'default';
+      }
+      final generation = (await customSelect(
+        'SELECT generation FROM reader_counter WHERE id=1',
+      ).getSingle()).read<int>('generation');
+      await customStatement(
+        'INSERT INTO reader_preferences VALUES (1, ?, 0, ?)',
+        [generation, preferencesToJson(preferences)],
+      );
+    }
+    await commitLibrary();
+  });
 
   /// Return after a committed write or a validated stale/duplicate no-op.
   /// Malformed/unknown events throw, so the native journal remains recoverable.
@@ -232,6 +329,25 @@ class NativeReaderStore extends GeneratedDatabase {
         ? (rows?.read<String>('preferences_json') ??
               preferencesToJson(defaultReaderPreferences()))
         : preferencesToJson(event.preferences!);
+    if (event.preferences != null) {
+      // Old journals from a different book may still restore that book's location,
+      // but must never roll back the current app-wide appearance.
+      final latest = await customSelect(
+        'SELECT generation FROM reader_counter WHERE id=1',
+      ).getSingle();
+      if (event.sessionGeneration == latest.read<int>('generation')) {
+        await customStatement(
+          '''INSERT INTO reader_preferences
+          (id, generation, sequence, preferences_json) VALUES (1, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET generation=excluded.generation,
+          sequence=excluded.sequence, preferences_json=excluded.preferences_json
+          WHERE excluded.generation > reader_preferences.generation OR
+            (excluded.generation = reader_preferences.generation AND
+             excluded.sequence > reader_preferences.sequence)''',
+          [event.sessionGeneration, event.sequence, preferences],
+        );
+      }
+    }
     await customStatement(
       '''INSERT INTO reader_positions
       (publication_id, content_revision, session_id, generation, sequence, locator_json, preferences_json)

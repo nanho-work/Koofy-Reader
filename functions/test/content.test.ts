@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ApiError, Content, assertRevision, bearer, id, inspectFont, metadata, publicItem, publish, requireSuperAdmin, validateUpload } from '../src/content';
+import { ApiError, Content, assertRevision, bearer, categoryName, id, inspectFont, metadata, publicItem, publish, requireSuperAdmin, validateUpload } from '../src/content';
 const item: Content = { id: 'a'.repeat(32), kind: 'book', title: '책', author: '작가', description: '', license: '배포 허가', revision: 2, assets: {}, published: false, publishedContent: null, updatedAt: '2026-09-20' };
 test('admin requires a bearer token and exact superAdmin boolean', () => {
   for (const header of [undefined, '', 'token', 'Bearer ', 'Bearer a b']) assert.throws(() => bearer(header), ApiError);
@@ -108,11 +108,20 @@ test('catalog category and source are optional for old clients and survive publi
   const updated = metadata({ ...item, category: '시', source: '  https://example.org/poem  ' });
   assert.equal(updated.category, '시');
   assert.equal(updated.source, 'https://example.org/poem');
-  assert.throws(() => metadata({ ...item, category: 'invalid' }), ApiError);
+  assert.throws(() => metadata({ ...item, category: '' }), ApiError);
   assert.throws(() => metadata({ ...item, source: 'a'.repeat(501) }), ApiError);
   const asset = { path: 'private/path', sha256: 'b'.repeat(64), size: 100, extension: 'epub', contentType: 'application/epub+zip' };
   const uploaded = { ...item, ...updated, assets: { epub: asset, cover: { ...asset, extension: 'webp' } } };
   const result = publicItem({ ...uploaded, published: true, publishedContent: publish(uploaded) });
   assert.equal(result.category, '시');
   assert.equal(result.source, updated.source);
+});
+
+test('custom categories normalize Unicode and reject empty or invalid names', () => {
+  assert.equal(metadata({ ...item, category: '  역사  ' }).category, '역사');
+  assert.equal(categoryName('동화'.normalize('NFD')), '동화');
+  assert.equal(metadata(item).category, '기타');
+  for (const value of ['', ' ', 'a'.repeat(41), '시\n소설', 123, null]) {
+    assert.throws(() => categoryName(value), ApiError);
+  }
 });

@@ -55,6 +55,25 @@ void main() {
   });
 
   test(
+    'backup recovers pending native checkpoints without opening a book',
+    () async {
+      final session = await store.beginSession('book', 'r1');
+      gateway.pending.add(
+        checkpoint(session, href: 'latest.xhtml')..preferences!.theme = 'dark',
+      );
+      await coordinator.recoverCheckpoints();
+      expect(gateway.request, isNull);
+      expect(coordinator.activeSessionId, isNull);
+      final backup = await store.exportBackup({'book'});
+      expect(
+        (backup['positions'] as List).single['locator'],
+        contains('latest.xhtml'),
+      );
+      expect(gateway.acknowledged, ['${session.id}:1']);
+    },
+  );
+
+  test(
     'changed content revision cannot silently restart a previously read book',
     () async {
       final old = await store.beginSession('book', 'r1');

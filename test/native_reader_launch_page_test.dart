@@ -8,6 +8,9 @@ import 'package:koofy_reader/core/constants/app_constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/domain/book_group.dart';
+import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_coordinator.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_services.dart';
 import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
@@ -23,10 +26,14 @@ class _DeferredPreparer extends ReadingPublicationPreparer {
   _DeferredPreparer() : super(storageDirectory: Directory.systemTemp);
   final result = Completer<PreparedReadingPublication>();
   int calls = 0;
+  final publications = <String, PreparedReadingPublication>{};
 
   @override
   Future<PreparedReadingPublication> prepare({required Book book}) {
     calls++;
+    if (publications.containsKey(book.id)) {
+      return Future.value(publications[book.id]);
+    }
     return result.future;
   }
 
@@ -117,7 +124,12 @@ void main() {
     await gateway.controller.close();
   });
 
-  Future<void> mount(WidgetTester tester, {Directory? support}) async {
+  Future<void> mount(
+    WidgetTester tester, {
+    Directory? support,
+    List<Book>? library,
+    List<BookGroup>? groups,
+  }) async {
     final services = NativeReaderServices(
       preparer: preparer,
       coordinator: coordinator,
@@ -126,6 +138,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          if (library != null)
+            booksProvider.overrideWith((ref) async => library),
+          if (groups != null)
+            bookGroupsProvider.overrideWith((ref) async => groups),
           levelPlayReadyProvider.overrideWith((ref) async => true),
           nativeReaderServicesProvider.overrideWith((ref) async => services),
         ],
@@ -160,6 +176,68 @@ void main() {
     }
     expect(ready(), isTrue);
   }
+
+  testWidgets(
+    'next volume preserves the old locator and opens the saved group order',
+    (tester) async {
+      final next = Book.asset(
+        id: 'next',
+        title: '제2화',
+        author: '',
+        description: '',
+        assetPath: 'unused.txt',
+      );
+      preparer.complete();
+      preparer.publications[next.id] = const PreparedReadingPublication(
+        publicationId: 'next',
+        contentRevision: 'r2',
+        filePath: '/next.epub',
+        title: '제2화',
+      );
+      gateway.recovery.complete([]);
+      await mount(
+        tester,
+        library: [book, next],
+        groups: [
+          BookGroup(id: 'group_test', title: '소설', bookIds: [book.id, next.id]),
+        ],
+      );
+      await pumpUntil(tester, () => gateway.openCalls == 1);
+      expect(gateway.request!.nextBookTitle, '제2화');
+      final request = gateway.request!;
+      gateway.controller.add(
+        ReaderEvent(
+          protocolVersion: 1,
+          sessionId: request.sessionId,
+          sessionGeneration: request.sessionGeneration,
+          publicationId: request.publicationId,
+          contentRevision: request.contentRevision,
+          sequence: 1,
+          kind: 'closed',
+          message: 'nextBook',
+          locatorJson: '{"href":"saved.xhtml"}',
+          preferences: defaultReaderPreferences()..theme = 'dark',
+        ),
+      );
+      await pumpUntil(tester, () => gateway.openCalls == 2);
+      expect(gateway.request!.publicationId, 'next');
+      expect(gateway.request!.nextBookTitle, isNull);
+      expect(gateway.request!.preferences.theme, 'dark');
+      expect(
+        (await tester.runAsync(
+          () => coordinator.store.loadPosition('book', 'revision'),
+        ))!.locatorJson,
+        contains('saved.xhtml'),
+      );
+      expect(find.byType(NativeReaderLaunchPage), findsOneWidget);
+      await gateway.close(gateway.request!.sessionId);
+      await pumpUntil(
+        tester,
+        () => find.byType(NativeReaderLaunchPage).evaluate().isEmpty,
+      );
+      expect(gateway.openCalls, 2);
+    },
+  );
 
   testWidgets('reader launch forwards the saved rewarded banner expiry', (
     tester,

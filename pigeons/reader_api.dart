@@ -44,6 +44,7 @@ class ReaderLaunchRequest {
     required this.preferences,
     this.bannerAdUnitId,
     this.adHiddenUntilEpochMs,
+    this.nextBookTitle,
   });
   int protocolVersion;
   String sessionId;
@@ -58,6 +59,9 @@ class ReaderLaunchRequest {
   /// LevelPlay viewer ad unit and the shared reward expiry.
   String? bannerAdUnitId;
   int? adHiddenUntilEpochMs;
+
+  /// Optional next member in the user's saved group order.
+  String? nextBookTitle;
 }
 
 class ReaderEvent {

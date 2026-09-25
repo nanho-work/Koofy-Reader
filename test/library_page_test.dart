@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -10,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
+import 'package:koofy_reader/features/library/domain/book_group.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/domain/library_reading_state.dart';
@@ -50,6 +53,7 @@ Future<void> pumpLibrary(
   Size size = const Size(390, 844),
   double scale = 1,
   List<Book>? books,
+  List<BookGroup>? groups,
   Future<Map<String, LibraryReadingState>> Function()? states,
   List<ui.DisplayFeature> features = const [],
   Brightness brightness = Brightness.light,
@@ -88,6 +92,8 @@ Future<void> pumpLibrary(
         catalogItemsProvider('font').overrideWith((ref) async => []),
         catalogInstalledProvider('font').overrideWith((ref) async => {}),
         booksProvider.overrideWith((ref) async => books ?? demoBooks),
+        if (groups != null)
+          bookGroupsProvider.overrideWith((ref) async => groups),
         if (nativePositions == null)
           libraryReadingStateProvider.overrideWith(
             (ref) => states?.call() ?? Future.value(demoState),
@@ -151,6 +157,69 @@ Future<void> capture(WidgetTester tester, String name) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final width in [390.0, 840.0]) {
+    testWidgets(
+      'resume uses group cover without changing member book at $width',
+      (tester) async {
+        final directory = Directory.systemTemp.createTempSync('resume-cover-');
+        addTearDown(() => directory.deleteSync(recursive: true));
+        final png = base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2h0sAAAAASUVORK5CYII=',
+        );
+        final groupFile = File('${directory.path}/group.png')
+          ..writeAsBytesSync(png);
+        final memberFile = File('${directory.path}/member.png')
+          ..writeAsBytesSync(png);
+        final group = BookGroup(
+          id: 'group_test',
+          title: '묶음 제목',
+          bookIds: ['b0'],
+          coverPath: groupFile.path,
+        );
+        final routes = <RouteSettings>[];
+        await pumpLibrary(
+          tester,
+          size: Size(width, 900),
+          books: [demoBooks.first],
+          groups: [group],
+          routes: routes,
+        );
+        await tester.pumpAndSettle();
+        final card = find.byKey(const ValueKey('continue-reading-card'));
+        final image = tester.widget<Image>(
+          find.descendant(of: card, matching: find.byType(Image)),
+        );
+        expect(
+          (image.image as ResizeImage).imageProvider,
+          FileImage(groupFile),
+        );
+        expect(
+          find.descendant(of: card, matching: find.text(demoBooks.first.title)),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(FilledButton, '이어 읽기'));
+        await tester.pumpAndSettle();
+        expect(routes.single.name, AppRoutes.nativeReader);
+        expect(identical(routes.single.arguments, demoBooks.first), isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await pumpLibrary(
+          tester,
+          size: Size(width, 900),
+          books: [demoBooks.first.withCoverPath(memberFile.path)],
+          groups: [group],
+        );
+        await tester.pumpAndSettle();
+        final ownImage = tester.widget<Image>(
+          find.descendant(of: card, matching: find.byType(Image)),
+        );
+        expect(
+          (ownImage.image as ResizeImage).imageProvider,
+          FileImage(memberFile),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets('phone exposes a named download button and persistent search', (
     tester,
   ) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/domain/book_order.dart';
 
 class GroupSelection {
   const GroupSelection(this.title, this.ids);
@@ -35,13 +36,15 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final books = widget.books
-        .where(
-          (b) => '${b.title} ${b.author}'.toLowerCase().contains(
-            _query.toLowerCase(),
-          ),
-        )
-        .toList();
+    final books =
+        widget.books
+            .where(
+              (b) => '${b.title} ${b.author}'.toLowerCase().contains(
+                _query.toLowerCase(),
+              ),
+            )
+            .toList()
+          ..sort((a, b) => compareBookTitles(a.title, b.title));
     final valid =
         _selected.length >= (widget.creating ? 2 : 1) &&
         (!widget.creating || _name.text.trim().isNotEmpty);
@@ -110,7 +113,15 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                             context,
                             GroupSelection(
                               _name.text.trim(),
-                              _selected.toList(),
+                              (widget.books
+                                      .where((b) => _selected.contains(b.id))
+                                      .toList()
+                                    ..sort(
+                                      (a, b) =>
+                                          compareBookTitles(a.title, b.title),
+                                    ))
+                                  .map((b) => b.id)
+                                  .toList(),
                             ),
                           )
                         : null,

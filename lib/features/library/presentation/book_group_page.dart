@@ -5,6 +5,7 @@ import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
+import 'package:koofy_reader/features/library/domain/book_order.dart';
 import 'package:koofy_reader/features/library/domain/book_group.dart';
 import 'package:koofy_reader/features/library/domain/library_reading_state.dart';
 import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dart';
@@ -31,6 +32,23 @@ class BookGroupPage extends ConsumerStatefulWidget {
 class _BookGroupPageState extends ConsumerState<BookGroupPage> {
   bool _opening = false;
   bool _reordering = false;
+  Future<void> _change(Future<Object?> Function() operation) async {
+    if (_reordering) return;
+    setState(() => _reordering = true);
+    try {
+      await operation();
+      ref.invalidate(bookGroupsProvider);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _reordering = false);
+    }
+  }
+
   Future<void> _open(Book book, LibraryReadingState? state) async {
     if (_opening) return;
     setState(() => _opening = true);
@@ -147,6 +165,38 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('묶음 안의 책 표지 표시'),
+                          value: group.showMemberCovers,
+                          onChanged: _reordering
+                              ? null
+                              : (value) => _change(
+                                  () => ref
+                                      .read(bookGroupRepositoryProvider)
+                                      .setMemberCovers(group.id, value),
+                                ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _reordering || members.length < 2
+                              ? null
+                              : () => _change(() {
+                                  final sorted = [...members]
+                                    ..sort(
+                                      (a, b) =>
+                                          compareBookTitles(a.title, b.title),
+                                    );
+                                  return ref
+                                      .read(bookGroupRepositoryProvider)
+                                      .reorder(
+                                        group.id,
+                                        sorted.map((b) => b.id).toList(),
+                                        availableIds: byId.keys.toSet(),
+                                      );
+                                }),
+                          icon: const Icon(Icons.sort),
+                          label: const Text('제목·회차 순으로 정렬'),
+                        ),
                         if (recent.isNotEmpty)
                           FilledButton.icon(
                             key: const ValueKey('group-continue'),
@@ -213,11 +263,13 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                       return ListTile(
                         key: ValueKey('group-book-${book.id}'),
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                        leading: SizedBox(
-                          width: 42,
-                          height: 60,
-                          child: BookCover(book: book, compact: true),
-                        ),
+                        leading: !group.showMemberCovers
+                            ? null
+                            : SizedBox(
+                                width: 42,
+                                height: 60,
+                                child: BookCover(book: book, compact: true),
+                              ),
                         title: Text('${index + 1}. ${book.title}'),
                         subtitle: Text(
                           reading.hasError

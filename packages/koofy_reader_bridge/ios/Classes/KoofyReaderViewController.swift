@@ -47,6 +47,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private let spinner = UIActivityIndicatorView(style: .large)
     private let statusLabel = UILabel()
     private let body = UIView()
+    private let spreadDivider = UIView()
     private let toolbar = UIToolbar()
     private var bannerFooter: ReaderBannerFooter?
     private var bannerHeight: NSLayoutConstraint?
@@ -85,6 +86,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         toolbar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(body)
         view.addSubview(toolbar)
+        spreadDivider.translatesAutoresizingMaskIntoConstraints = false
+        spreadDivider.isUserInteractionEnabled = false
+        spreadDivider.isAccessibilityElement = false
+        spreadDivider.isHidden = true
+        body.addSubview(spreadDivider)
         let footer = ReaderBannerFooter(controller: self, unitId: request.bannerAdUnitId, hiddenUntil: request.adHiddenUntilEpochMs)
         bannerFooter = footer
         footer.translatesAutoresizingMaskIntoConstraints = false
@@ -118,6 +124,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             body.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             body.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             body.bottomAnchor.constraint(equalTo: toolbar.topAnchor),
+            spreadDivider.centerXAnchor.constraint(equalTo: body.centerXAnchor),
+            spreadDivider.widthAnchor.constraint(equalToConstant: 1),
+            spreadDivider.topAnchor.constraint(equalTo: body.topAnchor, constant: 24),
+            spreadDivider.bottomAnchor.constraint(equalTo: body.bottomAnchor, constant: -24),
             toolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             toolbar.bottomAnchor.constraint(equalTo: footer.topAnchor),
@@ -280,6 +290,16 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private var canShowSpread: Bool {
         let width = body.bounds.width > 0 ? body.bounds.width : view.bounds.width
         return width >= 700
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateSpreadDivider()
+    }
+
+    private func updateSpreadDivider() {
+        spreadDivider.isHidden = preferences.scroll || preferences.columnCount == 1 || !canShowSpread
+        spreadDivider.backgroundColor = ReaderPalette.forTheme(preferences.theme).foreground.withAlphaComponent(0.095)
     }
 
     func apply(_ value: ReaderPreferences, completion: @escaping (Result<Void, Error>) -> Void) throws {
@@ -514,7 +534,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
     }
 
-    func close(completion: @escaping (Result<Void, Error>) -> Void) {
+    func close(nextBook: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
         guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
         cancelUncommittedTurn()
         isClosing = true
@@ -524,7 +544,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             guard let self else { return }
             await self.captureTask?.value
             do {
-                let closedEvent = try self.checkpoint(kind: "closed")
+                var closedEvent = try self.checkpoint(kind: "closed")
+                closedEvent.message = nextBook ? "nextBook" : nil
                 self.openingTask?.cancel()
                 self.readyTimeout?.cancel()
                 self.settingsCompletion?(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
@@ -745,7 +766,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         addChild(controller)
         controller.view.frame = body.bounds
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        body.insertSubview(controller.view, aboveSubview: current.view)
+        body.insertSubview(controller.view, aboveSubview: spreadDivider)
         controller.didMove(toParent: self)
     }
 
@@ -875,9 +896,24 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         let contents = UIBarButtonItem(title: "목차", style: .plain, target: self, action: #selector(contentsTapped))
         contents.accessibilityIdentifier = "reader.contents"
         navigationItem.rightBarButtonItems = [settings, contents]
+        if request.nextBookTitle != nil {
+            let next = UIBarButtonItem(title: "다음 권", style: .plain,
+                target: self, action: #selector(nextBookTapped))
+            navigationItem.rightBarButtonItems?.append(next)
+        }
         // Keep the navigation bar height stable across preference changes.
         navigationItem.prompt = nil
         applyChromeTheme()
+    }
+
+    @objc private func nextBookTapped() {
+        guard isReady, !isClosing, let title = request.nextBookTitle else { return }
+        let alert = UIAlertController(title: "다음 권 읽기", message: title, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "열기", style: .default) { [weak self] _ in
+            self?.close(nextBook: true) { _ in }
+        })
+        present(alert, animated: true)
     }
 
     @objc private func preferencesTapped(_ sender: UIBarButtonItem) {
@@ -906,6 +942,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     private func applyChromeTheme() {
+        updateSpreadDivider()
         let palette = ReaderPalette.forTheme(preferences.theme)
         view.backgroundColor = palette.background
         body.backgroundColor = palette.background

@@ -1,3 +1,4 @@
+import 'book_catalog_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
@@ -316,81 +317,21 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                           : () => _download(item),
                     );
                   }
-                  return Card(
+                  return BookCatalogRow(
                     key: ValueKey(key),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            item.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item.author,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            '${_books ? '${item.category} · ' : ''}${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          if (item.description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                item.description,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ExpansionTile(
-                            key: PageStorageKey('catalog-license-$key'),
-                            tilePadding: EdgeInsets.zero,
-                            title: const Text(
-                              '출처·이용 조건',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                            children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  [
-                                    if (item.source.isNotEmpty) item.source,
-                                    item.license,
-                                  ].join('\n\n'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (download.itemKey == key) ...[
-                            LinearProgressIndicator(value: download.progress),
-                            const SizedBox(height: 8),
-                            Text(
-                              '다운로드 중 ${(download.progress * 100).round()}%',
-                            ),
-                          ] else
-                            FilledButton.tonalIcon(
-                              onPressed:
-                                  download.busy ||
-                                      !installed.hasValue ||
-                                      installed.isLoading ||
-                                      installed.hasError ||
-                                      downloaded
-                                  ? null
-                                  : () => _download(item),
-                              icon: Icon(
-                                downloaded
-                                    ? Icons.check
-                                    : Icons.download_outlined,
-                              ),
-                              label: Text(downloaded ? '다운로드 완료' : '다운로드'),
-                            ),
-                        ],
-                      ),
-                    ),
+                    item: item,
+                    installed: downloaded,
+                    progress: download.itemKey == key
+                        ? download.progress
+                        : null,
+                    onDownload:
+                        download.busy ||
+                            !installed.hasValue ||
+                            installed.isLoading ||
+                            installed.hasError ||
+                            downloaded
+                        ? null
+                        : () => _download(item),
                   );
                 },
               ),

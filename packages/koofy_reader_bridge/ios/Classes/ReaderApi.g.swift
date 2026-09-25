@@ -190,9 +190,11 @@ struct ReaderLaunchRequest: Hashable {
   var title: String
   var initialLocatorJson: String? = nil
   var preferences: ReaderPreferences
-  /// Uses the same test/production ID and reward expiry as the Flutter shell.
+  /// LevelPlay viewer ad unit and the shared reward expiry.
   var bannerAdUnitId: String? = nil
   var adHiddenUntilEpochMs: Int64? = nil
+  /// Optional next member in the user's saved group order.
+  var nextBookTitle: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -208,6 +210,7 @@ struct ReaderLaunchRequest: Hashable {
     let preferences = pigeonVar_list[8] as! ReaderPreferences
     let bannerAdUnitId: String? = nilOrValue(pigeonVar_list[9])
     let adHiddenUntilEpochMs: Int64? = nilOrValue(pigeonVar_list[10])
+    let nextBookTitle: String? = nilOrValue(pigeonVar_list[11])
 
     return ReaderLaunchRequest(
       protocolVersion: protocolVersion,
@@ -220,7 +223,8 @@ struct ReaderLaunchRequest: Hashable {
       initialLocatorJson: initialLocatorJson,
       preferences: preferences,
       bannerAdUnitId: bannerAdUnitId,
-      adHiddenUntilEpochMs: adHiddenUntilEpochMs
+      adHiddenUntilEpochMs: adHiddenUntilEpochMs,
+      nextBookTitle: nextBookTitle
     )
   }
   func toList() -> [Any?] {
@@ -236,6 +240,7 @@ struct ReaderLaunchRequest: Hashable {
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookTitle,
     ]
   }
   static func == (lhs: ReaderLaunchRequest, rhs: ReaderLaunchRequest) -> Bool {
