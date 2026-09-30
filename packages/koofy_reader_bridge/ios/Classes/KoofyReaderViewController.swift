@@ -10,6 +10,16 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private let journal: ReaderCheckpointStore
     private let sendEvent: (ReaderEvent) -> Void
     private var speech: ReaderSpeech?
+    private let translation = ReaderTranslation()
+    private var translationHeight: NSLayoutConstraint?
+    private var bodyBottom: NSLayoutConstraint?
+    private var selectionHold = false
+    private lazy var selectionPress: UILongPressGestureRecognizer = {
+        let press = UILongPressGestureRecognizer(target: self, action: #selector(selectionPressed(_:)))
+        press.minimumPressDuration = 0.55; press.allowableMovement = 8
+        press.cancelsTouchesInView = false; press.delegate = self; press.isEnabled = false
+        return press
+    }()
     private let speechButton = UIButton(type: .system)
     private let speechControls = UIStackView()
     private var speechTransportItem: UIBarButtonItem?
@@ -102,6 +112,23 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         toolbar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(body)
         view.addSubview(toolbar)
+        translation.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(translation.view)
+        translationHeight = translation.view.heightAnchor.constraint(equalToConstant: 220)
+        bodyBottom = body.bottomAnchor.constraint(equalTo: toolbar.topAnchor)
+        translation.sample = { [weak self] script in
+            guard let self, self.isReady, !self.isClosing, !self.isRotating, let navigator = self.navigator else { return nil }
+            let raw = try? await navigator.evaluateJavaScript(script).get() as? String
+            if let selection = navigator.currentSelection, let highlight = selection.locator.text.highlight {
+                var value = raw.flatMap { $0.data(using: .utf8) }.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+                value["text"] = String(highlight.prefix(2001)); value["active"] = true
+                value["resource"] = selection.locator.href.string
+                return (try? JSONSerialization.data(withJSONObject: value)).map { String(decoding: $0, as: UTF8.self) }
+            }
+            return raw
+        }
+        translation.pauseBook = { [weak self] in self?.speech?.pause() }
+        translation.onClose = { [weak self] in self?.toggleTranslation() }
         spreadDivider.translatesAutoresizingMaskIntoConstraints = false
         spreadDivider.isUserInteractionEnabled = false
         spreadDivider.isAccessibilityElement = false
@@ -113,10 +140,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         view.addSubview(footer)
         let footerHeight = footer.heightAnchor.constraint(equalToConstant: footer.desiredHeight)
         bannerHeight = footerHeight
-        footer.onAdInteraction = { [weak self] in self?.speech?.pause() }
+        footer.onAdInteraction = { [weak self] in self?.speech?.pause(); self?.translation.stopVoice() }
         footer.onHeightChanged = { [weak self] height in self?.resizeAdFooter(to: height) }
         pagePan.delegate = self
         pagePan.maximumNumberOfTouches = 1
+        body.addGestureRecognizer(selectionPress)
+        pagePan.require(toFail: selectionPress)
         body.addGestureRecognizer(pagePan)
         progress.font = .preferredFont(forTextStyle: .caption1)
         progress.adjustsFontForContentSizeCategory = true
@@ -146,7 +175,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             body.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             body.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             body.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            body.bottomAnchor.constraint(equalTo: toolbar.topAnchor),
+            bodyBottom!,
+            translation.view.bottomAnchor.constraint(equalTo: toolbar.topAnchor),
+            translation.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            translation.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            translationHeight!,
             spreadDivider.centerXAnchor.constraint(equalTo: body.centerXAnchor),
             spreadDivider.widthAnchor.constraint(equalToConstant: 1),
             spreadDivider.topAnchor.constraint(equalTo: body.topAnchor, constant: 24),
@@ -337,7 +370,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     private func updateSpreadDivider() {
-        spreadDivider.isHidden = preferences.scroll || preferences.columnCount == 1 || !canShowSpread
+        spreadDivider.isHidden = isReaderDisplayCover(lastLocator) || preferences.scroll || preferences.columnCount == 1 || !canShowSpread
         spreadDivider.backgroundColor = ReaderPalette.forTheme(preferences.theme).foreground.withAlphaComponent(0.095)
     }
 
@@ -525,6 +558,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             }
             self.lastLocator = sameResource && snapshot["anchorVisible"] as? Bool == true ? anchor : exact
             self.restorationAnchor = nil
+            self.updateSpreadDivider()
             self.isReady = true
             self.spinner.stopAnimating()
             self.readyTimeout?.cancel()
@@ -536,6 +570,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             self.progress.text = self.atBookEnd
                 ? self.request.nextBookTitle.map { "마지막 페이지\n다음: \($0)" } ?? "마지막 페이지"
                 : String(format: "%.1f%%", (fallback.locations.totalProgression ?? 0) * 100)
+            if isReaderDisplayCover(self.lastLocator) { self.progress.text = "표지" }
             self.progress.sizeToFit()
             do {
                 let kind = self.hasSentReady ? (wasReady ? "locationChanged" : self.pendingKind) : "ready"
@@ -587,6 +622,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         speechFollowTask?.cancel()
         guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
         cancelUncommittedTurn()
+        translation.suspend()
         isClosing = true
         moveTask?.cancel()
         finishNavigation(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
@@ -686,6 +722,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     @objc private func flushBackground() {
+        translation.suspend()
         speech?.foreground(false)
         speechFollowTask?.cancel()
         bannerFooter?.pause()
@@ -794,6 +831,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                     self.turnCommitInFlight = false
                     self.turnBusy = false
                     if case .success = result, self.pageTurnController === controller,
+                       controller.frames.current.columns == frame.columns,
                        controller.frames.advance(to: frame) {
                         controller.rebase()
                     } else {
@@ -822,11 +860,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         body.insertSubview(controller.view, aboveSubview: spreadDivider)
         controller.didMove(toParent: self)
+        controller.view.isUserInteractionEnabled = !translation.enabled
     }
 
     /// All app-owned taps, buttons, keys and swipes use this policy. UIKit's
     /// edge drag commits through the same exact-locator navigation path.
     func requestPageTurn(forward: Bool) {
+        guard !translation.enabled || (!selectionHold && navigator?.currentSelection == nil) else { return }
+        translation.stopVoice()
         speech?.userNavigation()
         guard isReady, !isClosing, !isRotating, !turnBusy, presentedViewController == nil,
               let current = navigator else { return }
@@ -886,6 +927,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     @objc private func resumeForeground() {
+        translation.resume()
         speech?.foreground(true)
         guard !isClosing, !renderFailed else { return }
         bannerFooter?.resume()
@@ -909,17 +951,18 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        gestureRecognizer === speechScrollPan || otherGestureRecognizer === speechScrollPan
+        gestureRecognizer === selectionPress || otherGestureRecognizer === selectionPress || gestureRecognizer === speechScrollPan || otherGestureRecognizer === speechScrollPan
     }
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === selectionPress { return translation.enabled }
         if gestureRecognizer === speechScrollPan { return preferences.scroll }
-        guard gestureRecognizer === pagePan, !preferences.scroll, isReady, !turnBusy,
+        guard gestureRecognizer === pagePan, !selectionHold, !preferences.scroll, isReady, !turnBusy,
               !isClosing, navigator?.currentSelection == nil, presentedViewController == nil else { return false }
         let velocity = pagePan.velocity(in: body)
         guard abs(velocity.x) > abs(velocity.y) else { return false }
         let x = pagePan.location(in: body).x - pagePan.translation(in: body).x
         let edge = min(80, body.bounds.width * 0.2)
-        if usesPageCurl, let controller = pageTurnController, x < edge || x > body.bounds.width - edge {
+        if !translation.enabled, usesPageCurl, let controller = pageTurnController, x < edge || x > body.bounds.width - edge {
             let forward = controller.frames.rightToLeft ? x < edge : x > body.bounds.width - edge
             if controller.canTurn(forward: forward) { return false }
         }
@@ -946,6 +989,28 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
     }
 
+    @objc private func selectionPressed(_ recognizer: UILongPressGestureRecognizer) {
+        selectionHold = recognizer.state == .began || recognizer.state == .changed
+        if selectionHold { speech?.pause() }
+    }
+
+    private func toggleTranslation() {
+        guard isReady, !isClosing, !turnBusy else { return }
+        speech?.pause(); cancelUncommittedTurn()
+        let anchor = restorationAnchor ?? lastLocator
+        navigator?.clearSelection(); selectionHold = false
+        if translation.enabled { translation.disable() } else { translation.enable() }
+        selectionPress.isEnabled = translation.enabled
+        bodyBottom?.isActive = false
+        bodyBottom = body.bottomAnchor.constraint(equalTo: translation.enabled ? translation.view.topAnchor : toolbar.topAnchor)
+        bodyBottom?.isActive = true
+        translationHeight?.constant = min(220, view.bounds.height * 0.4)
+        translation.palette(ReaderPalette.forTheme(preferences.theme))
+        view.layoutIfNeeded()
+        do { try mountNavigator(at: anchor, kind: "locationChanged") }
+        catch { report(error, code: "relayout_failed", fatal: true) }
+    }
+
     private func configureSpeechControls() {
         speechButton.translatesAutoresizingMaskIntoConstraints = false
         speechButton.layer.cornerRadius = 24
@@ -962,7 +1027,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             button.setImage(UIImage(systemName: symbol), for: .normal)
             button.accessibilityLabel = label
             button.addTarget(self, action: action, for: .touchUpInside)
-            button.widthAnchor.constraint(equalToConstant: 48).isActive = true
+            button.widthAnchor.constraint(equalToConstant: label == "듣기 설정" ? 76 : 48).isActive = true
             speechControls.addArrangedSubview(button)
         }
         control("backward.end.fill", "이전 문장", #selector(speechPrevious))
@@ -973,7 +1038,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             speechButton.topAnchor.constraint(equalTo: body.topAnchor, constant: 8),
             speechButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
             speechButton.widthAnchor.constraint(equalToConstant: 48), speechButton.heightAnchor.constraint(equalToConstant: 48),
-            speechControls.widthAnchor.constraint(equalToConstant: 144),
+            speechControls.widthAnchor.constraint(equalToConstant: 172),
             speechControls.heightAnchor.constraint(equalToConstant: 48),
             toolbar.heightAnchor.constraint(equalToConstant: 48),
         ])
@@ -994,9 +1059,21 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             items[index] = transport ? item : progressItem
             toolbar.items = items
         }
-        for button in speechControls.arrangedSubviews.prefix(2) { button.isUserInteractionEnabled = playing; button.alpha = playing ? 1 : 0.4 }
+        let canSkip = playing && speech?.busy != true
+        for button in speechControls.arrangedSubviews.prefix(2) { button.isUserInteractionEnabled = canSkip; button.alpha = canSkip ? 1 : 0.4 }
+        if let settings = speechControls.arrangedSubviews.last as? UIButton {
+            let rate = String(format: "%g", speech?.speed ?? 1)
+            let minutes = speech?.timerMinutes ?? 0
+            let timer = minutes > 0 ? "\(minutes)분" : "타이머 꺼짐"
+            settings.setImage(nil, for: .normal)
+            settings.setTitle("\(rate)배\n\(timer)", for: .normal)
+            settings.titleLabel?.numberOfLines = 2
+            settings.titleLabel?.textAlignment = .center
+            settings.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)
+            settings.accessibilityLabel = "듣기 설정, \(rate)배, \(timer)"
+        }
     }
-    @objc private func speechTapped() { speech?.toggle() }
+    @objc private func speechTapped() { translation.stopVoice(); speech?.toggle() }
     @objc private func speechPrevious() { speech?.skip(false) }
     @objc private func speechNext() { speech?.skip(true) }
     @objc private func speechLongPressed(_ recognizer: UILongPressGestureRecognizer) {
@@ -1075,6 +1152,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             do { try self.apply(value, completion: completion) }
             catch { completion(.failure(error)) }
         }
+        settings.translationEnabled = translation.enabled
+        settings.onTranslation = { [weak self, weak settings] in
+            settings?.dismiss(animated: true) { self?.toggleTranslation() }
+        }
         settings.onSpeech = { [weak self, weak settings] in
             settings?.dismiss(animated: true) { self?.showSpeechSettings() }
         }
@@ -1098,11 +1179,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private func applyChromeTheme() {
         updateSpreadDivider()
         let palette = ReaderPalette.forTheme(preferences.theme)
+        translation.palette(palette)
         view.backgroundColor = palette.background
         body.backgroundColor = palette.background
         toolbar.backgroundColor = palette.background
         bannerFooter?.applyPalette(palette)
         speechButton.backgroundColor = palette.panel.withAlphaComponent(0.4)
+        speechButton.layer.borderWidth = 1
+        speechButton.layer.borderColor = palette.foreground.withAlphaComponent(0.28).cgColor
         speechButton.tintColor = palette.foreground
         speechControls.backgroundColor = palette.background
         speechControls.tintColor = palette.foreground
@@ -1132,7 +1216,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
 
     func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
         let edge = max(80, navigator.view.bounds.width * 0.3)
-        guard presentedViewController == nil, !turnBusy else { return }
+        guard presentedViewController == nil, !turnBusy, !selectionHold else { return }
         if point.x <= edge || point.x >= navigator.view.bounds.width - edge {
             guard !preferences.scroll, self.navigator?.currentSelection == nil else { return }
             let physicalForward = point.x >= navigator.view.bounds.width - edge
@@ -1204,6 +1288,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private func addBookmark() {
         guard isReady, !isClosing, let locator = lastLocator else { return }
         do {
+            guard !isReaderDisplayCover(locator) else { throw failure("cover_bookmark", "책갈피는 본문에서 추가해 주세요.") }
             let rows = try ReaderBookmark.decode(bookmarksJson)
             guard rows.count < 100 else { throw failure("bookmark_limit", "책갈피는 책마다 100개까지 저장할 수 있습니다.") }
             guard !rows.contains(where: { $0.locator == locator }) else { throw failure("bookmark_exists", "이미 저장한 위치입니다.") }

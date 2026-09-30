@@ -1,3 +1,6 @@
+import 'package:koofy_reader/core/storage/local_storage.dart';
+import 'package:koofy_reader/features/library/data/library_trash_store.dart';
+import 'package:koofy_reader/features/library/presentation/text_import_preview.dart';
 import 'dart:math' as math;
 import 'dart:ui' show DisplayFeatureType, DisplayFeatureState;
 
@@ -282,7 +285,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             : hinge.left - media.padding.left;
         final gap = hinge == null ? 12.0 : hinge.width;
         final intro = Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: recent.isNotEmpty
               ? _continueReading(
                   context,
@@ -343,8 +346,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 8,
+                      horizontal: 20,
+                      vertical: 6,
                     ),
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.download_outlined),
@@ -501,7 +504,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       children: [
         Container(
           key: const ValueKey('continue-reading-card'),
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: colors.surfaceContainer,
             borderRadius: BorderRadius.circular(20),
@@ -550,7 +553,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               if (state.progression != null) ...[
                 LinearProgressIndicator(
                   value: state.progression,
@@ -575,7 +578,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               FilledButton(
                 onPressed: canOpen ? () => _openReader(book, state) : null,
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
@@ -612,7 +615,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     required Map<String, BookGroup> groups,
   }) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       sliver: SliverMainAxisGroup(
         slivers: [
           SliverToBoxAdapter(
@@ -634,7 +637,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 8),
                   child: TextField(
                     controller: _search,
                     onChanged: (_) => setState(() {}),
@@ -652,7 +655,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
@@ -690,7 +693,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         PopupMenuItem(value: true, child: Text('제목순')),
                       ],
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -983,7 +986,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       builder: (context) => AlertDialog(
         title: Text('책 $action'),
         content: Text(
-          '서재에서 “${book.title}” 책을 ${book.isLocalFile ? '삭제' : '숨김 처리'}할까요?',
+          '“${book.title}”을 휴지통으로 옮길까요? 파일·표지·읽던 위치는 유지되며 설정의 휴지통에서 복원할 수 있습니다.',
         ),
         actions: [
           TextButton(
@@ -999,20 +1002,26 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
     if (!mounted || confirmed != true) return;
     try {
-      final groupsRepository = ref.read(bookGroupRepositoryProvider);
-      final removed = await ref
-          .read(bookRepositoryProvider)
-          .removeBookFromLibrary(book.id);
-      if (removed) {
-        for (final group in await groupsRepository.load()) {
-          if (group.bookIds.contains(book.id)) {
-            await groupsRepository.takeOut(group.id, book.id);
-          }
-        }
-      }
+      final trash = LibraryTrashStore(ref.read(localStorageProvider));
+      await trash.moveBook(book);
       if (!mounted) return;
       ref.invalidate(booksProvider);
-      _snack(removed ? '$action 완료: ${book.title}' : '제거할 책을 찾지 못했습니다.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('휴지통으로 이동: ${book.title}'),
+          action: SnackBarAction(
+            label: '실행 취소',
+            onPressed: () async {
+              try {
+                await trash.restoreBook(book.id);
+                if (mounted) ref.invalidate(booksProvider);
+              } catch (_) {
+                _snack('복원하지 못했습니다. 설정의 휴지통에서 다시 시도해 주세요.');
+              }
+            },
+          ),
+        ),
+      );
     } catch (_) {
       _snack('책을 제거하지 못했습니다. 다시 시도해 주세요.');
     }
@@ -1087,6 +1096,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         result.files
             .map((file) => BookImportFile(file.name, file.path))
             .toList(),
+        importFile: (path) => importWithTextPreview(
+          context,
+          ref.read(bookRepositoryProvider),
+          path,
+        ),
         onProgress: (completed, total) {
           if (mounted) {
             setState(() => _importProgress = '가져오는 중 $completed/$total');
@@ -1101,7 +1115,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       });
       final summary =
           '가져오기 완료: ${imported.added}권 추가'
-          '${imported.existing > 0 ? ' · 이미 등록된 책 ${imported.existing}권' : ''}';
+          '${imported.existing > 0 ? ' · 이미 등록된 책 ${imported.existing}권' : ''}'
+          '${imported.skipped > 0 ? ' · 건너뛴 파일 ${imported.skipped}개' : ''}';
       if (imported.failedNames.isEmpty) {
         _snack(summary);
       } else {

@@ -124,6 +124,13 @@ enum ReaderWebViewport {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         guard let metadata else { throw FrameError.notReady }
+        // Our registered cover is an isolated, single-viewport resource. Unlike
+        // arbitrary illustration pages, its href is an unambiguous curl anchor.
+        if isReaderDisplayCover(metadata) {
+            let valid = try await navigator.evaluateJavaScript("document.documentElement.id === 'koofy-display-cover' && document.documentElement.scrollWidth <= innerWidth + 2 && document.querySelector('img').naturalWidth > 0").get()
+            guard valid as? Bool == true else { throw FrameError.notReady }
+            return metadata
+        }
         let value = try await navigator.evaluateJavaScript(anchorScript(locator: nil, restore: false)).get()
         guard let raw = value as? String,
               let snapshot = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],

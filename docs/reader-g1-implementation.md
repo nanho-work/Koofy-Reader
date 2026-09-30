@@ -62,7 +62,7 @@ G1 위치 테이블은 `publicationId + contentRevision` 기준이다. 현재 �
 ## TXT·EPUB 지원 범위
 
 - TXT 원본은 그대로 보관하고 안정적인 문서 주소·문단 ID를 가진 내부 EPUB 3으로 변환한다. 동일한 입력과 변환 규칙은 동일한 결과를 만든다.
-- `publicationId`는 기존 서재의 `book.id`, `contentRevision`은 실제 읽기용 EPUB 바이트의 SHA-256이다. 원본/변환본이 달라지면 예전 Locator를 무조건 재사용하지 않는다.
+- `publicationId`는 기존 서재의 `book.id`, `contentRevision`은 등록 표지를 추가하기 전 원본/변환 EPUB 바이트의 SHA-256이다. 표지가 추가된 독서용 파일의 무결성 해시는 별도로 계산한다. 원본/변환본이 달라지면 예전 Locator를 무조건 재사용하지 않는다.
 - UTF-8, BOM이 있는 UTF-16을 엄격히 해석한다. CP949 등 다른 인코딩은 안내와 함께 거절한다. 인코딩 선택 UI는 아직 없다.
 - DRM 없는 정적 리플로우 EPUB을 원형 보관한다. 표준 IDPF/Adobe 글꼴 난독화는 허용한다. DRM·고정 레이아웃·본문 스크립트·외부 리소스 등 G1 범위 밖 콘텐츠는 명시적으로 거절한다.
 - EPUB 검사에는 경로 이탈·ZIP 구조와 CRC·해제 크기·manifest/spine·본문 XML 검사 등이 포함된다. 임의의 EPUB 전체 표준 적합성 검사를 대신하지 않는다.

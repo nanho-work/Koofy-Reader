@@ -79,6 +79,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var toolbar: LinearLayout
     private lateinit var navigation: LinearLayout
     private var speech: ReaderSpeech? = null
+    private var translation: ReaderTranslation? = null
     private lateinit var speechButton: Button
     private lateinit var speechControls: LinearLayout
     private var speechFollowJob: Job? = null
@@ -211,8 +212,15 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             }
             navigation.addView(nextBookButton)
         }
+        translation = ReaderTranslation(this,
+            sample = { script -> if (session.ready && !session.closing && !layoutPending) navigator?.evaluateJavascript(script) else null },
+            pauseBook = { speech?.pause() },
+            selectionChanged = { turnHost.selecting = it },
+            onClose = { toggleTranslation() }).also {
+                page.addView(it.view, LinearLayout.LayoutParams(-1, dp(220)))
+            }
         page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
-        bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, onAdInteraction = { speech?.pause() }, beforeResize = {
+        bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, onAdInteraction = { speech?.pause(); translation?.stopVoice() }, beforeResize = {
             if (session.ready && !session.closing) scheduleRelayout()
         }).also {
             page.addView(it, LinearLayout.LayoutParams(-1, dp(66)))
@@ -232,7 +240,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 if (session.ready) scheduleRelayout()
             }
         }
-        speechButton = button("▶") { speech?.toggle() }.apply {
+        speechButton = button("▶") { translation?.stopVoice(); speech?.toggle() }.apply {
             textSize = 20f
             contentDescription = "책 읽어주기 재생"
             setOnLongClickListener { showSpeechSettings(); true }
@@ -338,6 +346,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             turnHost.pageMode = !session.preferences.scroll
             reader.addInputListener(object : InputListener {
                 override fun onTap(event: TapEvent): Boolean {
+                    if (turnHost.selecting || turnHost.suppressTap) return true
                     val width = reader.publicationView.width.toDouble()
                     val edge = maxOf(80.0, width * .3)
                     if (event.point.x <= edge || event.point.x >= width - edge) {
@@ -423,6 +432,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 restoreTimeout?.cancel()
                 restoreTarget = null
                 lastLocator = saved
+                updateSpreadDivider()
                 session.locatorJson = saved.toJSON().toString()
                 val kind = if (!session.ready) "ready" else "locationChanged"
                 session.ready = true
@@ -432,6 +442,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     append("이 장 ${pageIndex + 1} / $totalPages")
                     if (hingeFallback) append(" · 한쪽 화면")
                 }
+                if (isReaderDisplayCover(saved)) status.text = "표지"
                 atBookEnd = snapshot.optBoolean("resourceEnd", false) &&
                     publication?.readingOrder?.lastOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
                 nextBookButton?.text = if (atBookEnd) "이어서 읽기" else "다음 권"
@@ -544,7 +555,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     private fun updateSpreadDivider() {
         if (!::spreadDivider.isInitialized) return
-        spreadDivider.visibility = if (readerColumns() == ColumnCount.TWO) View.VISIBLE else View.GONE
+        spreadDivider.visibility = if (!isReaderDisplayCover(lastLocator) && readerColumns() == ColumnCount.TWO) View.VISIBLE else View.GONE
         val color = ReaderPalette.forTheme(session.preferences.theme).foreground
         spreadDivider.setBackgroundColor((color and 0x00FFFFFF) or (24 shl 24))
     }
@@ -573,7 +584,20 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         speech?.pause()
         if (!session.ready || session.closing) return
         ReaderSettingsDialog(this, { session.preferences }, { applyReaderPreferences(it) },
-            readerFonts.optionIds, readerFonts.optionLabels, { showSpeechSettings() }).show()
+            readerFonts.optionIds, readerFonts.optionLabels, { showSpeechSettings() },
+            { toggleTranslation() }, translation?.enabled == true).show()
+    }
+
+    private fun toggleTranslation() {
+        if (!toolsReady()) return
+        val panel = translation ?: return
+        speech?.pause()
+        pageTurns?.invalidate()
+        lifecycleScope.launch { navigator?.evaluateJavascript("window.getSelection().removeAllRanges();") }
+        if (panel.enabled) panel.disable() else panel.enable()
+        turnHost.translationMode = panel.enabled
+        toolbar.visibility = View.VISIBLE; navigation.visibility = View.VISIBLE; chromeVisible = true
+        panel.palette(ReaderPalette.forTheme(session.preferences.theme))
     }
 
     private fun toggleChrome() {
@@ -591,10 +615,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         outer.setBackgroundColor(palette.background)
         page.setBackgroundColor(palette.background)
         bannerFooter?.applyPalette(palette)
+        translation?.palette(palette)
         if (::speechButton.isInitialized) {
             speechButton.setTextColor(palette.foreground)
             speechButton.background = android.graphics.drawable.GradientDrawable().apply {
                 setColor((palette.panel and 0x00FFFFFF) or (102 shl 24)); cornerRadius = dp(24).toFloat()
+                setStroke(dp(1), (palette.foreground and 0x00FFFFFF) or (72 shl 24))
             }
             speechControls.setBackgroundColor(palette.background)
             for (i in 0 until speechControls.childCount) (speechControls.getChildAt(i) as? TextView)?.setTextColor(palette.foreground)
@@ -629,7 +655,14 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         val transport = speech?.playing == true || speech?.busy == true
         speechControls.visibility = if (transport) View.VISIBLE else View.GONE
         status.visibility = if (transport) View.GONE else View.VISIBLE
-        for (i in 0..1) speechControls.getChildAt(i).isEnabled = speech?.playing == true
+        for (i in 0..1) speechControls.getChildAt(i).isEnabled = speech?.playing == true && speech?.busy != true
+        val rate = speech?.speed?.toString()?.removeSuffix(".0") ?: "1"
+        val timer = speech?.timerMinutes ?: 0
+        (speechControls.getChildAt(2) as Button).apply {
+            text = "${rate}배\n${if (timer > 0) "${timer}분" else "타이머 꺼짐"}"
+            textSize = 11f
+            contentDescription = "듣기 설정, ${rate}배, ${if (timer > 0) "타이머 ${timer}분 설정" else "타이머 꺼짐"}"
+        }
     }
 
     private fun followSpeech(locator: Locator?) {
@@ -762,6 +795,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     fun updateAdHiddenUntil(epochMs: Long?) { bannerFooter?.updateHiddenUntil(epochMs) }
 
     override fun onPause() {
+        translation?.suspend()
         speech?.foreground(false)
         speechFollowJob?.cancel()
         bannerFooter?.pause()
@@ -772,6 +806,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     override fun onResume() {
         super.onResume()
+        translation?.resume()
         speech?.foreground(true)
         bannerFooter?.resume()
         if (::session.isInitialized && session.ready) pageTurns?.resumePreparation()
@@ -795,6 +830,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     fun closeReader(nextBook: Boolean = false) {
         if (!::session.isInitialized || session.closing) return
         speech?.pause()
+        translation?.suspend()
         session.closing = true
         pageTurns?.invalidate()
         restoreTimeout?.cancel()
@@ -842,6 +878,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onDestroy() {
+        translation?.close()
         speech?.close()
         speechFollowJob?.cancel()
         bannerFooter?.dispose()

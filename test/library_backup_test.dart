@@ -1,3 +1,6 @@
+import 'package:koofy_reader/features/backup/data/speech_backup.dart';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
+import 'package:koofy_reader/features/library/data/library_trash_store.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -23,6 +26,7 @@ class MemoryBackupStorage implements LocalStorage {
   @override
   Future<void> remove(String key) async {
     strings.remove(key);
+    ints.remove(key);
   }
 
   @override
@@ -88,6 +92,32 @@ class BackupFixture {
     await root.delete(recursive: true);
   }
 }
+
+class MemorySpeechBackup extends SpeechBackup {
+  Map<String, dynamic> value = {};
+  bool fail = false;
+  @override
+  Future<Map<String, dynamic>> export() async => value;
+  @override
+  Future<void> merge(Map<String, dynamic> data) async {
+    if (fail) throw StateError('speech storage unavailable');
+    value = data;
+  }
+}
+
+LibraryBackupService serviceWithSpeech(
+  BackupFixture fixture,
+  SpeechBackup speech,
+) => LibraryBackupService(
+  storage: fixture.storage,
+  books: fixture.books,
+  groups: fixture.groups,
+  covers: fixture.covers,
+  reader: fixture.reader,
+  preparer: fixture.preparer,
+  directory: Directory('${fixture.root.path}/library_backups'),
+  speech: speech,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -164,6 +194,90 @@ void main() {
     await target.dispose();
   });
 
+  test(
+    'speech and cover settings roundtrip; missing legacy fields and existing device preference survive',
+    () async {
+      final from = MemorySpeechBackup()
+        ..value = {
+          'platform': 'android',
+          'settings': {'speed': 1.25, 'voice': 'ko-local', 'follow': false},
+          'positions': {
+            bookId: jsonEncode({
+              'revision': revision,
+              'locator': '{"href":"chapter.xhtml"}',
+            }),
+          },
+        };
+      await source.storage.setInt(readerCoverSettingKey, 0);
+      final backup = LibraryBackupService.decode(
+        await serviceWithSpeech(source, from).export(),
+      );
+      final to = MemorySpeechBackup();
+      await serviceWithSpeech(target, to).restore(backup);
+      expect(await target.storage.getInt(readerCoverSettingKey), 0);
+      expect((to.value['positions'] as Map).keys, [bookId]);
+      await target.storage.setInt(readerCoverSettingKey, 1);
+      await serviceWithSpeech(target, to).restore(backup);
+      expect(await target.storage.getInt(readerCoverSettingKey), 1);
+      backup.manifest.remove('speech');
+      backup.manifest.remove('displayCover');
+      await target.service.restore(backup);
+      expect(await target.storage.getInt(readerCoverSettingKey), 1);
+    },
+  );
+  test(
+    'failed listening merge rolls back book index and optional cover preference for retry',
+    () async {
+      final from = MemorySpeechBackup()
+        ..value = {
+          'platform': 'ios',
+          'settings': {'speed': 1.5},
+          'positions': {},
+        };
+      final backup = LibraryBackupService.decode(
+        await serviceWithSpeech(source, from).export(),
+      );
+      final to = MemorySpeechBackup()..fail = true;
+      await expectLater(
+        serviceWithSpeech(target, to).restore(backup),
+        throwsStateError,
+      );
+      expect(await target.storage.getInt(readerCoverSettingKey), isNull);
+      expect(
+        (await target.books.getBooks()).where((b) => b.isLocalFile),
+        isEmpty,
+      );
+      to.fail = false;
+      expect(await serviceWithSpeech(target, to).restore(backup), 2);
+    },
+  );
+  test(
+    'restore does not duplicate or unhide a retained trashed book',
+    () async {
+      final backup = LibraryBackupService.decode(await source.service.export());
+      await target.service.restore(backup);
+      final book = (await target.books.getBooks()).firstWhere(
+        (b) => b.id == bookId,
+      );
+      await LibraryTrashStore(target.storage).moveBook(book);
+      expect(await target.service.restore(backup), 0);
+      expect((await target.books.getBooks()).any((b) => b.id == bookId), false);
+      final exported = LibraryBackupService.decode(
+        await target.service.export(),
+      );
+      expect(
+        (exported.manifest['books'] as List).any(
+          (b) => (b as Map)['id'] == bookId,
+        ),
+        false,
+      );
+      await LibraryTrashStore(target.storage).restoreBook(bookId);
+      expect(
+        (await target.books.getBooks()).where((b) => b.id == bookId),
+        hasLength(1),
+      );
+    },
+  );
   test(
     'round trip restores source bytes, covers, group order, settings and exact locator',
     () async {

@@ -39,5 +39,8 @@
     "auth": {
       "port": 9099
     }
+  },
+  "remoteconfig": {
+    "template": "remoteconfig.template.json"
   }
 }

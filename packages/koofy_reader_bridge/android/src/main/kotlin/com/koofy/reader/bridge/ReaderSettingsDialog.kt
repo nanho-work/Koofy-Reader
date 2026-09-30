@@ -19,6 +19,8 @@ internal class ReaderSettingsDialog(
     private val fontIds: List<String> = ReaderFonts.ids,
     private val fontLabels: List<String> = ReaderFonts.labels,
     private val speechSettings: (() -> Unit)? = null,
+    private val translationSettings: (() -> Unit)? = null,
+    private val translationEnabled: Boolean = false,
 ) {
     private val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private val scroll = ScrollView(context).apply { addView(column) }
@@ -76,6 +78,7 @@ internal class ReaderSettingsDialog(
         heading.addView(button("완료") { dialog.dismiss() }, LinearLayout.LayoutParams(dp(64), dp(48)))
         column.addView(heading)
         speechSettings?.let { action -> column.addView(button("듣기 설정 · 로컬 음성") { dialog.dismiss(); action() }) }
+        translationSettings?.let { action -> column.addView(button(if (translationEnabled) "번역 모드 끄기" else "번역 모드 · Google로 번역") { dialog.dismiss(); action() }) }
         column.addView(label("글자 크기"))
         val font = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
         font.addView(button("A−") { update(current().copy(fontScale = (current().fontScale - .1).coerceAtLeast(.5))) }, LinearLayout.LayoutParams(0, -2, 1f))

@@ -11,6 +11,7 @@ class Book {
     this.localPath,
     this.coverPath,
     this.importSourcePath,
+    this.sourceHash,
   });
 
   factory Book.asset({
@@ -38,6 +39,7 @@ class Book {
     required String localPath,
     String? coverPath,
     String? importSourcePath,
+    String? sourceHash,
   }) {
     return Book(
       id: id,
@@ -48,6 +50,7 @@ class Book {
       localPath: localPath,
       coverPath: coverPath,
       importSourcePath: importSourcePath,
+      sourceHash: sourceHash,
     );
   }
 
@@ -62,6 +65,7 @@ class Book {
 
   /// Original picker identity for duplicate selection; never used to read a book.
   final String? importSourcePath;
+  final String? sourceHash;
 
   bool get isLocalFile => sourceType == BookSourceType.localFile;
 
@@ -75,6 +79,7 @@ class Book {
     localPath: localPath,
     coverPath: path,
     importSourcePath: importSourcePath,
+    sourceHash: sourceHash,
   );
 
   Map<String, dynamic> toJson() {
@@ -88,6 +93,7 @@ class Book {
       'localPath': localPath,
       'coverPath': coverPath,
       'importSourcePath': importSourcePath,
+      'sourceHash': sourceHash,
     };
   }
 
@@ -118,6 +124,9 @@ class Book {
       sourceType: sourceType,
       assetPath: assetPath is String ? assetPath : null,
       localPath: localPath is String ? localPath : null,
+      sourceHash: json['sourceHash'] is String
+          ? json['sourceHash'] as String
+          : null,
       coverPath: json['coverPath'] is String
           ? json['coverPath'] as String
           : null,

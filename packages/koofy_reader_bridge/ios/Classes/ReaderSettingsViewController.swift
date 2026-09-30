@@ -3,6 +3,8 @@ import UIKit
 /// Keeps settings open while the host applies preferences and restores its locator.
 final class ReaderSettingsViewController: UITableViewController {
     var onSpeech: (() -> Void)?
+    var onTranslation: (() -> Void)?
+    var translationEnabled = false
     private var preferences: ReaderPreferences
     private let change: (ReaderPreferences, @escaping (Result<Void, Error>) -> Void) -> Void
     private let fontIds: [String]
@@ -29,8 +31,15 @@ final class ReaderSettingsViewController: UITableViewController {
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "듣기 설정", style: .plain, target: self, action: #selector(speechTapped))
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 60
+        let translationButton = UIButton(type: .system)
+        translationButton.setTitle(translationEnabled ? "번역 모드 끄기" : "번역 모드 · Google로 번역", for: .normal)
+        translationButton.addTarget(self, action: #selector(translationTapped), for: .touchUpInside)
+        translationButton.frame = CGRect(x: 0, y: 0, width: 300, height: 52)
+        tableView.tableHeaderView = translationButton
         refresh()
     }
+
+    @objc private func translationTapped() { onTranslation?() }
 
     @objc private func speechTapped() { onSpeech?() }
 

@@ -8,14 +8,16 @@ Pod::Spec.new do |s|
   s.author           = { 'Koofy Reader' => 'Koofy Reader' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.swift'
-  s.resource_bundles = { 'KoofyReaderAssets' => ['Resources/*.js', 'Resources/Fonts/*.otf', 'Resources/Fonts/catalog.json'] }
+  s.resource_bundles = { 'KoofyReaderAssets' => ['Resources/*.js', 'Resources/translate-*.png', 'Resources/Fonts/*.otf', 'Resources/Fonts/catalog.json'] }
   s.dependency 'Flutter'
+  s.dependency 'GoogleMLKit/Translate', '8.0.0'
   s.dependency 'IronSourceSDK', '9.4.0.0'
   s.dependency 'IronSourceUnityAdsAdapter', '5.5.0'
+  s.dependency 'IronSourceAdMobAdapter', '5.4.0'
   s.dependency 'ReadiumShared', '= 3.11.0'
   s.dependency 'ReadiumStreamer', '= 3.11.0'
   s.dependency 'ReadiumNavigator', '= 3.11.0'
-  s.platform = :ios, '15.0'
+  s.platform = :ios, '15.5'
   s.swift_version = '5.10'
   s.static_framework = true
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

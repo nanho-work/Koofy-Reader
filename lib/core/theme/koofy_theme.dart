@@ -6,7 +6,7 @@ import 'package:koofy_reader/core/theme/reader_palette.dart';
 abstract final class KoofyTheme {
   static ThemeData forBrightness(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final p = dark ? ReaderPalette.dark : ReaderPalette.sepia;
+    final p = dark ? ReaderPalette.dark : ReaderPalette.light;
     final scheme =
         ColorScheme.fromSeed(
           seedColor: p.accent,
@@ -43,6 +43,15 @@ abstract final class KoofyTheme {
           ),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          side: BorderSide(color: p.secondary.withValues(alpha: 0.3)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: p.background,
         selectedColor: p.panel,
@@ -69,7 +78,7 @@ abstract final class KoofyTheme {
       statusBarBrightness: brightness,
       systemNavigationBarColor: dark
           ? ReaderPalette.dark.background
-          : ReaderPalette.sepia.background,
+          : ReaderPalette.light.background,
       systemNavigationBarIconBrightness: dark
           ? Brightness.light
           : Brightness.dark,

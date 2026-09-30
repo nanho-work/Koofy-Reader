@@ -67,7 +67,7 @@ final class ReaderBannerFooter: UIView {
             removeBanner()
             retryAt = .distantPast
             if currentTracking != .authorized {
-                LPMPrivacySettings.setGDPRConsents(["UnityAds": false, "IronSource": false])
+                LPMPrivacySettings.setGDPRConsents(["UnityAds": false, "IronSource": false, "AdMob": false])
                 LPMPrivacySettings.setCCPA(true)
             }
         }
@@ -119,7 +119,7 @@ final class ReaderBannerFooter: UIView {
         if bounds.width < 320 {
             removeBanner()
             message.isHidden = false
-            message.text = "광고 표시 공간이 부족합니다."
+            message.text = nil
         } else if banner == nil, Date() >= retryAt {
             load()
         } else if loaded {
@@ -127,7 +127,7 @@ final class ReaderBannerFooter: UIView {
             message.isHidden = true
         } else {
             message.isHidden = false
-            message.text = Date() < retryAt ? "광고를 불러오지 못했습니다." : "광고 불러오는 중…"
+            message.text = Date() < retryAt ? "지금은 광고를 표시할 수 없습니다." : "광고 불러오는 중…"
         }
         schedule()
     }
@@ -148,7 +148,7 @@ final class ReaderBannerFooter: UIView {
             self.removeBanner()
             self.retryAt = Date().addingTimeInterval(60)
             self.message.isHidden = false
-            self.message.text = "광고를 불러오지 못했습니다."
+            self.message.text = "지금은 광고를 표시할 수 없습니다."
         }
         callbacks.interacted = { [weak self] in self?.onAdInteraction?() }
         listener = callbacks
@@ -176,6 +176,12 @@ private final class ReaderBannerListener: NSObject, LPMBannerAdViewDelegate {
     var loaded: (() -> Void)?
     var failed: (() -> Void)?
     func didLoadAd(with adInfo: LPMAdInfo) { loaded?() }
-    func didFailToLoadAd(withAdUnitId adUnitId: String, error: Error) { failed?() }
-    func didFailToDisplayAd(with adInfo: LPMAdInfo, error: Error) { failed?() }
+    func didFailToLoadAd(withAdUnitId adUnitId: String, error: Error) {
+        NSLog("KoofyAds reader_banner load_failed code=%ld", (error as NSError).code)
+        failed?()
+    }
+    func didFailToDisplayAd(with adInfo: LPMAdInfo, error: Error) {
+        NSLog("KoofyAds reader_banner display_failed code=%ld", (error as NSError).code)
+        failed?()
+    }
 }

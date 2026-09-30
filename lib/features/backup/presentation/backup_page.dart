@@ -1,3 +1,5 @@
+import 'package:koofy_reader/features/backup/data/speech_backup.dart';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -18,6 +20,11 @@ class BackupPage extends ConsumerStatefulWidget {
 }
 
 class _BackupPageState extends ConsumerState<BackupPage> {
+  static const lastBackupKey = 'library_last_export_at_v1';
+  late final Future<int?> _initialBackup = ref
+      .read(localStorageProvider)
+      .getInt(lastBackupKey);
+  int? _lastBackup;
   bool _busy = false;
   String? _status;
   void _progress(String message) {
@@ -39,6 +46,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       final storage = ref.read(localStorageProvider);
       final service = LibraryBackupService(
         storage: storage,
+        speech: SpeechBackup(),
         books: ref.read(bookRepositoryProvider),
         groups: ref.read(bookGroupRepositoryProvider),
         covers: BookCoverStore(storage),
@@ -89,6 +97,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         ref.invalidate(bookGroupsProvider);
         ref.invalidate(nativeLibraryPositionsProvider);
         ref.invalidate(libraryCompletionProvider);
+        ref.invalidate(readerCoverEnabledProvider);
         _progress('복원 완료 · $count권 추가\n기존 책과 독서 기록은 유지했습니다.');
       } else {
         final bytes = await service.export(progress: _progress);
@@ -102,6 +111,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           allowedExtensions: ['zip'],
           bytes: bytes,
         );
+        if (path != null) {
+          _lastBackup = DateTime.now().millisecondsSinceEpoch;
+          try {
+            await storage.setInt(lastBackupKey, _lastBackup!);
+          } catch (_) {
+            _progress('백업 파일은 저장했지만 마지막 백업 날짜를 기록하지 못했습니다.');
+            return;
+          }
+        }
         _progress(path == null ? '백업 저장을 취소했습니다.' : '백업 파일을 저장했습니다.');
       }
     } catch (error) {
@@ -123,11 +141,32 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text('책 파일, 표지, 묶음과 순서, 읽던 위치, 완독 표시, 보기 설정을 파일 하나로 저장합니다.'),
+          FutureBuilder<int?>(
+            future: _initialBackup,
+            builder: (context, snapshot) {
+              final value = _lastBackup ?? snapshot.data;
+              final date = value == null
+                  ? null
+                  : DateTime.fromMillisecondsSinceEpoch(value);
+              final stale =
+                  date == null || DateTime.now().difference(date).inDays >= 30;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  snapshot.hasError
+                      ? '마지막 백업 날짜를 확인하지 못했습니다.'
+                      : '${date == null ? '이 기기에 백업 저장 기록이 없습니다.' : '마지막 백업: ${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}'}${stale ? '\n책을 많이 추가했거나 기기를 바꾸기 전에는 백업을 저장해 주세요.' : ''}',
+                ),
+              );
+            },
+          ),
+          const Text(
+            '책 파일, 표지, 묶음과 순서, 읽던 위치, 책갈피, 완독 표시, 보기·듣기 설정과 듣던 위치를 파일 하나로 저장합니다.',
+          ),
           const SizedBox(height: 12),
           const Text(
             '파일 앱에서 다른 기기로 옮겨 복원할 수 있습니다. 자동 동기화는 하지 않습니다. '
-            '다운로드한 글꼴은 새 기기에서 다시 내려받아 주세요. 광고 숨김 시간과 광고 동의는 백업하지 않습니다.',
+            '다운로드한 글꼴과 음성은 새 기기에서 다시 설치해 주세요. 다른 운영체제에서는 목소리를 다시 선택합니다. 휴지통의 책, 광고 숨김 시간과 광고 동의는 백업하지 않습니다.',
           ),
           const SizedBox(height: 12),
           const Text(

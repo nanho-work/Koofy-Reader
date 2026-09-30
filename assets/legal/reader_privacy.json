@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-21",
+  "updatedAt": "2026-09-29",
   "email": "koofylab@gmail.com",
   "translations": {
     "ko": {
@@ -23,16 +23,18 @@
           "heading": "3. 도서·글꼴 다운로드와 서버 기록",
           "paragraphs": [
             "공개된 도서·표지·글꼴 목록 조회와 파일 다운로드에 Firebase Cloud Functions, Cloud Firestore 및 Cloud Storage를 사용합니다. 이 과정에서 요청한 콘텐츠 식별자, IP 주소, 요청 시각, 응답·오류 등 서버 접속 정보가 서비스 제공·보안·장애 대응을 위해 처리될 수 있습니다.",
-            "현재 앱에는 Firebase Authentication, Analytics 또는 Crashlytics SDK를 이용한 사용자 계정·행동 분석·충돌 수집 기능이 포함되어 있지 않습니다. 광고 SDK 자체의 통계·진단 처리는 별개입니다."
+            "현재 앱에는 Firebase Authentication, Analytics 또는 Crashlytics SDK를 이용한 사용자 계정·행동 분석·충돌 수집 기능이 포함되어 있지 않습니다. 광고 SDK 자체의 통계·진단 처리는 별개입니다.",
+            "앱 시작 시 업데이트 안내를 확인하기 위해 Firebase Remote Config를 사용합니다. 이 과정에서 Firebase 설치 식별자, 앱 버전과 기기·운영체제 정보 등이 설정 제공을 위해 처리될 수 있습니다. 이 기능에 독서 본문·기록을 전송하지 않으며 Analytics 기반 개인화나 A/B 테스트를 사용하지 않습니다."
           ]
         },
         {
           "heading": "4. 광고와 선택권",
           "paragraphs": [
-            "Unity LevelPlay를 통해 ironSource Ads 및 Unity Ads의 배너·선택형 리워드 광고를 제공합니다. 광고 제공, 성과 측정, 부정 이용 방지 및 진단을 위해 광고 사업자가 IP 주소, 기기·운영체제·앱 정보, 광고 노출·클릭·보상·오류 정보 등을 처리할 수 있습니다. 광고 식별자와 개인화에 사용되는 정보는 OS 권한과 이용자의 선택, 제공자 정책에 따라 처리됩니다.",
-            "첫 실행에서 광고 관련 선택을 안내하며 선택 전에는 광고 SDK를 초기화하지 않습니다. 선택은 설정 > 개인정보 및 광고에서 다시 확인·변경할 수 있습니다. 맞춤형 광고를 거부하더라도 독서는 이용할 수 있으며 광고 제공·보안에 필요한 제한된 정보가 처리되는 비맞춤형 광고가 표시될 수 있습니다.",
-            "iOS에서는 앱의 광고 선택과 별개로 Apple의 추적 허가가 적용됩니다. 추적 허가를 거부하거나 제한한 경우 맞춤형 광고 허용 선택만으로 추적을 허용하지 않습니다. OS 추적 권한은 기기 설정에서 변경할 수 있습니다.",
-            "리워드 광고는 이용자가 버튼을 눌러 선택했을 때만 표시됩니다. 시청 완료 보상은 배너를 2시간 숨기는 기능이며, 추적 허가에 대한 대가가 아닙니다."
+            "Unity LevelPlay를 통해 ironSource Ads, Unity Ads 및 Google AdMob의 배너·선택형 리워드 광고를 제공합니다. 광고 제공, 성과 측정, 부정 이용 방지 및 진단을 위해 광고 사업자가 IP 주소, 기기·운영체제·앱 정보, 광고 노출·클릭·보상·오류 정보 등을 처리할 수 있습니다. 광고 식별자와 개인화에 사용되는 정보는 OS 권한과 이용자의 선택, 제공자 정책에 따라 처리됩니다.",
+            "첫 실행에서 광고와 개인정보 처리를 안내하며 안내 절차가 끝나기 전에는 광고 SDK를 초기화하지 않습니다. Android에서는 앱에서 광고 방식을 선택합니다. 맞춤형 광고를 거부하더라도 독서는 이용할 수 있으며 광고 제공·보안에 필요한 제한된 정보가 처리되는 비맞춤형 광고가 표시될 수 있습니다.",
+            "iOS에서는 안내 화면의 계속 버튼을 누른 뒤 아직 결정하지 않은 Apple 추적 권한을 시스템 창에서 선택합니다. 계속 버튼 자체는 추적 동의가 아닙니다. 거부·제한·미결정 상태에서는 비맞춤형 광고를 적용합니다. 설정 > 개인정보 및 광고에서 현재 상태를 확인하고 비맞춤형 광고만 사용하도록 제한할 수 있으며, OS 추적 권한은 기기 설정에서 변경할 수 있습니다. 기존에 선택한 비맞춤형 광고 설정은 유지합니다.",
+            "리워드 광고는 이용자가 버튼을 눌러 선택했을 때만 표시됩니다. 시청 완료 보상은 배너를 2시간 숨기는 기능이며, 추적 허가에 대한 대가가 아닙니다.",
+            "Google User Messaging Platform(UMP)을 통해 앱 실행 시 지역별 광고 개인정보 요건을 확인하고 필요한 동의 화면을 표시합니다. 동의 화면 처리가 끝났다는 사실만으로 맞춤형 광고에 동의한 것으로 해석하지 않습니다. 지역별 동의 관리가 필요한 경우 비맞춤형 광고로 제한하며, SDK가 광고 요청을 허용하지 않으면 광고를 요청하지 않습니다. 확인 실패 시에도 독서는 이용할 수 있습니다. 해당되는 경우 설정 > 개인정보 및 광고 > 광고 개인정보 선택 관리에서 선택을 변경할 수 있습니다. SDK는 동의 상태를 기기에 저장하고 IP 주소와 앱·기기 정보 등을 동의 안내 제공에 사용할 수 있습니다."
           ]
         },
         {
@@ -46,7 +48,8 @@
           "heading": "6. 외부 서비스 및 국외 처리",
           "paragraphs": [
             "Firebase의 서버·파일 제공과 Google의 이메일 서비스, Unity·ironSource의 광고 서비스가 각 역할에 필요한 정보를 처리합니다. 서비스 제공자의 서버와 광고 파트너가 위치한 미국 등 국외에서 정보가 처리될 수 있습니다.",
-            "콘텐츠 메타데이터와 Cloud Functions는 서울 리전, 도서·글꼴 파일의 Cloud Storage는 미국 리전을 사용합니다. 각 제공자의 처리·보유·삭제 정책은 아래 공식 안내에서 확인할 수 있습니다."
+            "콘텐츠 메타데이터와 Cloud Functions는 서울 리전, 도서·글꼴 파일의 Cloud Storage는 미국 리전을 사용합니다. 각 제공자의 처리·보유·삭제 정책은 아래 공식 안내에서 확인할 수 있습니다.",
+            "Google은 AdMob 광고와 UMP 동의 관리 서비스를 제공합니다."
           ],
           "links": [
             {
@@ -56,6 +59,10 @@
             {
               "label": "Unity·ironSource 앱 이용자 개인정보처리방침",
               "href": "https://unity.com/legal/game-player-and-app-user-privacy-policy"
+            },
+            {
+              "label": "Google 개인정보처리방침",
+              "href": "https://policies.google.com/privacy"
             }
           ]
         },
@@ -81,6 +88,19 @@
             "처리 목적·서비스 구성·관련 규정이 바뀌면 방침과 업데이트 일자를 변경하며 중요한 변경은 앱 또는 웹페이지로 안내합니다.",
             "운영자 및 개인정보 문의: Koofy Lab / koofylab@gmail.com"
           ]
+        },
+        {
+          "heading": "선택 번역과 발음 듣기",
+          "paragraphs": [
+            "선택 번역은 Google ML Kit를 이용해 기기 안에서 처리합니다. 선택한 본문과 번역 결과를 Google 번역 서버나 운영자 서버로 전송하지 않으며 앱에서 번역 기록으로 저장하지 않습니다. 발음 듣기는 기기의 음성 합성을 이용합니다.",
+            "번역 언어 데이터 다운로드·갱신 및 SDK 운영을 위해 Google 서버와 통신할 수 있으며 API의 성능·사용 통계가 Google에 전송될 수 있습니다. 자세한 처리 내용은 Google ML Kit 안내를 참고해 주세요."
+          ],
+          "links": [
+            {
+              "label": "Google ML Kit 개인정보 안내",
+              "href": "https://developers.google.com/ml-kit/terms"
+            }
+          ]
         }
       ]
     },
@@ -105,16 +125,18 @@
           "heading": "3. Downloads and infrastructure logs",
           "paragraphs": [
             "Firebase Cloud Functions, Cloud Firestore, and Cloud Storage provide the public catalog and book, cover, and font downloads. Content identifiers, IP addresses, request times, responses, and error information may be processed to deliver and secure these services and diagnose problems.",
-            "The app currently does not include user accounts through Firebase Authentication or user analytics/crash collection through Firebase Analytics or Crashlytics. Advertising SDK statistics and diagnostics are separate."
+            "The app currently does not include user accounts through Firebase Authentication or user analytics/crash collection through Firebase Analytics or Crashlytics. Advertising SDK statistics and diagnostics are separate.",
+            "Firebase Remote Config checks for update notices at app startup. Firebase installation identifiers, app version and device or operating system information may be processed to deliver configuration values. Reading content and history are not sent for this feature. Analytics-based personalization and A/B testing are not used."
           ]
         },
         {
           "heading": "4. Advertising and your choices",
           "paragraphs": [
-            "Unity LevelPlay mediates banner and optional rewarded ads from ironSource Ads and Unity Ads. Advertising providers may process IP addresses, device, operating-system and app details, and ad impressions, interactions, rewards, and errors for ad delivery, measurement, fraud prevention, and diagnostics. Advertising identifiers and personalization data depend on your choices, OS permissions, and provider policies.",
-            "Advertising choices are presented at first launch; the advertising SDK is not initialized before a choice. You can review and change your choice in Settings > Privacy and advertising. Declining personalized ads does not prevent reading. Non-personalized ads may still be shown and process limited information needed for delivery and security.",
-            "On iOS, Apple tracking permission is separate from your in-app advertising choice. An in-app choice does not override denied or restricted tracking permission. OS tracking permission can be changed in device settings.",
-            "Rewarded ads play only after you choose to watch. A completed reward hides banners for two hours; it is not a reward for granting tracking permission."
+            "Unity LevelPlay mediates banner and optional rewarded ads from ironSource Ads, Unity Ads and Google AdMob. Advertising providers may process IP addresses, device, operating-system and app details, and ad impressions, interactions, rewards, and errors for ad delivery, measurement, fraud prevention, and diagnostics. Advertising identifiers and personalization data depend on your choices, OS permissions, and provider policies.",
+            "Advertising and privacy information is presented at first launch. The advertising SDK is not initialized before this flow is completed. On Android, you select an advertising preference in the app. Declining personalized ads does not prevent reading. Non-personalized ads may still process limited information needed for delivery and security.",
+            "On iOS, Continue leads to the Apple tracking permission prompt if permission has not been determined. Continue itself does not grant tracking permission. Denied, restricted or undetermined permission results in non-personalized ads. In Settings > Privacy and advertising you can review the status and restrict ads to non-personalized ads. OS tracking permission can be changed in device settings. Existing non-personalized advertising preferences are preserved.",
+            "Rewarded ads play only after you choose to watch. A completed reward hides banners for two hours; it is not a reward for granting tracking permission.",
+            "Google User Messaging Platform (UMP) checks regional advertising privacy requirements at app launch and presents required messages. Completing a form is not treated as agreement to personalized advertising. We restrict advertising to non-personalized ads where regional consent management is required, and do not request ads unless the SDK permits it. Reading remains available if the check fails. Where applicable, you can change choices in Settings > Privacy and advertising > Manage advertising privacy choices. The SDK stores consent status on the device and may use IP addresses and app/device information to provide the consent flow."
           ]
         },
         {
@@ -127,7 +149,7 @@
         {
           "heading": "6. Providers and international processing",
           "paragraphs": [
-            "Google/Firebase provides hosting and downloads, Google provides email, and Unity/ironSource provides advertising. Data may be processed in the United States and other countries where providers and their partners operate.",
+            "Google/Firebase provides hosting and downloads, Google provides email, and Unity/ironSource and Google AdMob provide advertising; Google UMP provides consent management. Data may be processed in the United States and other countries where providers and their partners operate.",
             "Catalog metadata and Cloud Functions use the Seoul region. Cloud Storage for downloadable files uses a US region. Please consult the linked provider policies for their processing, retention and deletion practices."
           ],
           "links": [
@@ -138,6 +160,10 @@
             {
               "label": "Unity / ironSource app user privacy policy",
               "href": "https://unity.com/legal/game-player-and-app-user-privacy-policy"
+            },
+            {
+              "label": "Google privacy policy",
+              "href": "https://policies.google.com/privacy"
             }
           ]
         },
@@ -162,6 +188,19 @@
           "paragraphs": [
             "We update this policy and its date when our processing, services or relevant requirements change. Material changes are communicated through the app or website.",
             "Operator and privacy contact: Koofy Lab / koofylab@gmail.com"
+          ]
+        },
+        {
+          "heading": "Selected-text translation and pronunciation",
+          "paragraphs": [
+            "Selected text is translated on the device using Google ML Kit. The source text and translation are not sent to Google translation servers or our servers, and the app does not save a translation history. Pronunciation uses the device speech engine.",
+            "The SDK may contact Google to download or update language models and send API performance and usage metrics. See the Google ML Kit privacy information for details."
+          ],
+          "links": [
+            {
+              "label": "Google ML Kit privacy information",
+              "href": "https://developers.google.com/ml-kit/terms"
+            }
           ]
         }
       ]

@@ -19,21 +19,21 @@ class AdFooterWidget extends ConsumerWidget {
     final connectivityAsync = ref.watch(connectivityResultsProvider);
 
     return adStateAsync.when(
-      loading: () => _AdBox(message: '광고 상태 확인중...'),
-      error: (_, _) => _AdBox(message: '광고 정보를 불러오지 못했습니다.'),
+      loading: () => const SizedBox(height: 50),
+      error: (_, _) => const _AdBox(message: '지금은 광고를 표시할 수 없습니다.'),
       data: (adState) {
         if (adState.isBannerHidden) {
           return const SizedBox.shrink();
         }
         return connectivityAsync.when(
-          loading: () => _AdBox(message: '광고 로딩중...'),
-          error: (_, _) => _AdBox(message: '네트워크 상태 확인 실패'),
+          loading: () => const SizedBox(height: 50),
+          error: (_, _) => const _AdBox(message: '지금은 광고를 표시할 수 없습니다.'),
           data: (results) {
             final connected = results.any((e) => e != ConnectivityResult.none);
             if (connected) {
               return const BannerAdWidget();
             }
-            return _AdBox(message: '네트워크 연결 필요');
+            return const _AdBox(message: '오프라인에서도 독서를 계속할 수 있습니다.');
           },
         );
       },

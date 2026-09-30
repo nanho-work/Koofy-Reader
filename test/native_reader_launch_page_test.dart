@@ -29,7 +29,10 @@ class _DeferredPreparer extends ReadingPublicationPreparer {
   final publications = <String, PreparedReadingPublication>{};
 
   @override
-  Future<PreparedReadingPublication> prepare({required Book book}) {
+  Future<PreparedReadingPublication> prepare({
+    required Book book,
+    bool showRegisteredCover = true,
+  }) {
     calls++;
     if (publications.containsKey(book.id)) {
       return Future.value(publications[book.id]);

@@ -55,13 +55,11 @@ class BookCover extends StatelessWidget {
   }
 
   Widget _fallback(BuildContext context) {
-    const colors = [
-      Color(0xFF365347),
-      Color(0xFF665742),
-      Color(0xFF506176),
-      Color(0xFF835747),
-      Color(0xFF515B49),
-    ];
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = Theme.of(context).colorScheme.onSurface;
+    final colors = dark
+        ? const [Color(0xFF354238), Color(0xFF444137), Color(0xFF39413A)]
+        : const [Color(0xFFEAE4D4), Color(0xFFDCE3D5), Color(0xFFE3D8C8)];
     final index =
         book.id.codeUnits.fold(0, (sum, unit) => sum + unit) % colors.length;
     return Semantics(
@@ -69,18 +67,19 @@ class BookCover extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors[index],
-          borderRadius: const BorderRadius.horizontal(
-            right: Radius.circular(8),
-          ),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x16000000),
-              blurRadius: 8,
-              offset: Offset(3, 4),
+              color: Color(0x0C000000),
+              blurRadius: 3,
+              offset: Offset(1, 2),
             ),
           ],
-          border: const Border(
-            left: BorderSide(color: Color(0x22FFFFFF), width: 4),
+          border: Border(
+            left: BorderSide(
+              color: foreground.withValues(alpha: 0.12),
+              width: 4,
+            ),
           ),
         ),
         child: Padding(
@@ -94,23 +93,35 @@ class BookCover extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  book.title,
-                  maxLines: compact ? 3 : 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFFFFF5DF),
-                    fontSize: compact ? 15 : 20,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final fontSize = compact ? 15.0 : 20.0;
+                    final lineHeight =
+                        MediaQuery.textScalerOf(context).scale(fontSize) * 1.35;
+                    final lines = math.min(
+                      compact ? 3 : 4,
+                      (constraints.maxHeight / lineHeight).floor(),
+                    );
+                    if (lines < 1) return const SizedBox.shrink();
+                    return Text(
+                      book.title,
+                      maxLines: lines,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    );
+                  },
                 ),
               ),
               if (!compact)
-                const Text(
+                Text(
                   'KOOFY',
                   style: TextStyle(
-                    color: Color(0xFFFFF5DF),
+                    color: foreground.withValues(alpha: 0.75),
                     fontSize: 10,
                     letterSpacing: 2,
                   ),
@@ -167,11 +178,23 @@ class BookTile extends StatelessWidget {
           padding: EdgeInsets.zero,
           tooltip: '${book.title} 더보기',
           onPressed: onMore,
-          icon: Icon(
-            Icons.more_horiz,
-            size: 20,
-            color: compact ? const Color(0xFFFFF5DF) : null,
-          ),
+          icon: compact || badge != null
+              ? Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.more_horiz,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                )
+              : const Icon(Icons.more_horiz, size: 20),
         ),
       );
       return Column(
@@ -181,18 +204,58 @@ class BookTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Semantics(
-                  label: '${book.title}, ${book.author}, $statusLabel',
-                  button: true,
-                  child: InkWell(
-                    onTap: onTap,
-                    onLongPress: enableLongPress ? onMore : null,
-                    child: ExcludeSemantics(
-                      child: BookCover(
-                        book: book,
-                        compact: compact,
-                        bottomInset: compact ? 38 : 0,
-                        topInset: badge == null ? 0 : scaler.scale(11) + 12,
+                if (badge != null) ...[
+                  Positioned.fill(
+                    left: 8,
+                    bottom: 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    left: 4,
+                    top: 4,
+                    right: 4,
+                    bottom: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                Positioned.fill(
+                  top: badge == null ? 0 : 8,
+                  right: badge == null ? 0 : 8,
+                  child: Semantics(
+                    label:
+                        '${book.title}, ${book.author}, $statusLabel${badge == null ? '' : ', $badge'}',
+                    button: true,
+                    child: InkWell(
+                      onTap: onTap,
+                      onLongPress: enableLongPress ? onMore : null,
+                      child: ExcludeSemantics(
+                        child: BookCover(
+                          book: book,
+                          compact: compact,
+                          bottomInset: compact && badge == null ? 38 : 0,
+                          topInset: badge == null
+                              ? 0
+                              : math.max(48, scaler.scale(11) + 12),
+                        ),
                       ),
                     ),
                   ),
@@ -200,33 +263,54 @@ class BookTile extends StatelessWidget {
                 if (badge != null)
                   Positioned(
                     left: 6,
-                    top: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xDD243D32),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        badge!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
+                    top: 8,
+                    right: 8,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: compact ? 3 : 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xDD243D32),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  badge!,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        more,
+                      ],
                     ),
                   ),
-                if (compact) Positioned(right: 0, bottom: 0, child: more),
+                if (compact && badge == null)
+                  Positioned(
+                    right: badge == null ? 0 : 8,
+                    bottom: 0,
+                    child: more,
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 8),
           SizedBox(
             height: compact ? titleHeight : math.max(48, titleHeight + 8),
-            child: compact
+            child: compact || badge != null
                 ? title
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

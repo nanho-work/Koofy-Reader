@@ -10,11 +10,19 @@ import org.readium.r2.shared.util.Language
 import org.readium.r2.shared.util.tokenizer.DefaultTextContentTokenizer
 import org.readium.r2.shared.util.tokenizer.TextUnit
 
+internal fun isReaderDisplayCover(locator: Locator?): Boolean =
+    locator?.href?.toString()?.substringBefore('#') == "__koofy_reader_cover_v1__/cover.xhtml"
+
 internal data class SpeechStart(val locator: Locator, val skip: Int)
 
 /** Readium's content iterator seeks elements, not a sentence inside them. Keep its full
  * cursor (so Previous still works), silently advancing only the sentences before the anchor. */
 internal suspend fun speechStart(publication: Publication, target: Locator): SpeechStart {
+    if (isReaderDisplayCover(target)) {
+        val body = publication.readingOrder.firstOrNull { it.url().toString() != "__koofy_reader_cover_v1__/cover.xhtml" }
+        val start = body?.let { publication.locatorFromLink(it) }
+        if (start != null) return SpeechStart(start, 0)
+    }
     val json = target.toJSON()
     val locations = json.optJSONObject("locations") ?: JSONObject().also { json.put("locations", it) }
     if (!locations.has("cssSelector")) target.locations.fragments.firstOrNull()?.let { id ->

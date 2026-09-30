@@ -13,6 +13,8 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
     var onManualScroll: () -> Unit = {}
     var pageMode = true
     var selecting = false
+    var translationMode = false
+    var suppressTap = false; private set
     var blocked = false
     var begin: (Boolean, Float) -> Unit = { _, _ -> }
     var move: (Float, Float) -> Unit = { _, _ -> }
@@ -31,12 +33,13 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
         if (blocked) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                suppressTap = translationMode && selecting
                 downX = event.x
                 downY = event.y
                 downTime = event.eventTime
                 edgeStart = downX < width * .18f || downX > width * .82f
                 val cornerWidth = maxOf(32 * resources.displayMetrics.density, width * .08f)
-                ownsCorner = pageMode && !selecting &&
+                ownsCorner = pageMode && !selecting && !translationMode &&
                     (downX <= cornerWidth || downX >= width - cornerWidth) &&
                     (downY <= height * .25f || downY >= height * .75f)
                 dragging = false
@@ -52,7 +55,7 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
                 if (!pageMode && abs(dy) > slop) onManualScroll()
                 // A long press belongs to text selection; multiple fingers to the system.
                 if (pageMode && !selecting && event.pointerCount == 1 &&
-                    (edgeStart || event.eventTime - downTime < ViewConfiguration.getLongPressTimeout()) &&
+                    ((edgeStart && !translationMode) || event.eventTime - downTime < ViewConfiguration.getLongPressTimeout()) &&
                     abs(dx) > slop && abs(dx) > abs(dy) * 1.15f) {
                     dragging = true
                     left = dx < 0
@@ -112,7 +115,7 @@ internal class ReaderTurnHost(context: Context) : FrameLayout(context) {
         // Readium's WebView claims its gutter on a sub-slop MOVE. Retain the right
         // to recognize a horizontal page gesture, while leaving selection/scroll alone.
         val ownsCandidate = pageMode && !selecting &&
-            (edgeStart || SystemClock.uptimeMillis() - downTime < ViewConfiguration.getLongPressTimeout())
+            ((edgeStart && !translationMode) || SystemClock.uptimeMillis() - downTime < ViewConfiguration.getLongPressTimeout())
         super.requestDisallowInterceptTouchEvent(if (ownsCandidate) false else disallowIntercept)
     }
 }

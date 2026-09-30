@@ -14,14 +14,18 @@ import java.util.concurrent.Executors
 /** The Flutter engine is retained behind a separate native reader Activity. */
 class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
     private var activity: Activity? = null
+    private var speechBackup: SpeechBackupChannel? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         ReaderRuntime.initialize(binding.applicationContext)
+        speechBackup = SpeechBackupChannel(binding.applicationContext, binding.binaryMessenger)
         ReaderRuntime.events = ReaderFlutterApi(binding.binaryMessenger)
         ReaderHostApi.setUp(binding.binaryMessenger, this)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        speechBackup?.dispose()
+        speechBackup = null
         ReaderHostApi.setUp(binding.binaryMessenger, null)
         ReaderRuntime.events = null
     }

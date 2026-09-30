@@ -175,6 +175,7 @@ class RewardCallbacks implements LevelPlayRewardedAdListener {
 
   @override
   void onAdLoadFailed(LevelPlayAdError error) {
+    debugPrint('KoofyAds rewarded load_failed code=${error.errorCode}');
     final attempt = _current;
     if (attempt != null && !attempt.loaded.isCompleted) {
       attempt.loaded.complete(false);
@@ -183,6 +184,7 @@ class RewardCallbacks implements LevelPlayRewardedAdListener {
 
   @override
   void onAdDisplayFailed(LevelPlayAdError error, LevelPlayAdInfo adInfo) {
+    debugPrint('KoofyAds rewarded display_failed code=${error.errorCode}');
     final attempt = _current;
     if (attempt != null &&
         (attempt.auctionId == null || attempt.auctionId == adInfo.auctionId)) {

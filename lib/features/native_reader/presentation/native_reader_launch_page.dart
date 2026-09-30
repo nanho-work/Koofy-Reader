@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,7 +78,12 @@ class _NativeReaderLaunchPageState
           );
         }
       });
-      final publication = await services.preparer.prepare(book: _book);
+      final showCover = await ref.read(readerCoverEnabledProvider.future);
+      if (!mounted || _leaveRequested) return;
+      final publication = await services.preparer.prepare(
+        book: _book,
+        showRegisteredCover: showCover,
+      );
       if (!mounted || _leaveRequested) return;
       _nextBook = null;
       try {
@@ -140,11 +146,13 @@ class _NativeReaderLaunchPageState
       if (widget.initialContentRevision != publication.contentRevision) {
         throw StateError('책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요.');
       }
-      return widget.initialLocatorJson;
+      return publication.restoreLocator(widget.initialLocatorJson);
     }
     // Journal recovery has already run inside open(). A recovered native record
     // always takes precedence; a legacy archive can never overwrite it.
-    if (position.locatorJson != null) return position.locatorJson;
+    if (position.locatorJson != null) {
+      return publication.restoreLocator(position.locatorJson);
+    }
     if (position.previousRevisionExists) {
       final start = await showDialog<bool>(
         context: context,

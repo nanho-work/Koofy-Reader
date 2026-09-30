@@ -21,6 +21,33 @@ class FailingBookRepository extends LocalBookRepository {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('declining an encoding preview skips only that file', () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = LocalBookRepository(SharedPrefsLocalStorage());
+    final visited = <String>[];
+    final result = await importBooks(
+      repository,
+      const [
+        BookImportFile('old.txt', '/old.txt'),
+        BookImportFile('next.txt', '/next.txt'),
+      ],
+      importFile: (path) async {
+        visited.add(path);
+        if (path == '/old.txt') throw BookImportSkipped();
+        return Book.asset(
+          id: 'next',
+          title: '다음 책',
+          author: '',
+          description: '',
+          assetPath: 'unused',
+        );
+      },
+    );
+    expect(visited, ['/old.txt', '/next.txt']);
+    expect(result.skipped, 1);
+    expect(result.added, 1);
+    expect(result.failedNames, isEmpty);
+  });
   test('unsafe and oversized EPUBs cannot enter the library', () async {
     SharedPreferences.setMockInitialValues({});
     final directory = await Directory.systemTemp.createTemp(

@@ -1,0 +1,112 @@
+{
+  "parameterGroups": {
+    "android_updates": {
+      "description": "안드로이드 업데이트 안내 (새 버전 공개 전에는 enabled=false 유지)",
+      "parameters": {
+        "android_update_enabled": {
+          "defaultValue": {
+            "value": "false"
+          },
+          "valueType": "BOOLEAN",
+          "description": "업데이트 안내 사용 여부. 실제 배포/설치 가능 확인 후 true로 켭니다."
+        },
+        "android_update_latest_version": {
+          "defaultValue": {
+            "value": "1.2.0"
+          },
+          "valueType": "STRING",
+          "description": "스토어에 공개된 최신 버전. 빌드 번호 없이 숫자 3자리, 예: 1.2.0"
+        },
+        "android_update_minimum_version": {
+          "defaultValue": {
+            "value": "1.0.0"
+          },
+          "valueType": "STRING",
+          "description": "계속 이용 가능한 최소 버전. 미만이면 나중에 없이 업데이트 안내. 일반 업데이트 때는 올리지 않습니다."
+        },
+        "android_update_title": {
+          "defaultValue": {
+            "value": "새 버전이 있습니다"
+          },
+          "valueType": "STRING",
+          "description": "선택형 업데이트 안내 제목"
+        },
+        "android_update_message": {
+          "defaultValue": {
+            "value": "더 편리한 독서를 위해 쿠피리더를 업데이트해 주세요. 지금 업데이트하거나 나중에 계속 읽을 수 있습니다."
+          },
+          "valueType": "STRING",
+          "description": "최소 버전 이상인 사용자에게 보여 줄 선택형 안내 본문"
+        },
+        "android_update_required_message": {
+          "defaultValue": {
+            "value": "현재 버전은 지원이 종료되었습니다. 책과 읽던 기록을 유지하려면 앱을 삭제하지 말고 스토어에서 업데이트해 주세요."
+          },
+          "valueType": "STRING",
+          "description": "최소 버전 미만인 사용자에게 보여 줄 필수 안내 본문"
+        },
+        "android_update_store_url": {
+          "defaultValue": {
+            "value": "https://play.google.com/store/apps/details?id=com.koofylab.koofyreader"
+          },
+          "valueType": "STRING",
+          "description": "쿠피리더 설치/업데이트 스토어 링크. 다른 앱/사이트 주소는 앱에서 차단합니다."
+        }
+      }
+    },
+    "ios_updates": {
+      "description": "애플 iOS 업데이트 안내 (새 버전 공개 전에는 enabled=false 유지)",
+      "parameters": {
+        "ios_update_enabled": {
+          "defaultValue": {
+            "value": "false"
+          },
+          "valueType": "BOOLEAN",
+          "description": "업데이트 안내 사용 여부. 실제 배포/설치 가능 확인 후 true로 켭니다."
+        },
+        "ios_update_latest_version": {
+          "defaultValue": {
+            "value": "1.0.0"
+          },
+          "valueType": "STRING",
+          "description": "스토어에 공개된 최신 버전. 빌드 번호 없이 숫자 3자리, 예: 1.2.0"
+        },
+        "ios_update_minimum_version": {
+          "defaultValue": {
+            "value": "1.0.0"
+          },
+          "valueType": "STRING",
+          "description": "계속 이용 가능한 최소 버전. 미만이면 나중에 없이 업데이트 안내. 일반 업데이트 때는 올리지 않습니다."
+        },
+        "ios_update_title": {
+          "defaultValue": {
+            "value": "새 버전이 있습니다"
+          },
+          "valueType": "STRING",
+          "description": "선택형 업데이트 안내 제목"
+        },
+        "ios_update_message": {
+          "defaultValue": {
+            "value": "더 편리한 독서를 위해 쿠피리더를 업데이트해 주세요. 지금 업데이트하거나 나중에 계속 읽을 수 있습니다."
+          },
+          "valueType": "STRING",
+          "description": "최소 버전 이상인 사용자에게 보여 줄 선택형 안내 본문"
+        },
+        "ios_update_required_message": {
+          "defaultValue": {
+            "value": "현재 버전은 지원이 종료되었습니다. 책과 읽던 기록을 유지하려면 앱을 삭제하지 말고 스토어에서 업데이트해 주세요."
+          },
+          "valueType": "STRING",
+          "description": "최소 버전 미만인 사용자에게 보여 줄 필수 안내 본문"
+        },
+        "ios_update_store_url": {
+          "defaultValue": {
+            "value": "https://apps.apple.com/kr/app/id6814514729"
+          },
+          "valueType": "STRING",
+          "description": "쿠피리더 설치/업데이트 스토어 링크. 다른 앱/사이트 주소는 앱에서 차단합니다."
+        }
+      }
+    }
+  }
+}

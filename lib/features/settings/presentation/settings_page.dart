@@ -1,4 +1,8 @@
+import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
+import 'package:koofy_reader/features/library/presentation/library_trash_page.dart';
 import 'dart:async';
+import 'package:koofy_reader/core/storage/local_storage.dart';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
 import 'package:koofy_reader/features/ads/config/levelplay_ids.dart';
 import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
@@ -9,6 +13,7 @@ import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 import 'package:koofy_reader/features/backup/presentation/backup_page.dart';
+import 'package:koofy_reader/features/updates/data/update_service.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -20,6 +25,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   Timer? _ticker;
   bool _busy = false;
+  bool _savingCover = false;
 
   @override
   void initState() {
@@ -56,6 +62,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline),
+            title: const Text('앱 버전'),
+            subtitle: ref
+                .watch(installedPackageProvider)
+                .when(
+                  data: (info) =>
+                      Text('${info.version} (빌드 ${info.buildNumber})'),
+                  loading: () => const Text('확인 중…'),
+                  error: (_, __) => const Text('버전 정보를 확인할 수 없습니다.'),
+                ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.backup_outlined),
             title: const Text('서재 백업·복원'),
             subtitle: const Text('책·표지·묶음·읽던 위치를 파일로 보관'),
@@ -63,6 +82,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute<void>(builder: (_) => const BackupPage())),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.delete_outline),
+            title: const Text('휴지통'),
+            subtitle: const Text('삭제한 책과 해제한 묶음 복원'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const LibraryTrashPage()),
+            ),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -74,6 +103,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               MaterialPageRoute<void>(
                 builder: (_) => const PrivacySettingsPage(),
               ),
+            ),
+          ),
+          ref
+              .watch(readerCoverEnabledProvider)
+              .when(
+                data: (enabled) => SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('독서 화면에 표지 표시'),
+                  subtitle: const Text(
+                    '각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.',
+                  ),
+                  value: enabled,
+                  onChanged: _savingCover
+                      ? null
+                      : (value) async {
+                          setState(() => _savingCover = true);
+                          try {
+                            await ref
+                                .read(localStorageProvider)
+                                .setInt(readerCoverSettingKey, value ? 1 : 0);
+                            ref.invalidate(readerCoverEnabledProvider);
+                          } catch (_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    '표지 설정을 저장하지 못했습니다. 다시 시도해 주세요.',
+                                  ),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _savingCover = false);
+                          }
+                        },
+                ),
+                loading: () => const ListTile(title: Text('표지 설정을 불러오는 중…')),
+                error: (_, __) => ListTile(
+                  title: const Text('표지 설정 다시 불러오기'),
+                  onTap: () => ref.invalidate(readerCoverEnabledProvider),
+                ),
+              ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('문제 신고용 진단 정보'),
+            subtitle: const Text('앱 버전과 독서 설정 확인·복사'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const DiagnosticsPage()),
             ),
           ),
           const Divider(height: 24),
@@ -150,7 +228,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ? '2시간 동안 배너 광고를 숨깁니다.'
                 : result == false
                 ? '광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.'
-                : '광고를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+                : '지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다.',
           ),
         ),
       );

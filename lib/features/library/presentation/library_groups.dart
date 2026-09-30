@@ -345,13 +345,12 @@ extension _LibraryGroups on _LibraryPageState {
     _setGroupBusy(true);
     try {
       final repository = ref.read(bookGroupRepositoryProvider);
-      final covers = ref.read(groupCoverStoreProvider);
       final change = await action();
       if (!mounted) return;
       ref.invalidate(bookGroupsProvider);
       final messenger = ScaffoldMessenger.of(context);
       messenger.hideCurrentSnackBar();
-      final snack = messenger.showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(message),
           duration: const Duration(seconds: 6),
@@ -370,22 +369,6 @@ extension _LibraryGroups on _LibraryPageState {
           ),
         ),
       );
-      // Keep the group cover during Undo; clean it up only after Undo expires.
-      if (change.removedGroupIds.isNotEmpty) {
-        snack.closed.then((reason) async {
-          if (reason == SnackBarClosedReason.action) return;
-          try {
-            final remaining = (await repository.load())
-                .map((g) => g.id)
-                .toSet();
-            for (final id in change.removedGroupIds) {
-              if (!remaining.contains(id)) await covers.reset(id);
-            }
-          } catch (_) {
-            /* Cleanup can be retried without changing membership. */
-          }
-        });
-      }
     } catch (_) {
       _snack('묶음 변경을 저장하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
     } finally {

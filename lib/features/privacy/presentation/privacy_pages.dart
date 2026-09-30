@@ -90,51 +90,56 @@ class _AdvertisingChoicesPageState
             Text('개인정보와 광고', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             const Text(
-              '책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads가 제공합니다.',
+              '책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.',
             ),
             const SizedBox(height: 12),
             const Text(
               '광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.',
             ),
             const SizedBox(height: 12),
-            const Text(
-              '어느 항목을 선택해도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다. 선택은 설정에서 변경할 수 있습니다.',
+            Text(
+              service.isIOS
+                  ? '추적을 허용하지 않아도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다.'
+                  : '어느 항목을 선택해도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다. 선택은 설정에서 변경할 수 있습니다.',
             ),
             if (service.isIOS)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text(
-                  'iOS 추적 허가는 Apple의 별도 권한입니다. 맞춤형 광고를 선택한 경우 아직 결정하지 않은 추적 허가를 요청합니다. 거부해도 비맞춤형 광고와 독서를 이용할 수 있습니다.',
+                  '계속을 누르면 Apple의 추적 권한 요청으로 이동합니다. 허용 여부는 시스템 창에서 직접 선택합니다. 이미 결정했거나 기기에서 요청을 제한한 경우에는 기존 설정을 따릅니다.',
                 ),
               ),
             TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ReaderPrivacyPolicyPage(),
-                ),
-              ),
+              onPressed: _busy
+                  ? null
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ReaderPrivacyPolicyPage(),
+                      ),
+                    ),
               child: const Text('개인정보처리방침 읽기'),
             ),
-            RadioGroup<AdvertisingChoice>(
-              groupValue: _selection,
-              onChanged: (v) => setState(() => _selection = v),
-              child: Column(
-                children: [
-                  RadioListTile<AdvertisingChoice>(
-                    title: const Text('비맞춤형 광고 이용'),
-                    subtitle: const Text('맞춤형 광고와 이를 위한 정보 공유에 동의하지 않습니다.'),
-                    value: AdvertisingChoice.standard,
-                    enabled: !_busy,
-                  ),
-                  RadioListTile<AdvertisingChoice>(
-                    title: const Text('맞춤형 광고 허용 (선택)'),
-                    subtitle: const Text('안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.'),
-                    value: AdvertisingChoice.personalized,
-                    enabled: !_busy,
-                  ),
-                ],
+            if (!service.isIOS)
+              RadioGroup<AdvertisingChoice>(
+                groupValue: _selection,
+                onChanged: (v) => setState(() => _selection = v),
+                child: Column(
+                  children: [
+                    RadioListTile<AdvertisingChoice>(
+                      title: const Text('비맞춤형 광고 이용'),
+                      subtitle: const Text('맞춤형 광고와 이를 위한 정보 공유에 동의하지 않습니다.'),
+                      value: AdvertisingChoice.standard,
+                      enabled: !_busy,
+                    ),
+                    RadioListTile<AdvertisingChoice>(
+                      title: const Text('맞춤형 광고 허용 (선택)'),
+                      subtitle: const Text('안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.'),
+                      value: AdvertisingChoice.personalized,
+                      enabled: !_busy,
+                    ),
+                  ],
+                ),
               ),
-            ),
             if (current?.error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -142,12 +147,16 @@ class _AdvertisingChoicesPageState
               ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: _busy || _selection == null
+              onPressed: _busy || (!service.isIOS && _selection == null)
                   ? null
                   : () async {
                       setState(() => _busy = true);
                       try {
-                        await service.choose(_selection!);
+                        if (service.isIOS) {
+                          await service.continueIOSTrackingNotice();
+                        } else {
+                          await service.choose(_selection!);
+                        }
                         if (context.mounted && !widget.firstRun) {
                           Navigator.of(context).pop();
                         }
@@ -166,6 +175,8 @@ class _AdvertisingChoicesPageState
               child: Text(
                 _busy
                     ? '적용 중…'
+                    : service.isIOS
+                    ? '계속'
                     : widget.firstRun
                     ? '선택하고 시작하기'
                     : '선택 저장',
@@ -190,27 +201,28 @@ class PrivacySettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ListTile(
-            title: const Text('광고 선택'),
-            subtitle: Text(
-              choice == null
-                  ? '선택 전'
-                  : choice == AdvertisingChoice.standard
-                  ? '비맞춤형 광고'
-                  : '맞춤형 광고 허용',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AdvertisingChoicesPage(),
+          if (!service.isIOS)
+            ListTile(
+              title: const Text('광고 선택'),
+              subtitle: Text(
+                choice == null
+                    ? '선택 전'
+                    : choice == AdvertisingChoice.standard
+                    ? '비맞춤형 광고'
+                    : '맞춤형 광고 허용',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AdvertisingChoicesPage(),
+                ),
               ),
             ),
-          ),
           if (state?.changedAt != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                '최근 선택: ${state!.changedAt!.toLocal().toString().split('.').first}\n안내 버전: ${PrivacyService.policyVersion}',
+                '최근 선택: ${state!.changedAt!.toLocal().toString().split('.').first}\n기록 버전: ${PrivacyService.policyVersion}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -219,11 +231,47 @@ class PrivacySettingsPage extends ConsumerWidget {
               title: Text(state!.error!),
               trailing: IconButton(
                 tooltip: '다시 적용',
-                onPressed: () => service.refresh(),
+                onPressed: () => service.retryConsent(),
                 icon: const Icon(Icons.refresh),
               ),
             ),
           if (service.isIOS) ...[
+            ListTile(
+              title: const Text('현재 광고 제공 방식'),
+              subtitle: Text(
+                state?.configured != true
+                    ? '광고 설정 확인 중'
+                    : state!.effectivePersonalized
+                    ? '맞춤형 광고'
+                    : '비맞춤형 광고',
+              ),
+            ),
+            SwitchListTile(
+              title: const Text('비맞춤형 광고만 사용'),
+              subtitle: const Text(
+                '켜면 추적 허가와 관계없이 비맞춤형 광고를 사용합니다. 꺼도 Apple의 추적 허가를 변경하지 않습니다.',
+              ),
+              value: choice == AdvertisingChoice.standard,
+              onChanged: choice == null
+                  ? null
+                  : (standardOnly) async {
+                      try {
+                        await service.choose(
+                          standardOnly
+                              ? AdvertisingChoice.standard
+                              : AdvertisingChoice.systemTracking,
+                        );
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('설정을 저장하지 못했습니다. 다시 시도해 주세요.'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+            ),
             ListTile(
               title: const Text('iOS 추적 허가'),
               subtitle: Text(switch (state?.att) {
@@ -242,6 +290,15 @@ class PrivacySettingsPage extends ConsumerWidget {
               ),
             ),
           ],
+          if (state?.privacyOptionsRequired == true)
+            ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('광고 개인정보 선택 관리'),
+              subtitle: const Text('광고 제공자의 동의 화면에서 선택을 확인하거나 변경합니다.'),
+              onTap: () async {
+                await service.showConsentOptions();
+              },
+            ),
           const Divider(height: 32),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),

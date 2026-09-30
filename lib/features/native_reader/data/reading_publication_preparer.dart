@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
@@ -10,6 +11,8 @@ import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:xml/xml.dart';
 import 'package:koofy_reader/features/native_reader/data/text_publication_map.dart';
 
+part 'publication_cover.dart';
+
 class PreparedReadingPublication {
   const PreparedReadingPublication({
     required this.publicationId,
@@ -17,6 +20,7 @@ class PreparedReadingPublication {
     required this.filePath,
     required this.title,
     this.textMap,
+    this.hasDisplayCover = false,
   });
 
   final String publicationId;
@@ -24,6 +28,10 @@ class PreparedReadingPublication {
   final String filePath;
   final String title;
   final TextPublicationMap? textMap;
+  final bool hasDisplayCover;
+
+  String? restoreLocator(String? locator) =>
+      !hasDisplayCover && isReaderCoverLocator(locator) ? null : locator;
 }
 
 /// A supported-subset error that can be displayed without losing the original.
@@ -40,8 +48,9 @@ class ReadingPublicationPreparationException implements Exception {
 /// Makes an immutable, app-owned publication for the native reading engine.
 ///
 /// Book identity survives renderer changes. The revision identifies the exact
-/// EPUB bytes, so a locator from another document revision is never reused by
-/// accident. Source copies are retained separately, including original TXT bytes.
+/// original body EPUB bytes (before optional cover decoration), so a locator
+/// from another document revision is never reused by accident. Source copies
+/// are retained separately, including original TXT bytes.
 class ReadingPublicationPreparer {
   ReadingPublicationPreparer({required this.storageDirectory});
 
@@ -58,7 +67,7 @@ class ReadingPublicationPreparer {
   ) => Isolate.run(() {
     _checkSourceSize(bytes.length, extension);
     if (extension == 'txt') {
-      _decodeUnicode(bytes);
+      _checkXmlCharacters(_decodeUnicode(bytes));
       return (title: null, author: null);
     }
     _validateEpub(bytes);
@@ -89,13 +98,25 @@ class ReadingPublicationPreparer {
     return (bytes: source.bytes, extension: source.extension);
   }
 
-  Future<PreparedReadingPublication> prepare({required Book book}) async {
+  Future<PreparedReadingPublication> prepare({
+    required Book book,
+    bool showRegisteredCover = true,
+  }) async {
     final source = await _readSource(book);
     final title = book.title.trim().isEmpty ? '제목 없는 책' : book.title;
     final author = book.author;
     final prepared = await Isolate.run(
       () => _prepareContent(source.bytes, source.extension, title, author),
     );
+    final cover = showRegisteredCover
+        ? await _readDisplayCover(book.coverPath)
+        : null;
+    final display = cover == null
+        ? (bytes: prepared.publicationBytes, added: false)
+        : await Isolate.run(
+            () => _withDisplayCover(prepared.publicationBytes, cover),
+          );
+    final displayHash = sha256.convert(display.bytes).toString();
     final directory = io.Directory(
       '${storageDirectory.path}/${prepared.sourceHash}',
     );
@@ -105,14 +126,8 @@ class ReadingPublicationPreparer {
       source.bytes,
       prepared.sourceHash,
     );
-    final publication = io.File(
-      '${directory.path}/${prepared.publicationHash}.epub',
-    );
-    await _writeVerified(
-      publication,
-      prepared.publicationBytes,
-      prepared.publicationHash,
-    );
+    final publication = io.File('${directory.path}/$displayHash.epub');
+    await _writeVerified(publication, display.bytes, displayHash);
     // Commit the reference only after both immutable files have been flushed.
     await _atomicWrite(
       _referenceFor(book.id),
@@ -129,6 +144,7 @@ class ReadingPublicationPreparer {
       contentRevision: 'epub-sha256:${prepared.publicationHash}',
       filePath: publication.absolute.path,
       title: title,
+      hasDisplayCover: display.added,
       textMap: source.extension == 'txt'
           ? TextPublicationMap(
               _decodeUnicode(
@@ -333,7 +349,7 @@ String _decodeUnicode(List<int> bytes) {
   } on FormatException {
     throw const ReadingPublicationPreparationException(
       'unsupported_encoding',
-      '문자 인코딩을 읽을 수 없습니다. UTF-8 또는 BOM이 있는 UTF-16으로 저장해 주세요. CP949/EUC-KR은 아직 지원하지 않습니다.',
+      '문자 인코딩을 읽을 수 없습니다. UTF-8 또는 BOM이 있는 UTF-16으로 저장해 주세요. CP949/EUC-KR TXT는 서재의 책 가져오기에서 미리보기를 확인해 변환할 수 있습니다.',
     );
   }
 }

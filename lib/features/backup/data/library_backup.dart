@@ -1,3 +1,5 @@
+import 'speech_backup.dart';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'dart:convert';
 import 'package:koofy_reader/core/storage/library_mutations.dart';
 import 'dart:io';
@@ -34,7 +36,9 @@ class LibraryBackupService {
     required this.reader,
     required this.preparer,
     required this.directory,
+    this.speech,
   });
+  final SpeechBackup? speech;
   final LocalStorage storage;
   final BookRepository books;
   final BookGroupRepository groups;
@@ -50,82 +54,91 @@ class LibraryBackupService {
     return raw == null || raw.trim().isEmpty ? [] : jsonDecode(raw) as List;
   }
 
-  Future<Uint8List> export({void Function(String)? progress}) =>
-      LibraryMutations.run(() async {
-        final allBooks = await books.getBooks();
-        final allGroups = await groups.load();
-        final payload = <String, Uint8List>{};
-        final hashes = <String, String>{};
-        var total = 0;
-        String add(Uint8List bytes, String extension) {
-          total += bytes.length;
-          if (total > maxBytes) {
-            throw const FormatException('한 번에 백업할 수 있는 용량은 100MB입니다.');
-          }
-          if (payload.length >= 4000) {
-            throw const FormatException('백업 파일 항목이 너무 많습니다.');
-          }
-          final name = 'payload/${payload.length}.$extension';
-          payload[name] = bytes;
-          hashes[name] = sha256.convert(bytes).toString();
-          return name;
-        }
+  Future<Uint8List> export({
+    void Function(String)? progress,
+  }) => LibraryMutations.run(() async {
+    final allBooks = await books.getBooks();
+    final activeIds = allBooks.map((b) => b.id).toSet();
+    final allGroups = (await groups.load())
+        .map(
+          (g) =>
+              g.copyWith(bookIds: g.bookIds.where(activeIds.contains).toList()),
+        )
+        .where((g) => g.bookIds.isNotEmpty)
+        .toList();
+    final payload = <String, Uint8List>{};
+    final hashes = <String, String>{};
+    var total = 0;
+    String add(Uint8List bytes, String extension) {
+      total += bytes.length;
+      if (total > maxBytes) {
+        throw const FormatException('한 번에 백업할 수 있는 용량은 100MB입니다.');
+      }
+      if (payload.length >= 4000) {
+        throw const FormatException('백업 파일 항목이 너무 많습니다.');
+      }
+      final name = 'payload/${payload.length}.$extension';
+      payload[name] = bytes;
+      hashes[name] = sha256.convert(bytes).toString();
+      return name;
+    }
 
-        final records = <Map<String, dynamic>>[];
-        final coverEntries = <String, String>{};
-        for (final book in allBooks) {
-          progress?.call('${records.length + 1}/${allBooks.length}권 백업 준비 중');
-          final json = book.toJson()
-            ..remove('localPath')
-            ..remove('importSourcePath')
-            ..remove('coverPath');
-          if (book.isLocalFile) {
-            try {
-              final source = await preparer.backupSource(book);
-              json['source'] = add(source.bytes, source.extension);
-            } catch (error) {
-              throw FormatException(
-                '“${book.title}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ($error)',
-              );
-            }
-          }
-          records.add(json);
+    final records = <Map<String, dynamic>>[];
+    final coverEntries = <String, String>{};
+    for (final book in allBooks) {
+      progress?.call('${records.length + 1}/${allBooks.length}권 백업 준비 중');
+      final json = book.toJson()
+        ..remove('localPath')
+        ..remove('importSourcePath')
+        ..remove('coverPath');
+      if (book.isLocalFile) {
+        try {
+          final source = await preparer.backupSource(book);
+          json['source'] = add(source.bytes, source.extension);
+        } catch (error) {
+          throw FormatException(
+            '“${book.title}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ($error)',
+          );
         }
-        final groupBooks = await covers.apply(
-          allGroups.map((g) => g.displayBook).toList(),
-        );
-        for (final book in [...allBooks, ...groupBooks]) {
-          final path = book.coverPath;
-          if (path == null) continue;
-          final file = File(path);
-          if (!await file.exists()) {
-            continue; // A missing cover is already rendered as a title cover.
-          }
-          if (await file.length() > BookCoverStore.maxBytes) {
-            throw const FormatException('표지 이미지가 너무 큽니다.');
-          }
-          coverEntries[book.id] = add(await file.readAsBytes(), 'png');
-        }
-        final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
-        final manifest = <String, dynamic>{
-          'format': 'koofy-reader-backup',
-          'version': 1,
-          'createdAt': DateTime.now().toUtc().toIso8601String(),
-          'books': records,
-          'groups': allGroups.map((g) => g.toJson()).toList(),
-          'covers': coverEntries,
-          'files': hashes,
-          'reader': await reader.exportBackup(ids),
-          'completion': await LibraryCompletionRepository(storage).load(),
-          'hidden': await _hiddenBooks(),
-        };
-        final encoded = utf8.encode(jsonEncode(manifest));
-        if (encoded.length > 5 * 1024 * 1024 ||
-            total + encoded.length > maxBytes) {
-          throw const FormatException('백업 정보가 100MB 제한을 초과했습니다.');
-        }
-        return _encodeArchive(encoded, payload);
-      });
+      }
+      records.add(json);
+    }
+    final groupBooks = await covers.apply(
+      allGroups.map((g) => g.displayBook).toList(),
+    );
+    for (final book in [...allBooks, ...groupBooks]) {
+      final path = book.coverPath;
+      if (path == null) continue;
+      final file = File(path);
+      if (!await file.exists()) {
+        continue; // A missing cover is already rendered as a title cover.
+      }
+      if (await file.length() > BookCoverStore.maxBytes) {
+        throw const FormatException('표지 이미지가 너무 큽니다.');
+      }
+      coverEntries[book.id] = add(await file.readAsBytes(), 'png');
+    }
+    final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
+    final manifest = <String, dynamic>{
+      'format': 'koofy-reader-backup',
+      'version': 1,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'books': records,
+      'groups': allGroups.map((g) => g.toJson()).toList(),
+      'covers': coverEntries,
+      'files': hashes,
+      'reader': await reader.exportBackup(ids),
+      'completion': await LibraryCompletionRepository(storage).load(),
+      'hidden': await _hiddenBooks(),
+      'displayCover': await storage.getInt(readerCoverSettingKey) != 0,
+      'speech': SpeechBackup.validated(await speech?.export(), ids),
+    };
+    final encoded = utf8.encode(jsonEncode(manifest));
+    if (encoded.length > 5 * 1024 * 1024 || total + encoded.length > maxBytes) {
+      throw const FormatException('백업 정보가 100MB 제한을 초과했습니다.');
+    }
+    return _encodeArchive(encoded, payload);
+  });
 
   static Future<Uint8List> _encodeArchive(
     List<int> encoded,
@@ -248,6 +261,10 @@ class LibraryBackupService {
         throw const FormatException('표지 정보가 올바르지 않습니다.');
       }
     }
+    if (manifest['displayCover'] != null && manifest['displayCover'] is! bool) {
+      throw const FormatException('표지 표시 설정이 올바르지 않습니다.');
+    }
+    manifest['speech'] = SpeechBackup.validated(manifest['speech'], ids);
     final state = Map<String, dynamic>.from(manifest['reader'] as Map);
     preferencesFromJson(state['preferences'] as String);
     final positions = <String>{};
@@ -289,6 +306,8 @@ class LibraryBackupService {
     final local = rawLocal == null || rawLocal.isEmpty
         ? <dynamic>[]
         : jsonDecode(rawLocal) as List;
+    // Trashed books are retained in the index; do not duplicate or unhide them on restore.
+    currentIds.addAll(local.map((raw) => (raw as Map)['id'] as String));
     // Hidden samples are still installed, so never introduce duplicate sample entries.
     currentIds.addAll(['sample_1', 'sample_2']);
     final restored = <String>{};
@@ -304,6 +323,7 @@ class LibraryBackupService {
         final file = File('${stage.path}/${source.split('/').last}');
         await file.writeAsBytes(backup.files[source]!, flush: true);
         json['localPath'] = file.path;
+        json['sourceHash'] = await _sourceHash(backup.files[source]!);
         json.remove('coverPath');
         json.remove('importSourcePath');
         json.remove('source');
@@ -363,6 +383,9 @@ class LibraryBackupService {
         previous[key] = await storage.getString(key);
       }
       final written = <String>[];
+      final oldCover = await storage.getInt(readerCoverSettingKey);
+      final restoreCover = oldCover == null && manifest['displayCover'] is bool;
+      var coverWritten = false;
       try {
         await reader.mergeBackup(
           Map<String, dynamic>.from(manifest['reader'] as Map),
@@ -372,9 +395,22 @@ class LibraryBackupService {
               written.add(entry.key);
               await storage.setString(entry.key, entry.value);
             }
+            if (restoreCover) {
+              coverWritten = true;
+              await storage.setInt(
+                readerCoverSettingKey,
+                manifest['displayCover'] == true ? 1 : 0,
+              );
+            }
+            final listening = SpeechBackup.validated(
+              manifest['speech'],
+              allIds,
+            );
+            if (listening.isNotEmpty) await speech?.merge(listening);
           },
         );
       } catch (_) {
+        if (coverWritten) await storage.remove(readerCoverSettingKey);
         for (final key in written.reversed) {
           final value = previous[key];
           if (value == null) {
@@ -393,3 +429,6 @@ class LibraryBackupService {
     }
   });
 }
+
+Future<String> _sourceHash(Uint8List bytes) =>
+    Isolate.run(() => sha256.convert(bytes).toString());

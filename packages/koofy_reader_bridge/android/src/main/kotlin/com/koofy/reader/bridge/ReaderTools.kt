@@ -35,6 +35,7 @@ internal class ReaderTools(private val context: Context, private val scope: Coro
     private fun message(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     private fun add() {
         val locator = current() ?: return
+        if (isReaderDisplayCover(locator)) { message("책갈피는 본문에서 추가해 주세요."); return }
         val rows = JSONArray(bookmarks())
         if ((0 until rows.length()).any { rows.getJSONObject(it).getJSONObject("locator").toString() == locator.toJSON().toString() }) {
             message("이미 저장한 위치입니다."); return

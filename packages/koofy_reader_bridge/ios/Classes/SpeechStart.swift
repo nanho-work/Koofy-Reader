@@ -1,12 +1,21 @@
 import Foundation
 import ReadiumShared
 
+func isReaderDisplayCover(_ locator: Locator?) -> Bool {
+    locator?.href.string.components(separatedBy: "#").first == "__koofy_reader_cover_v1__/cover.xhtml"
+}
+
 struct SpeechStart {
     let locator: Locator
     let skip: Int
 }
 
 func speechStart(publication: Publication, target: Locator) async throws -> SpeechStart {
+    if isReaderDisplayCover(target),
+       let body = publication.readingOrder.first(where: { $0.url().string != "__koofy_reader_cover_v1__/cover.xhtml" }),
+       let start = await publication.locate(body) {
+        return SpeechStart(locator: start, skip: 0)
+    }
     var locator = target
     if locator.locations.otherLocations["cssSelector"] == nil, let id = locator.locations.fragments.first {
         let escaped = id.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")

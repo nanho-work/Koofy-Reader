@@ -17,6 +17,13 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = KoofyReaderBridgePlugin(registrar: registrar)
         ReaderHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: instance)
+        let maintenance = FlutterMethodChannel(name: "koofy_reader/maintenance", binaryMessenger: registrar.messenger())
+        maintenance.setMethodCallHandler { [weak instance] call, result in
+            guard let instance, instance.reader == nil else {
+                result(FlutterError(code: "reader_busy", message: "독서 화면을 닫고 다시 시도해 주세요.", details: nil)); return
+            }
+            SpeechBackupChannel.handle(call, result: result)
+        }
         registrar.publish(instance)
     }
 

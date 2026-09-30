@@ -74,7 +74,11 @@ internal class ReaderPageTurns(
             activeTarget = null
             state = "idle"
             host.blocked = false
-            if (target != null && surfaces?.advance(target) == true) {
+            // The app cover is one column even when the body is a spread.
+            // Rebuild the curl geometry when crossing that resource boundary.
+            if (target != null &&
+                isReaderDisplayCover(surfaces?.source?.locator) == isReaderDisplayCover(target.locator) &&
+                surfaces?.advance(target) == true) {
                 prepareWindow()
                 drainRequest()
                 return
@@ -173,6 +177,7 @@ internal class ReaderPageTurns(
         Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
     fun request(next: Boolean) {
+        if (host.selecting) return
         (activity as? ReaderActivity)?.pauseSpeechForNavigation()
         if (state != "idle") { queuedRequest = next; return }
         if (!available()) return

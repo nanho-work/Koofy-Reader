@@ -1,3 +1,7 @@
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'library_trash_store.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -63,11 +67,17 @@ class LocalBookRepository implements BookRepository {
   @override
   Future<List<Book>> getBooks() => LibraryMutations.run(() async {
     final local = await _loadLocalBooks();
-    final hiddenIds = await _loadHiddenBookIds();
+    final hiddenIds = {
+      ...await _loadHiddenBookIds(),
+      ...await LibraryTrashStore(_storage).hiddenBookIds(),
+    };
     final visibleSamples = _books
         .where((book) => !hiddenIds.contains(book.id))
         .toList(growable: false);
-    return _covers.apply([...local, ...visibleSamples]);
+    return _covers.apply([
+      ...local.where((b) => !hiddenIds.contains(b.id)),
+      ...visibleSamples,
+    ]);
   });
 
   @override
@@ -83,7 +93,15 @@ class LocalBookRepository implements BookRepository {
   Future<void> resetBookCover(String bookId) => _covers.reset(bookId);
 
   @override
-  Future<Book?> importBookFile(String path) => LibraryMutations.run(() async {
+  Future<Book?> importBookFile(String path) => _import(path);
+
+  Future<Book?> importNormalizedText(String path, String text) =>
+      _import(path, normalized: Uint8List.fromList(utf8.encode(text)));
+
+  Future<Book?> _import(
+    String path, {
+    Uint8List? normalized,
+  }) => LibraryMutations.run(() async {
     final file = File(path);
     if (!await file.exists()) {
       return null;
@@ -97,13 +115,6 @@ class LocalBookRepository implements BookRepository {
     }
 
     final localBooks = await _loadLocalBooks();
-    final duplicate = localBooks
-        .where(
-          (book) => book.localPath == path || book.importSourcePath == path,
-        )
-        .firstOrNull;
-    if (duplicate != null) return duplicate;
-
     final fileName = _fileNameFromPath(path);
     var title = fileName.replaceAll(
       RegExp(r'\.(txt|epub)$', caseSensitive: false),
@@ -119,7 +130,28 @@ class LocalBookRepository implements BookRepository {
     if (length <= 0 || length > maximum) {
       throw FormatException('비어 있지 않은 ${isEpub ? 40 : 20}MB 이하의 파일을 선택해 주세요.');
     }
-    final bytes = await file.readAsBytes();
+    final bytes = normalized ?? await file.readAsBytes();
+    if (bytes.length > maximum) {
+      throw const FormatException('변환된 책의 용량이 제한을 초과했습니다.');
+    }
+    final fingerprint = await _fingerprint(bytes);
+    final hidden = await LibraryTrashStore(_storage).hiddenBookIds();
+    for (final existing in localBooks.where((b) => !hidden.contains(b.id))) {
+      var hash = existing.sourceHash;
+      if (hash == null && existing.localPath != null) {
+        final prior = File(existing.localPath!);
+        if (await prior.exists() && await prior.length() == bytes.length) {
+          hash = (await sha256.bind(prior.openRead()).first).toString();
+        }
+      }
+      if (hash == fingerprint &&
+          existing.localPath?.toLowerCase().endsWith(
+                isEpub ? '.epub' : '.txt',
+              ) ==
+              true) {
+        return existing;
+      }
+    }
     final metadata = await ReadingPublicationPreparer.inspectImport(
       bytes,
       isEpub ? 'epub' : 'txt',
@@ -147,6 +179,7 @@ class LocalBookRepository implements BookRepository {
       description: description,
       localPath: owned.path,
       importSourcePath: path,
+      sourceHash: fingerprint,
     );
 
     final next = [imported, ...localBooks];
@@ -166,6 +199,8 @@ class LocalBookRepository implements BookRepository {
       book,
       ...current.where((existing) => existing.id != book.id),
     ]);
+    // An explicit download must make a previously trashed catalog book visible.
+    await LibraryTrashStore(_storage).restoreBook(book.id);
   });
 
   @override
@@ -287,3 +322,6 @@ class LocalBookRepository implements BookRepository {
     }
   }
 }
+
+Future<String> _fingerprint(Uint8List bytes) =>
+    Isolate.run(() => sha256.convert(bytes).toString());

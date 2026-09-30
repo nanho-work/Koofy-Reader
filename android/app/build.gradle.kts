@@ -74,6 +74,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 

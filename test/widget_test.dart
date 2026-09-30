@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/updates/data/update_service.dart';
 import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
 // This is a basic Flutter widget test.
 //
@@ -17,6 +18,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          updateServiceProvider.overrideWithValue(
+            UpdateService(
+              source: FirebaseUpdateSource(),
+              platform: null,
+              installedVersion: () async => '1.0.0',
+            ),
+          ),
           privacyStateProvider.overrideWith(
             (ref) => Stream.value(
               const PrivacyState(

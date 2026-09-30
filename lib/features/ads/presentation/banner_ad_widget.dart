@@ -29,7 +29,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
     if (!mounted) return;
     setState(() {
       _ready = ready;
-      if (!ready) _message = '광고를 준비하지 못했습니다.';
+      if (!ready) _message = '지금은 광고를 표시할 수 없습니다.';
     });
   }
 
@@ -103,17 +103,25 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
 
   @override
   void onAdLoadFailed(LevelPlayAdError error) {
+    debugPrint('KoofyAds library_banner load_failed code=${error.errorCode}');
     if (mounted) {
       setState(() {
         _loaded = false;
-        _message = '광고를 불러오지 못했습니다.';
+        _message = '지금은 광고를 표시할 수 없습니다.';
       });
     }
   }
 
   @override
-  void onAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error) =>
-      onAdLoadFailed(error);
+  void onAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error) {
+    debugPrint('KoofyAds library_banner display_failed code=${error.errorCode}');
+    if (mounted) {
+      setState(() {
+        _loaded = false;
+        _message = '지금은 광고를 표시할 수 없습니다.';
+      });
+    }
+  }
   @override
   void onAdDisplayed(LevelPlayAdInfo adInfo) {}
   @override

@@ -26,6 +26,9 @@ class LevelPlayService implements LevelPlayInitListener {
     final attempt = Completer<bool>();
     _initializing = attempt;
     try {
+      await LevelPlay.setMetaData({
+        'AdMob_MaxContentRating': ['MAX_AD_CONTENT_RATING_PG'],
+      });
       if (LevelPlayIds.testSuite) {
         await LevelPlay.setMetaData({
           'is_test_suite': ['enable'],

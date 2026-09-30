@@ -59,6 +59,128 @@ class ReaderRenderingTest {
         fixture.delete()
     }
 
+    @Test fun translationUsesSelectionAndPreservesReadingCheckpoint() {
+        launch(initial = null)
+        fun translation(activity: ReaderActivity): ReaderTranslation {
+            val field = ReaderActivity::class.java.getDeclaredField("translation").apply { isAccessible = true }
+            return field.get(activity) as ReaderTranslation
+        }
+        scenario!!.onActivity {
+            ReaderActivity::class.java.getDeclaredMethod("toggleTranslation").apply { isAccessible = true }.invoke(it)
+            assertTrue(translation(it).enabled)
+        }
+        Thread.sleep(1500)
+        snapshot("""(function(){var p=document.querySelector('p'); p.textContent='The leaves were trembling in the wind.'; var r=document.createRange();r.selectNodeContents(p);var s=getSelection();s.removeAllRanges();s.addRange(r);return JSON.stringify({selected:s.toString()});})()""")
+        awaitCondition("Selection was not sent to the translation panel") {
+            var selected = false
+            scenario!!.onActivity {
+                val field = ReaderTranslation::class.java.getDeclaredField("source").apply { isAccessible = true }
+                selected = field.get(translation(it)) == "The leaves were trembling in the wind."
+            }
+            selected
+        }
+        scenario!!.onActivity { translation(it).prepare() }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(180)
+        var korean = false
+        while (!korean && System.nanoTime() < deadline) {
+            scenario!!.onActivity {
+                val field = ReaderTranslation::class.java.getDeclaredField("result").apply { isAccessible = true }
+                korean = (field.get(translation(it)) as String).any { it in '가'..'힣' }
+            }
+            Thread.sleep(300)
+        }
+        assertTrue("Foreground model download/translation failed", korean)
+        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { image ->
+            File(context.getExternalFilesDir(null), "translation-panel.png").outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        val checkpoint = ReaderRuntime.session!!.locatorJson
+        scenario!!.onActivity { it.pageTurns!!.request(true) }
+        Thread.sleep(700)
+        assertEquals("Selecting must block page turns", checkpoint, ReaderRuntime.session!!.locatorJson)
+        snapshot("""(function(){getSelection().removeAllRanges();return JSON.stringify({ok:true});})()""")
+        Thread.sleep(700)
+        snapshot("""(function(){var r=document.createRange();r.selectNodeContents(document.querySelector('p'));getSelection().addRange(r);return JSON.stringify({ok:true});})()""")
+        awaitCondition("Reselecting the same sentence must translate again") {
+            var ready = false
+            scenario!!.onActivity {
+                val field = ReaderTranslation::class.java.getDeclaredField("result").apply { isAccessible = true }
+                ready = (field.get(translation(it)) as String).any { it in '가'..'힣' }
+            }
+            ready
+        }
+        scenario!!.onActivity {
+            ReaderActivity::class.java.getDeclaredMethod("toggleTranslation").apply { isAccessible = true }.invoke(it)
+            assertFalse(translation(it).enabled)
+        }
+        awaitCondition("Reading did not resume after translation mode") { ReaderRuntime.session?.ready == true }
+    }
+
+    @Test fun registeredCoverIsOnePageAndSpeechStartsAtBody() {
+        InstrumentationRegistry.getInstrumentation().context.assets.open("reader-display-cover.epub").use { input ->
+            fixture.outputStream().use { input.copyTo(it) }
+        }
+        launch(initial = null, preferences = ReaderPreferences(1.0, 2, false, "light"))
+        fun onCover() = ReaderRuntime.session!!.locatorJson?.contains("__koofy_reader_cover_v1__") == true
+        assertTrue(onCover())
+        val cover = snapshot("""JSON.stringify({columns:getComputedStyle(document.documentElement).columnCount,width:innerWidth,extent:document.documentElement.scrollWidth,image:document.querySelector('img').naturalWidth})""")
+        assertEquals("1", cover.getString("columns"))
+        assertTrue(cover.getInt("extent") <= cover.getInt("width") + 2)
+        assertTrue(cover.getInt("image") > 0)
+        val done = CountDownLatch(1)
+        var speechHref: String? = null
+        scenario!!.onActivity { activity -> activity.lifecycleScope.launch {
+            try {
+                val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+                speechHref = speechStart(publication, org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(ReaderRuntime.session!!.locatorJson!!))!!).locator.href.toString()
+            } finally { done.countDown() }
+        } }
+        assertTrue(done.await(10, TimeUnit.SECONDS))
+        assertEquals("EPUB/section-00000.xhtml", speechHref)
+        scenario!!.onActivity { navigator(it).goForward(false) }
+        awaitCondition("Cover must turn to body in one action") { !onCover() }
+        val body = ReaderRuntime.session!!.locatorJson!!
+        scenario!!.onActivity { navigator(it).goBackward(false) }
+        awaitCondition("Previous must return to cover") { onCover() }
+        for (scroll in listOf(true, false)) {
+            val before = ReaderRuntime.session!!.sequence
+            scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(scroll = scroll)) }
+            awaitCondition("Cover mode switch did not settle") {
+                var settled = false
+                scenario!!.onActivity { activity ->
+                    val target = ReaderActivity::class.java.getDeclaredField("restoreTarget").apply { isAccessible = true }.get(activity)
+                    val pending = ReaderActivity::class.java.getDeclaredField("layoutPending").apply { isAccessible = true }.getBoolean(activity)
+                    settled = target == null && !pending && ReaderRuntime.session!!.sequence > before
+                }
+                settled
+            }
+            assertTrue(onCover())
+        }
+        scenario!!.onActivity { it.goToLocator(body) }
+        awaitCondition("Saved body locator must still resolve") { !onCover() }
+        assertEquals(JSONObject(body).getString("href"), JSONObject(ReaderRuntime.session!!.locatorJson!!).getString("href"))
+        scenario!!.onActivity { navigator(it).goBackward(false) }
+        awaitCondition("Return to cover for curl") { onCover() }
+        scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(pageTurnStyle = "curl")) }
+        awaitCondition("Cover curl did not prepare") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.next != null }
+            ready
+        }
+        scenario!!.onActivity {
+            assertEquals(1, it.pageTurns!!.surfaces!!.columns)
+            assertFalse(isReaderDisplayCover(it.pageTurns!!.surfaces!!.next!!.locator))
+            it.pageTurns!!.request(true)
+        }
+        awaitCondition("Cover curl did not move to body") { !onCover() }
+        val bodyColumns = snapshot("JSON.stringify({columns:parseInt(getComputedStyle(document.documentElement).columnCount)||1})").getInt("columns")
+        awaitCondition("Body curl must adopt the body column count") {
+            var ready = false
+            scenario!!.onActivity { ready = it.pageTurns?.surfaces?.let { f -> f.next != null && f.columns == bodyColumns } == true }
+            ready
+        }
+        scenario!!.onActivity { assertEquals(0, it.pageTurns!!.fallbackCount) }
+    }
+
     @Test fun speechStopsOnBackgroundAndManualNavigationWithoutOverwritingReadingCheckpoint() {
         launch()
         val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
@@ -129,6 +251,20 @@ class ReaderRenderingTest {
                 assertFalse("A changed book must not reuse an old audio checkpoint", changed.hasSaved)
                 changed.close()
             }
+            // Capture the settings with a deterministic installed voice for UI review.
+            scenario!!.onActivity { activity ->
+                ReaderSpeechDialog(activity, speech!!, ReaderPalette.forTheme("light")).show()
+            }
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            // Wait for the dialog window entrance animation before the UI capture.
+            Thread.sleep(500)
+            val settingsImage = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            File(context.getExternalFilesDir(null), "speech-settings.png").outputStream().use {
+                settingsImage.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            settingsImage.recycle()
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand("cp ${context.getExternalFilesDir(null)}/speech-settings.png /sdcard/Download/koofy-speech-settings.png")).use { it.readBytes() }
         } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
     }
 
@@ -196,6 +332,76 @@ class ReaderRenderingTest {
             awaitCondition("The sentence after resume did not play") { fake.spoken.size > previousCount }
             assertTrue("Repeated quotes must retain their ordinal", fake.spoken.last().contains("81 번째"))
         } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
+    }
+
+    @Test fun installedVoicePreviewThenBookPlaybackUsesRealTts() {
+        launch()
+        val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+        var speech: ReaderSpeech? = null
+        var failure: Throwable? = null
+        val prepared = CountDownLatch(1)
+        fun speaking(): Boolean {
+            var speaking = false
+            scenario!!.onActivity {
+                val engine = ReaderSpeech::class.java.getDeclaredField("engine").apply { isAccessible = true }.get(speech) as? OfflineSpeechEngine
+                if (engine != null) {
+                    val tts = OfflineSpeechEngine::class.java.getDeclaredField("native").apply { isAccessible = true }.get(engine) as android.speech.tts.TextToSpeech
+                    speaking = tts.isSpeaking
+                }
+            }
+            return speaking
+        }
+        try {
+            scenario!!.onActivity { activity -> activity.lifecycleScope.launch {
+                try {
+                    val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+                    speech = ReaderSpeech(activity, publication, ReaderRuntime.session!!.request,
+                        { org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(targetLocator())) }, { true }, {}, {}, storage)
+                    speech!!.foreground(true)
+                    kotlinx.coroutines.withTimeout(20_000) { assertNotNull("Readium content service/navigator missing", speech!!.prepare()) }
+                    assertTrue("Test device must have an installed offline Korean voice", speech!!.voices.isNotEmpty())
+                    speech!!.selectVoice(speech!!.voices.first().id.value)
+                    speech!!.preview()
+                } catch (error: Throwable) { failure = error }
+                finally { prepared.countDown() }
+            } }
+            assertTrue(prepared.await(25, TimeUnit.SECONDS))
+            failure?.let { throw it }
+            awaitCondition("Real preview never entered speaking state", ::speaking)
+            scenario!!.onActivity { speech!!.stopPreview(); speech!!.toggle() }
+            awaitCondition("Book playback after preview never entered speaking state", ::speaking)
+            scenario!!.onActivity {
+                assertNull(speech!!.preparationFailure)
+                assertTrue(speech!!.playing)
+                speech!!.foreground(false)
+            }
+            awaitCondition("Backgrounding did not stop the native voice") { !speaking() }
+        } finally { scenario!!.onActivity { speech?.close() }; storage.edit().clear().commit() }
+    }
+
+    @Test fun missingBookContentIsNotReportedAsMissingVoiceEngine() {
+        launch()
+        val finished = CountDownLatch(1)
+        var failure: Throwable? = null
+        scenario!!.onActivity { activity -> activity.lifecycleScope.launch {
+            val real = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+            val withoutContent = org.readium.r2.shared.publication.Publication(real.manifest)
+            val storage = context.getSharedPreferences("speech-test-${UUID.randomUUID()}", Context.MODE_PRIVATE)
+            val speech = ReaderSpeech(activity, withoutContent, ReaderRuntime.session!!.request,
+                { null }, { true }, {}, {}, storage, { TestSpeechEngine() })
+            val noEngine = ReaderSpeech(activity, real, ReaderRuntime.session!!.request,
+                { null }, { true }, {}, {}, storage, { null })
+            try {
+                assertNull(speech.prepare())
+                assertTrue("Installed voices remain available even when content service is absent", speech.voices.isNotEmpty())
+                assertEquals(SpeechPreparationFailure.CONTENT_SERVICE_MISSING, speech.preparationFailure)
+                assertNull(noEngine.prepare())
+                assertEquals(SpeechPreparationFailure.ENGINE_INITIALIZATION, noEngine.preparationFailure)
+            } catch (error: Throwable) { failure = error }
+            finally { speech.close(); noEngine.close(); withoutContent.close(); storage.edit().clear().commit(); finished.countDown() }
+        } }
+        assertTrue("Preparation did not finish", finished.await(20, TimeUnit.SECONDS))
+        failure?.let { throw it }
     }
 
     private class TestSpeechEngine : ReaderSpeechEngine {

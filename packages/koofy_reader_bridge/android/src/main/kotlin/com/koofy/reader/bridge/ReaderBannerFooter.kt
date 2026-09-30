@@ -3,6 +3,7 @@ package com.koofy.reader.bridge
 import android.app.Activity
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -99,12 +100,12 @@ internal class ReaderBannerFooter(
         if (width < dp(320)) {
             removeBanner()
             message.visibility = View.VISIBLE
-            message.text = "광고 표시 공간이 부족합니다."
+            message.text = ""
         } else if (banner == null && now >= retryAt) {
             load()
         } else if (!loaded) {
             message.visibility = View.VISIBLE
-            message.text = if (retryAt > now) "광고를 불러오지 못했습니다." else "광고 불러오는 중…"
+            message.text = if (retryAt > now) "지금은 광고를 표시할 수 없습니다." else "광고 불러오는 중…"
         }
         handler.postDelayed(refreshTask, 60_000L)
     }
@@ -126,13 +127,15 @@ internal class ReaderBannerFooter(
             }
             override fun onAdLoadFailed(error: LevelPlayAdError) {
                 if (disposed || banner !== ad) return
-                removeBanner()
-                retryAt = System.currentTimeMillis() + 60_000L
-                message.text = "광고를 불러오지 못했습니다."
-                message.visibility = View.VISIBLE
+                Log.i("KoofyAds", "reader_banner load_failed code=${error.errorCode}")
+                unavailable()
             }
             override fun onAdDisplayed(adInfo: LevelPlayAdInfo) {}
-            override fun onAdDisplayFailed(adInfo: LevelPlayAdInfo, error: LevelPlayAdError) { onAdLoadFailed(error) }
+            override fun onAdDisplayFailed(adInfo: LevelPlayAdInfo, error: LevelPlayAdError) {
+                if (disposed || banner !== ad) return
+                Log.i("KoofyAds", "reader_banner display_failed code=${error.errorCode}")
+                unavailable()
+            }
             override fun onAdClicked(adInfo: LevelPlayAdInfo) { onAdInteraction() }
             override fun onAdExpanded(adInfo: LevelPlayAdInfo) { onAdInteraction() }
             override fun onAdCollapsed(adInfo: LevelPlayAdInfo) {}
@@ -140,6 +143,13 @@ internal class ReaderBannerFooter(
         })
         addView(ad, LayoutParams(dp(320), dp(50), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
         ad.loadAd()
+    }
+
+    private fun unavailable() {
+        removeBanner()
+        retryAt = System.currentTimeMillis() + 60_000L
+        message.text = "지금은 광고를 표시할 수 없습니다."
+        message.visibility = View.VISIBLE
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

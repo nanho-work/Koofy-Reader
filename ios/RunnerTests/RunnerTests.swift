@@ -1,4 +1,5 @@
 import Foundation
+import Flutter
 import ReadiumShared
 import ReadiumNavigator
 import ReadiumZIPFoundation
@@ -16,6 +17,109 @@ final class RunnerTests: XCTestCase {
 
     override func tearDownWithError() throws {
         try FileManager.default.removeItem(at: directory)
+    }
+
+    func testSpeechBackupPreservesCurrentSettingsAndSkipsForeignVoice() throws {
+        let suite = "speech-backup-test-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(1.25, forKey: "reader.speech.speed")
+        defaults.set("secret", forKey: "unrelated")
+        let item = "{\"revision\":\"body-v1\",\"locator\":\"{\\\"href\\\":\\\"body.xhtml\\\"}\"}"
+        var error: Any?
+        SpeechBackupChannel.handle(FlutterMethodCall(methodName: "mergeSpeech", arguments: [
+            "platform": "android", "settings": ["voice": "android-only", "speed": 2.0, "follow": false], "positions": ["book": item]
+        ]), defaults: defaults) { error = $0 }
+        XCTAssertNil(error)
+        XCTAssertEqual(defaults.double(forKey: "reader.speech.speed"), 1.25)
+        XCTAssertNil(defaults.object(forKey: "reader.speech.voice"))
+        XCTAssertFalse(defaults.bool(forKey: "reader.speech.follow"))
+        var exported: [String: Any]?
+        SpeechBackupChannel.handle(FlutterMethodCall(methodName: "exportSpeech", arguments: nil), defaults: defaults) { exported = $0 as? [String: Any] }
+        XCTAssertEqual(exported?["platform"] as? String, "ios")
+        XCTAssertFalse(String(describing: exported).contains("secret"))
+        let positions = try XCTUnwrap(exported?["positions"] as? [String: String])
+        let position = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(positions["book"]).utf8)) as? [String: String]
+        XCTAssertEqual(position?["revision"], "body-v1")
+    }
+
+    @MainActor
+    func testRegisteredCoverPageAndScrollRoundTrip() async {
+        do { try await verifyRegisteredCover() }
+        catch { XCTFail("Registered cover failed: \(error)") }
+    }
+
+    @MainActor
+    private func verifyRegisteredCover() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let file = root.appendingPathComponent("test/fixtures/reader-display-cover.epub")
+        let ready = expectation(description: "Cover ready")
+        var events: [ReaderEvent] = []
+        let preferences = ReaderPreferences(fontScale: 1, columnCount: 2, scroll: false, theme: "light", pageTurnStyle: "instant")
+        let reader = KoofyReaderViewController(request: ReaderLaunchRequest(protocolVersion: 1,
+            sessionId: "display-cover", sessionGeneration: 1, publicationId: "cover", contentRevision: "body-v1",
+            filePath: file.path, title: "표지 테스트", preferences: preferences),
+            journal: try ReaderCheckpointStore(directory: directory.appendingPathComponent("journal"))) { event in
+                if event.kind == "ready", !events.contains(where: { $0.kind == "ready" }) { ready.fulfill() }
+                if event.kind == "error" { XCTFail(event.message ?? "Cover reader error") }
+                events.append(event)
+            }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let presenter = try XCTUnwrap(scene.windows.first { $0.isKeyWindow }?.rootViewController)
+        let navigation = UINavigationController(rootViewController: reader)
+        navigation.modalPresentationStyle = .fullScreen
+        presenter.present(navigation, animated: false)
+        defer { navigation.dismiss(animated: false) }
+        await fulfillment(of: [ready], timeout: 35)
+        func active() throws -> EPUBNavigatorViewController { try XCTUnwrap(reader.children.compactMap { $0 as? EPUBNavigatorViewController }.first) }
+        func onCover() -> Bool { events.last?.locatorJson?.contains("__koofy_reader_cover_v1__") == true }
+        func waitCover(_ expected: Bool) async throws {
+            for _ in 0..<100 { if onCover() == expected { return }; try await Task.sleep(nanoseconds: 100_000_000) }
+            XCTFail("Cover navigation did not settle")
+        }
+        XCTAssertTrue(onCover())
+        let nav = try active()
+        let onePage = try await nav.evaluateJavaScript("getComputedStyle(document.documentElement).columnCount === '1' && document.documentElement.scrollWidth <= innerWidth + 2 && document.querySelector('img').naturalWidth > 0").get()
+        XCTAssertEqual(onePage as? Bool, true)
+        let target = try Locator(jsonString: XCTUnwrap(events.last?.locatorJson))
+        let start = try await speechStart(publication: nav.publication, target: target)
+        XCTAssertEqual(start.locator.href.string, "EPUB/section-00000.xhtml")
+        reader.requestPageTurn(forward: true)
+        try await waitCover(false)
+        let body = try XCTUnwrap(events.last?.locatorJson)
+        reader.requestPageTurn(forward: false)
+        try await waitCover(true)
+        for scrolling in [true, false] {
+            var value = preferences; value.scroll = scrolling
+            try await applyForCurlTest(value, to: reader)
+            XCTAssertTrue(onCover())
+        }
+        func move(_ locator: Locator) async throws {
+            let result: Result<Void, Error> = await withCheckedContinuation { c in
+                do { try reader.go(to: locator) { c.resume(returning: $0) } }
+                catch { c.resume(returning: .failure(error)) }
+            }
+            try result.get()
+        }
+        try await move(Locator(jsonString: body))
+        XCTAssertFalse(onCover())
+        try await move(target)
+        XCTAssertTrue(onCover())
+        var curl = preferences; curl.pageTurnStyle = "curl"
+        try await applyForCurlTest(curl, to: reader)
+        let controller = try await waitForCurl(in: reader)
+        XCTAssertEqual(controller.frames.current.columns, 1)
+        XCTAssertFalse(isReaderDisplayCover(controller.frames.next?.locator))
+        let attachment = XCTAttachment(image: controller.frames.current.image)
+        attachment.name = "Registered cover - one page"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        reader.requestPageTurn(forward: true)
+        try await waitCover(false)
+        let bodyController = try await waitForCurl(in: reader)
+        XCTAssertEqual(bodyController.frames.current.columns, reader.view.bounds.width >= 700 ? 2 : 1)
+        let completion: Result<Void, Error> = await withCheckedContinuation { c in reader.close { c.resume(returning: $0) } }
+        try completion.get()
     }
 
     @MainActor

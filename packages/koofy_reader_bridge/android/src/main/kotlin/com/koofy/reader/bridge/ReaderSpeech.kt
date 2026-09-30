@@ -32,6 +32,12 @@ import org.readium.r2.shared.util.getOrElse
 
 internal typealias ReaderSpeechEngine = TtsEngine<AndroidTtsSettings, AndroidTtsPreferences, AndroidTtsEngine.Error, AndroidTtsEngine.Voice>
 
+internal enum class SpeechPreparationFailure(val userMessage: String) {
+    ENGINE_INITIALIZATION("기기의 음성 엔진을 시작하지 못했습니다. 잠시 후 다시 시도하거나 기기 음성 설정을 확인해 주세요."),
+    CONTENT_SERVICE_MISSING("책의 본문 읽기 기능을 준비하지 못했습니다. 앱 업데이트를 확인해 주세요."),
+    CONTENT_UNAVAILABLE("현재 위치에서 읽을 본문을 준비하지 못했습니다. 본문 페이지로 이동한 뒤 다시 시도해 주세요."),
+}
+
 /** Foreground-only owner; the visual reader's checkpoint is deliberately not the audio checkpoint. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal class ReaderSpeech(
@@ -60,6 +66,7 @@ internal class ReaderSpeech(
     private var serial = 0
     private var closed = false
     private var active = false
+    var preparationFailure: SpeechPreparationFailure? = null; private set
     var busy = false; private set
     var playing = false; private set
     var used = false; private set
@@ -105,7 +112,7 @@ internal class ReaderSpeech(
                         engine?.close(); engine = null
                     }
                     val nav = prepare(start?.locator) ?: run {
-                        message("기기의 음성 엔진을 사용할 수 없습니다. 음성 설치 상태를 확인해 주세요.")
+                        preparationFailure?.let { message(it.userMessage) }
                         return@withTimeout
                     }
                     if (generation != serial || !active || closed) return@withTimeout
@@ -132,14 +139,19 @@ internal class ReaderSpeech(
             } catch (_: kotlinx.coroutines.CancellationException) {
                 // A stop while initialization is pending must never become delayed playback.
                 if (generation == serial) message("음성 준비 시간이 초과되었습니다. 다시 시도해 주세요.")
-            } catch (_: Exception) { message("음성을 준비하지 못했습니다. 기기의 음성 설정을 확인해 주세요.") }
+            } catch (_: Exception) {
+                android.util.Log.w("KoofySpeech", "preparation_failed: unexpected")
+                message("책 읽어주기를 준비하지 못했습니다. 독서 화면을 다시 열어 시도해 주세요.")
+            }
             finally { if (generation == serial) { if (!playing) busy = false; changed() } }
         }
     }
     suspend fun prepare(initial: Locator? = null): AndroidTtsNavigator? = prepareLock.withLock {
+        preparationFailure = null
         if (closed) return@withLock null
         navigator?.let { return@withLock it }
-        val offline = engine ?: createEngine()?.also { engine = it } ?: return@withLock null
+        val offline = engine ?: createEngine()?.also { engine = it }
+            ?: return@withLock preparationFailed(SpeechPreparationFailure.ENGINE_INITIALIZATION)
         if (closed) { offline.close(); return@withLock null }
         (offline as? OfflineSpeechEngine)?.onPreviewFinished = { if (!playing) releaseFocus() }
         if (voiceId == null) {
@@ -177,11 +189,12 @@ internal class ReaderSpeech(
         val factory = TtsNavigatorFactory(host.application, publication, provider, tokenizerFactory = {
             org.readium.r2.shared.util.tokenizer.DefaultTextContentTokenizer(
                 org.readium.r2.shared.util.tokenizer.TextUnit.Sentence, Language("ko"))
-        }) ?: return@withLock null
+        }) ?: return@withLock preparationFailed(SpeechPreparationFailure.CONTENT_SERVICE_MISSING)
         val nav = factory.createNavigator(object : TtsNavigator.Listener {
             override fun onStopRequested() { pause() }
         }, initialLocator = initial ?: visible()?.let { speechStart(publication, it).locator }, initialPreferences = preferences()).getOrElse {
-            message("이 책의 읽을 본문을 준비하지 못했습니다."); return@withLock null
+            return@withLock preparationFailed(if (it is TtsNavigatorFactory.Error.EngineInitialization)
+                SpeechPreparationFailure.ENGINE_INITIALIZATION else SpeechPreparationFailure.CONTENT_UNAVAILABLE)
         }
         if (closed) { nav.close(); return@withLock null }
         // 3.1.2 ignores Media3's handleAudioFocus=false and keeps playing during a
@@ -206,6 +219,12 @@ internal class ReaderSpeech(
             }
         }
         nav
+    }
+    private fun preparationFailed(reason: SpeechPreparationFailure): AndroidTtsNavigator? {
+        preparationFailure = reason
+        // Diagnostic category only: no book text, title, path, locator or voice ID.
+        android.util.Log.w("KoofySpeech", "preparation_failed: ${reason.name}")
+        return null
     }
     private fun recordUtterance(location: Locator) {
         val marker = location.href.toString() + ":" + location.locations.otherLocations["cssSelector"]

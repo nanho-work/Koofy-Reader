@@ -1,3 +1,4 @@
+import 'library_trash_store.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:koofy_reader/core/storage/library_mutations.dart';
@@ -148,9 +149,31 @@ class BookGroupRepository {
       bookIds: groups[index].bookIds.where((b) => b != bookId).toList(),
     );
   });
-  Future<GroupChange> dissolve(String id) => _change((groups) {
-    groups.removeAt(_index(groups, id));
-  }, removed: [id]);
+  Future<GroupChange> dissolve(String id) => _serial(() async {
+    final current = await load();
+    await LibraryTrashStore(storage).keepGroup(current[_index(current, id)]);
+    return _change((groups) {
+      groups.removeAt(_index(groups, id));
+    }, removed: [id]);
+  });
+
+  Future<void> restoreGroup(BookGroup group, Set<String> availableIds) =>
+      _serial(() async {
+        await _change((groups) {
+          if (groups.any((g) => g.id == group.id)) return;
+          final occupied = groups.expand((g) => g.bookIds).toSet();
+          groups.add(
+            group.copyWith(
+              bookIds: group.bookIds
+                  .where(
+                    (id) => availableIds.contains(id) && !occupied.contains(id),
+                  )
+                  .toList(),
+            ),
+          );
+        });
+        await LibraryTrashStore(storage).forget(group.id);
+      });
   Future<GroupChange> reorder(
     String id,
     List<String> ids, {
@@ -170,6 +193,9 @@ class BookGroupRepository {
   Future<bool> undo(GroupChange change) => _serial(() async {
     if (await storage.getString(storageKey) != change.after) return false;
     await storage.setString(storageKey, change.before ?? '');
+    for (final id in change.removedGroupIds) {
+      await LibraryTrashStore(storage).forget(id);
+    }
     return true;
   });
 }

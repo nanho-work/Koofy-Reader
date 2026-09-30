@@ -50,7 +50,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final before = tester.getSize(find.byKey(bodyKey)).height;
-      expect(find.text('네트워크 연결 필요'), findsOneWidget);
+      expect(find.text('오프라인에서도 독서를 계속할 수 있습니다.'), findsOneWidget);
       hidden = true;
       container.invalidate(adStateProvider);
       await tester.pumpAndSettle();
@@ -62,7 +62,7 @@ void main() {
       container.invalidate(adStateProvider);
       await tester.pumpAndSettle();
       expect(tester.getSize(find.byKey(bodyKey)).height, before);
-      expect(find.text('네트워크 연결 필요'), findsOneWidget);
+      expect(find.text('오프라인에서도 독서를 계속할 수 있습니다.'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       container.dispose();
     },
