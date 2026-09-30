@@ -99,13 +99,17 @@
     const css = selector(node.parentElement);
     const end = charEnd(node.data, offset);
     return JSON.stringify({anchorVisible, resourceEnd: resourceEnd(), locations: {
-      cssSelector: css,
+      koofyCover: 0, cssSelector: css,
       koofyText: {cssSelector: css, textNodeIndex: Array.prototype.indexOf.call(node.parentNode.childNodes, node), charOffset: offset}
     }, text: {
       before: node.data.slice(Math.max(0, offset - 48), offset),
       highlight: node.data.slice(offset, end),
       after: node.data.slice(end, end + 48)
     }});
+  }
+  if (document.body.hasAttribute('data-koofy-cover') && Math.abs(window.scrollX) < 2 && window.scrollY < 2) {
+    return JSON.stringify({anchorVisible, resourceEnd: false,
+      locations: {progression: 0, cssSelector: 'body', koofyCover: 1}, text: {}});
   }
   return JSON.stringify({anchorVisible, resourceEnd: resourceEnd()});
 })(__KOOFY_ANCHOR__)

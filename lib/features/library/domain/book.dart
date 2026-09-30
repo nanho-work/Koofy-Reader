@@ -12,6 +12,7 @@ class Book {
     this.coverPath,
     this.importSourcePath,
     this.sourceHash,
+    this.originalFileName,
   });
 
   factory Book.asset({
@@ -40,6 +41,7 @@ class Book {
     String? coverPath,
     String? importSourcePath,
     String? sourceHash,
+    String? originalFileName,
   }) {
     return Book(
       id: id,
@@ -51,6 +53,7 @@ class Book {
       coverPath: coverPath,
       importSourcePath: importSourcePath,
       sourceHash: sourceHash,
+      originalFileName: originalFileName,
     );
   }
 
@@ -66,6 +69,11 @@ class Book {
   /// Original picker identity for duplicate selection; never used to read a book.
   final String? importSourcePath;
   final String? sourceHash;
+  final String? originalFileName;
+
+  /// Keep a filename, never a title or an app-owned `source.txt` fallback.
+  String? get matchingFileName =>
+      originalFileName ?? importSourcePath?.split(RegExp(r'[\\/]')).last;
 
   bool get isLocalFile => sourceType == BookSourceType.localFile;
 
@@ -80,6 +88,7 @@ class Book {
     coverPath: path,
     importSourcePath: importSourcePath,
     sourceHash: sourceHash,
+    originalFileName: originalFileName,
   );
 
   Map<String, dynamic> toJson() {
@@ -94,6 +103,7 @@ class Book {
       'coverPath': coverPath,
       'importSourcePath': importSourcePath,
       'sourceHash': sourceHash,
+      'originalFileName': matchingFileName,
     };
   }
 
@@ -122,6 +132,9 @@ class Book {
       author: author,
       description: description,
       sourceType: sourceType,
+      originalFileName: json['originalFileName'] is String
+          ? json['originalFileName'] as String
+          : null,
       assetPath: assetPath is String ? assetPath : null,
       localPath: localPath is String ? localPath : null,
       sourceHash: json['sourceHash'] is String

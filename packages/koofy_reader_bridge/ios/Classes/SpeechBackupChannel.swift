@@ -9,7 +9,7 @@ enum SpeechBackupChannel {
             switch call.method {
             case "exportSpeech":
                 var settings: [String: Any] = [:]
-                for key in ["voice", "speed", "follow"] { settings[key] = defaults.object(forKey: prefix + key) }
+                for key in ["voice", "speed", "follow", "alwaysShow"] { settings[key] = defaults.object(forKey: prefix + key) }
                 var positions: [String: String] = [:]
                 for (key, value) in defaults.dictionaryRepresentation() where key.hasPrefix(prefix + "position.") {
                     guard JSONSerialization.isValidJSONObject(value) else { continue }
@@ -24,6 +24,7 @@ enum SpeechBackupChannel {
                     guard speed.doubleValue.isFinite, (0.5...2).contains(speed.doubleValue) else { throw BackupError.invalid }
                     pending[prefix + "speed"] = speed.doubleValue
                 }
+                if let always = settings["alwaysShow"] as? Bool { pending[prefix + "alwaysShow"] = always }
                 if let follow = settings["follow"] as? Bool { pending[prefix + "follow"] = follow }
                 if data["platform"] as? String == "ios", let voice = settings["voice"] as? String { pending[prefix + "voice"] = voice }
                 for (id, raw) in data["positions"] as? [String: String] ?? [:] {

@@ -126,7 +126,7 @@ enum ReaderWebViewport {
         guard let metadata else { throw FrameError.notReady }
         // Our registered cover is an isolated, single-viewport resource. Unlike
         // arbitrary illustration pages, its href is an unambiguous curl anchor.
-        if isReaderDisplayCover(metadata) {
+        if metadata.href.string == "__koofy_reader_cover_v1__/cover.xhtml" {
             let valid = try await navigator.evaluateJavaScript("document.documentElement.id === 'koofy-display-cover' && document.documentElement.scrollWidth <= innerWidth + 2 && document.querySelector('img').naturalWidth > 0").get()
             guard valid as? Bool == true else { throw FrameError.notReady }
             return metadata
@@ -143,6 +143,7 @@ enum ReaderWebViewport {
         guard let locations = snapshot["locations"] as? [String: Any] else { throw FrameError.invalidAnchor }
         var merged = json["locations"] as? [String: Any] ?? [:]
         merged.removeValue(forKey: "fragments")
+                if locations["koofyCover"] as? Int == 1 { merged.removeValue(forKey: "koofyText"); merged.removeValue(forKey: "koofySpeechOrdinal") }
         merged.merge(locations) { _, new in new }
         json["locations"] = merged
         json["text"] = snapshot["text"]

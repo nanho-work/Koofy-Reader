@@ -9,7 +9,9 @@ bool isReaderCoverLocator(String? locator) {
     final value = jsonDecode(locator);
     return value is Map &&
         value['href'] is String &&
-        Uri.parse(value['href'] as String).path == readerCoverHref;
+        (Uri.parse(value['href'] as String).path == readerCoverHref ||
+            (value['locations'] is Map &&
+                value['locations']['koofyCover'] == 1));
   } on FormatException {
     return false;
   }
@@ -54,7 +56,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
   }
 }
 
-({Uint8List bytes, bool added}) _withDisplayCover(
+({Uint8List bytes, bool added, String? firstBodyHref}) _withDisplayCover(
   Uint8List original,
   Uint8List cover,
 ) {
@@ -83,7 +85,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
       .toList();
   if (spineItems.isEmpty ||
       files.keys.any((p) => p.startsWith('__koofy_reader_cover_v1__/'))) {
-    return (bytes: original, added: false);
+    return (bytes: original, added: false, firstBodyHref: null);
   }
   // EPUB2 guide and EPUB3 semantic cover pages are authoritative. Keep the
   // publisher's cover instead of displaying the same cover twice. An image-only
@@ -99,7 +101,9 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
   for (var i = 0; i < spineItems.length; i++) {
     final item = spineItems[i];
     final path = _localReference(base, item.getAttribute('href')!);
-    if (declared.contains(path)) return (bytes: original, added: false);
+    if (declared.contains(path)) {
+      return (bytes: original, added: false, firstBodyHref: null);
+    }
     final file = files[path];
     if (file == null ||
         !(item.getAttribute('media-type') ?? '').contains('html')) {
@@ -135,7 +139,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
         .join()
         .trim();
     if (coverSemantic || (i == 0 && images.isNotEmpty && visibleText.isEmpty)) {
-      return (bytes: original, added: false);
+      return (bytes: original, added: false, firstBodyHref: null);
     }
   }
   String id(String name) {
@@ -171,14 +175,37 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
       'media-type': 'image/png',
     }),
   );
-  spine.children.insert(
-    0,
-    XmlElement(XmlName('itemref', spine.name.prefix), [
-      XmlAttribute(XmlName('idref'), pageId),
+  final firstPath = _localReference(
+    base,
+    spineItems.first.getAttribute('href')!,
+  );
+  final firstDocument = XmlDocument.parse(
+    _decodeUnicode(files[firstPath]!.content),
+  );
+  final firstBody = _elements(firstDocument, 'body').first;
+  firstBody.setAttribute('data-koofy-cover', 'true');
+  final imageRelative =
+      '${'../' * (firstPath.split('/').length - 1)}${readerCoverHref.replaceAll('cover.xhtml', 'image.png')}';
+  // A generated CSS box occupies exactly one column in the first body resource.
+  // No body child/text nodes are inserted: saved selectors, CFIs and TTS remain valid.
+  _elements(firstDocument, 'head').first.children.add(
+    XmlElement(XmlName('style'), [], [
+      XmlText("""
+body[data-koofy-cover]::before {
+  content: '' !important; display: block !important;
+  width: 100% !important; height: calc(100vh - 2px) !important;
+  min-height: 0 !important; max-height: none !important;
+  margin: 0 !important; padding: 0 !important;
+  background: url('$imageRelative') center / contain no-repeat !important;
+  -webkit-column-break-inside: avoid !important; break-inside: avoid !important;
+  -webkit-column-break-after: always !important; break-after: column !important;
+}
+"""),
     ]),
   );
   final replaced = <String, Uint8List>{
     opfPath: Uint8List.fromList(utf8.encode(opf.toXmlString())),
+    firstPath: Uint8List.fromList(utf8.encode(firstDocument.toXmlString())),
   };
   // Include an explicit cover entry so readers can return through the contents.
   for (final item in items.values) {
@@ -199,7 +226,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
       final depth = path.split('/').length - 1;
       final link = XmlElement(
         XmlName('a', list.name.prefix),
-        [XmlAttribute(XmlName('href'), '${'../' * depth}$readerCoverHref')],
+        [XmlAttribute(XmlName('href'), '${'../' * depth}$firstPath')],
         [XmlText('표지')],
       );
       list.children.insert(
@@ -258,7 +285,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
           node(
             'content',
             attributes: {
-              'src': '${'../' * (path.split('/').length - 1)}$readerCoverHref',
+              'src': '${'../' * (path.split('/').length - 1)}$firstPath',
             },
           ),
         ],
@@ -285,6 +312,7 @@ Future<Uint8List?> _readDisplayCover(String? path) async {
   return (
     bytes: ZipEncoder().encodeBytes(output, modified: DateTime.utc(2000)),
     added: true,
+    firstBodyHref: firstPath,
   );
 }
 

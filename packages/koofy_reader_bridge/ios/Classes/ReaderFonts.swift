@@ -1,5 +1,7 @@
 import CryptoKit
 import Foundation
+import UIKit
+import CoreText
 import ReadiumNavigator
 import ReadiumShared
 
@@ -26,8 +28,10 @@ final class ReaderFonts {
     }
     static func isValidId(_ id: String?) -> Bool {
         let value = id ?? "default"
-        return ids.contains(value) || value.range(of: "^remote_[a-f0-9]{32}$", options: .regularExpression) != nil
+        return ids.contains(value) || value.range(of: "^(remote|personal)_[a-f0-9]{32}$", options: .regularExpression) != nil
     }
+    private var previewFiles: [String: URL] = [:]
+    private var previewFonts: [String: UIFont] = [:]
     let optionIds: [String]
     let optionLabels: [String]
     let declarations: [AnyHTMLFontFamilyDeclaration]
@@ -68,17 +72,18 @@ final class ReaderFonts {
         var loadedLabels = ["기본"] + catalog.families.map(\.label)
         let support = try FileManager.default.url(for: .applicationSupportDirectory,
             in: .userDomainMask, appropriateFor: nil, create: true)
-        let remoteDirectory = downloadedDirectory ?? support.appendingPathComponent("cloud_reader/fonts", isDirectory: true)
+        for remoteDirectory in [downloadedDirectory ?? support.appendingPathComponent("cloud_reader/fonts", isDirectory: true), support.appendingPathComponent("personal_fonts", isDirectory: true)] {
+        let personal = remoteDirectory.lastPathComponent == "personal_fonts"
         let manifestURL = remoteDirectory.appendingPathComponent("catalog.json")
         if let attributes = try? FileManager.default.attributesOfItem(atPath: manifestURL.path),
            let size = attributes[.size] as? NSNumber, size.intValue <= 1_048_576,
            let data = try? Data(contentsOf: manifestURL),
            let remote = try? JSONDecoder().decode(Catalog.self, from: data), remote.version == 1 {
             for family in remote.families {
-                guard family.id.hasPrefix("remote_"), Self.isValidId(family.id),
+                guard family.id.hasPrefix(personal ? "personal_" : "remote_"), Self.isValidId(family.id),
                       !loadedIds.contains(family.id), !family.label.isEmpty, family.label.count <= 160,
                       (1...9).contains(family.faces.count) else { continue }
-                let alias = "KoofyRemote_" + family.id.dropFirst(7)
+                let alias = (personal ? "KoofyPersonal_" : "KoofyRemote_") + family.id.dropFirst(personal ? 9 : 7)
                 guard let faces = try? family.faces.map({ face -> CSSFontFace in
                     guard face.sha256.count == 64, face.sha256.allSatisfy({ "0123456789abcdef".contains($0) }),
                           [face.sha256 + ".otf", face.sha256 + ".ttf"].contains(face.file),
@@ -93,14 +98,25 @@ final class ReaderFonts {
                           let file = FileURL(url: target) else { throw Self.invalidFont() }
                     return CSSFontFace(file: file, style: .normal, weight: .standard(weight))
                 }) else { continue }
+                previewFiles[family.id] = remoteDirectory.appendingPathComponent(family.faces[0].file)
                 loadedIds.append(family.id); loadedLabels.append(family.label)
                 loadedFamilies[family.id] = FontFamily(rawValue: alias)
                 loadedDeclarations.append(CSSFontFamilyDeclaration(fontFamily: FontFamily(rawValue: alias),
                     alternates: [.sansSerif], fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration())
             }
         }
+        }
         families = loadedFamilies; declarations = loadedDeclarations
         optionIds = loadedIds; optionLabels = loadedLabels
+        for family in catalog.families { if let face = family.faces.first { previewFiles[family.id] = directory.appendingPathComponent(face.sha256 + ".otf") } }
+    }
+
+    func preview(_ id: String) -> UIFont? {
+        if let cached = previewFonts[id] { return cached }
+        guard let url = previewFiles[id], let provider = CGDataProvider(url: url as CFURL), let font = CGFont(provider), let name = font.postScriptName else { return nil }
+        CTFontManagerRegisterGraphicsFont(font, nil)
+        let result = UIFont(name: name as String, size: UIFont.preferredFont(forTextStyle: .body).pointSize)
+        previewFonts[id] = result; return result
     }
 
     func family(_ id: String?) -> FontFamily? { id.flatMap { families[$0] } }

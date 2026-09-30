@@ -258,6 +258,7 @@ internal class ReaderPageSurfaces(
         val result = base.toJSON()
         val merged = result.optJSONObject("locations") ?: JSONObject()
         merged.remove("fragments")
+                    if (locations.optInt("koofyCover") == 1) { merged.remove("koofyText"); merged.remove("koofySpeechOrdinal") }
         locations.keys().forEach { merged.put(it, locations.get(it)) }
         result.put("locations", merged).put("text", value.optJSONObject("text"))
         return requireNotNull(Locator.fromJSON(result))

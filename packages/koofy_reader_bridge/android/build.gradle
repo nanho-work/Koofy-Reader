@@ -4,9 +4,17 @@ version = '1.0'
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
+// Share scripts/images with iOS without copying its Fonts symlinks into Android.
+def sharedReaderAssets = tasks.register('prepareSharedReaderAssets', Sync) {
+    from('../ios/Resources') {
+        include '*.js', 'translate-*.png'
+    }
+    into(layout.buildDirectory.dir('generated/sharedReaderAssets'))
+}
+
 android {
     namespace = 'com.koofy.reader.bridge'
-    sourceSets.main.assets.srcDirs += ['../ios/Resources']
+    sourceSets.main.assets.srcDir(sharedReaderAssets)
     sourceSets.androidTest.assets.srcDirs += ['../../../test/fixtures']
     sourceSets.main.assets.srcDirs += ['../../../assets/fonts']
     compileSdk = 36
@@ -23,6 +31,8 @@ android {
     }
     kotlinOptions { jvmTarget = '11' }
 }
+
+tasks.named('preBuild').configure { dependsOn(sharedReaderAssets) }
 
 dependencies {
     implementation 'com.google.mlkit:translate:17.0.3'

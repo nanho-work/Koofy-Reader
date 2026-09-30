@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
+import 'package:koofy_reader/features/fonts/presentation/personal_fonts_page.dart';
 import 'dart:async';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 
@@ -41,6 +44,7 @@ class _NativeReaderLaunchPageState
   String? _error;
   String _status = '책을 준비하고 있습니다…';
   bool _launching = false;
+  bool _initialLocationConsumed = false;
   bool _leaveRequested = false;
   bool _closed = false;
   bool _popScheduled = false;
@@ -142,7 +146,9 @@ class _NativeReaderLaunchPageState
     StoredReaderPosition position,
   ) async {
     if (!mounted || _leaveRequested) throw const _LaunchCancelled();
-    if (_book.id == widget.book.id && widget.initialLocatorJson != null) {
+    if (!_initialLocationConsumed &&
+        _book.id == widget.book.id &&
+        widget.initialLocatorJson != null) {
       if (widget.initialContentRevision != publication.contentRevision) {
         throw StateError('책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요.');
       }
@@ -228,6 +234,7 @@ class _NativeReaderLaunchPageState
     if (!mounted || event.publicationId != _book.id) return;
     switch (event.kind) {
       case 'ready':
+        _initialLocationConsumed = true;
         setState(() => _status = '책을 읽고 있습니다.');
       case 'error':
         setState(() => _error = event.message ?? '독서 화면에서 오류가 발생했습니다.');
@@ -235,6 +242,10 @@ class _NativeReaderLaunchPageState
         setState(() => _closed = true);
         ref.invalidate(nativeLibraryPositionsProvider);
         if (_error == null &&
+            event.message == 'manageFonts' &&
+            !_leaveRequested) {
+          unawaited(_manageFonts());
+        } else if (_error == null &&
             event.message == 'nextBook' &&
             _nextBook != null &&
             !_leaveRequested) {
@@ -246,6 +257,28 @@ class _NativeReaderLaunchPageState
         } else if (_error == null) {
           _returnToLibrary();
         }
+    }
+  }
+
+  Future<void> _manageFonts() async {
+    try {
+      final services = await ref.read(nativeReaderServicesProvider.future);
+      if (!mounted) return;
+      final support = services.supportDirectory;
+      if (support == null) throw StateError('글꼴 저장소를 찾지 못했습니다.');
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => PersonalFontsPage(
+            store: PersonalFontStore(
+              Directory('${support.path}/personal_fonts'),
+            ),
+            reader: services.coordinator.store,
+          ),
+        ),
+      );
+      if (mounted && !_leaveRequested) await _open();
+    } catch (error) {
+      if (mounted) setState(() => _error = '글꼴 관리 화면을 열지 못했습니다.\n$error');
     }
   }
 

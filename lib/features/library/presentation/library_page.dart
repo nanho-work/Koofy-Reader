@@ -1,3 +1,5 @@
+import 'package:koofy_reader/features/library/application/cover_matching.dart';
+import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/data/library_trash_store.dart';
 import 'package:koofy_reader/features/library/presentation/text_import_preview.dart';
@@ -483,7 +485,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       if (empty) ...[
         const SizedBox(height: 24),
         FilledButton.icon(
-          onPressed: _importing ? null : _importBook,
+          onPressed: _importing || _updatingCover ? null : _importBook,
           icon: const Icon(Icons.add),
           label: Text(_importing ? _importProgress : '첫 책 가져오기'),
         ),
@@ -629,8 +631,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   runSpacing: 8,
                   children: [
                     Text('나의 책', style: Theme.of(context).textTheme.titleLarge),
+                    TextButton.icon(
+                      onPressed: _importing || _updatingCover
+                          ? null
+                          : _batchCovers,
+                      icon: const Icon(Icons.collections_outlined, size: 18),
+                      label: const Text('표지 일괄 등록'),
+                    ),
                     OutlinedButton.icon(
-                      onPressed: _importing ? null : _importBook,
+                      onPressed: _importing || _updatingCover
+                          ? null
+                          : _importBook,
                       icon: const Icon(Icons.add, size: 18),
                       label: Text(_importing ? _importProgress : '책 가져오기'),
                     ),
@@ -1028,7 +1039,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 
   Future<void> _updateCover(Book book, {bool reset = false}) async {
-    if (_updatingCover) return;
+    if (_updatingCover || _importing) return;
     if (kIsWeb) {
       _snack('표지 이미지는 Android · iOS 앱에서 등록해 주세요.');
       return;
@@ -1072,8 +1083,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
   }
 
+  Future<void> _batchCovers() async {
+    if (_updatingCover || _importing) return;
+    setState(() => _updatingCover = true);
+    try {
+      await showBatchCovers(context, ref);
+    } finally {
+      if (mounted) setState(() => _updatingCover = false);
+    }
+  }
+
   Future<void> _importBook() async {
-    if (_importing) return;
+    if (_importing || _updatingCover) return;
     if (kIsWeb) {
       _snack('파일 가져오기는 Android · iOS 앱에서 이용해 주세요.');
       return;
@@ -1085,17 +1106,28 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['txt', 'epub'],
+        allowedExtensions: const ['txt', 'epub', ...coverImageExtensions],
         allowMultiple: true,
-        dialogTitle: '책 선택 (여러 파일 선택 가능)',
+        dialogTitle: '책과 같은 이름의 표지 이미지 함께 선택',
       );
       if (!mounted || result == null || result.files.isEmpty) return;
-      setState(() => _importProgress = '가져오는 중 0/${result.files.length}');
+      final selected = result.files
+          .map((f) => BookImportFile(f.name, f.path))
+          .toList();
+      final images = selected
+          .where((f) => coverImageExtensions.contains(fileExtension(f.name)))
+          .toList();
+      final bookFiles = selected
+          .where((f) => !coverImageExtensions.contains(fileExtension(f.name)))
+          .toList();
+      if (bookFiles.isEmpty) {
+        await showBatchCovers(context, ref, images: images);
+        return;
+      }
+      setState(() => _importProgress = '가져오는 중 0/${bookFiles.length}');
       final imported = await importBooks(
         ref.read(bookRepositoryProvider),
-        result.files
-            .map((file) => BookImportFile(file.name, file.path))
-            .toList(),
+        bookFiles,
         importFile: (path) => importWithTextPreview(
           context,
           ref.read(bookRepositoryProvider),
@@ -1140,7 +1172,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
         );
       }
-      if (mounted && result.files.length > 1 && imported.addedIds.isNotEmpty) {
+      if (mounted && images.isNotEmpty) {
+        await showBatchCovers(
+          context,
+          ref,
+          images: images,
+          bookIds: imported.importedIds.toSet(),
+        );
+      }
+      if (mounted && bookFiles.length > 1 && imported.addedIds.isNotEmpty) {
         await _organizeImportedBooks(imported.addedIds);
       }
     } catch (_) {

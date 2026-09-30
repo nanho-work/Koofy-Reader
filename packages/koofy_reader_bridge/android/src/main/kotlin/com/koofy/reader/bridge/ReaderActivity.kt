@@ -80,6 +80,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var navigation: LinearLayout
     private var speech: ReaderSpeech? = null
     private var translation: ReaderTranslation? = null
+    private var listeningMode = false
+    private var settingsDialog: ReaderSettingsDialog? = null
     private lateinit var speechButton: Button
     private lateinit var speechControls: LinearLayout
     private var speechFollowJob: Job? = null
@@ -237,10 +239,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 lastWidth = width
                 lastHeight = height
                 updateSpreadDivider()
+                settingsDialog?.refreshLayout()
                 if (session.ready) scheduleRelayout()
             }
         }
-        speechButton = button("▶") { translation?.stopVoice(); speech?.toggle() }.apply {
+        speechButton = button("▶") { listeningMode = true; translation?.stopVoice(); speech?.toggle(); updateSpeechControls() }.apply {
+            visibility = View.INVISIBLE
             textSize = 20f
             contentDescription = "책 읽어주기 재생"
             setOnLongClickListener { showSpeechSettings(); true }
@@ -423,6 +427,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     val merged = json.optJSONObject("locations") ?: JSONObject()
                     // Position estimates remain presentation metadata only.
                     merged.remove("fragments")
+                    if (locations.optInt("koofyCover") == 1) { merged.remove("koofyText"); merged.remove("koofySpeechOrdinal") }
                     locations.keys().forEach { key -> merged.put(key, locations.get(key)) }
                     json.put("locations", merged)
                     json.put("text", snapshot.getJSONObject("text"))
@@ -541,12 +546,16 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
     }
 
-    private fun readerColumns(): ColumnCount {
-        val p = session.preferences
+    private fun canShowSpread(): Boolean {
         val usableWidth = if (::container.isInitialized && container.width > 0) container.width / resources.displayMetrics.density
             else resources.configuration.screenWidthDp.toFloat()
+        return !hingeFallback && usableWidth >= 700
+    }
+
+    private fun readerColumns(): ColumnCount {
+        val p = session.preferences
         return when {
-            p.scroll || hingeFallback || usableWidth < 700 -> ColumnCount.ONE
+            p.scroll || !canShowSpread() -> ColumnCount.ONE
             p.columnCount == 1L -> ColumnCount.ONE
             p.columnCount == 2L -> ColumnCount.TWO
             else -> ColumnCount.TWO
@@ -583,9 +592,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private fun showSettings() {
         speech?.pause()
         if (!session.ready || session.closing) return
-        ReaderSettingsDialog(this, { session.preferences }, { applyReaderPreferences(it) },
+        settingsDialog = ReaderSettingsDialog(this, { session.preferences }, { applyReaderPreferences(it) },
             readerFonts.optionIds, readerFonts.optionLabels, { showSpeechSettings() },
-            { toggleTranslation() }, translation?.enabled == true).show()
+            { toggleTranslation() }, translation?.enabled == true, { canShowSpread() },
+            { listeningMode = true; translation?.stopVoice(); speech?.toggle(); updateSpeechControls() },
+            { speech?.pause(); listeningMode = false; updateSpeechControls() },
+            { closeReader(manageFonts = true) }, { updateSpeechControls() }, { readerFonts.preview(it) }).also { it.show() }
     }
 
     private fun toggleTranslation() {
@@ -619,7 +631,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::speechButton.isInitialized) {
             speechButton.setTextColor(palette.foreground)
             speechButton.background = android.graphics.drawable.GradientDrawable().apply {
-                setColor((palette.panel and 0x00FFFFFF) or (102 shl 24)); cornerRadius = dp(24).toFloat()
+                setColor((palette.panel and 0x00FFFFFF) or (235 shl 24)); cornerRadius = dp(24).toFloat()
                 setStroke(dp(1), (palette.foreground and 0x00FFFFFF) or (72 shl 24))
             }
             speechControls.setBackgroundColor(palette.background)
@@ -649,10 +661,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     private fun updateSpeechControls() {
         if (!::speechButton.isInitialized) return
-        speechButton.visibility = if (chromeVisible) View.VISIBLE else View.INVISIBLE
+        if (speech?.playing == true || speech?.busy == true) listeningMode = true
+        speechButton.visibility = if ((listeningMode || speech?.playing == true || getSharedPreferences("reader_speech", MODE_PRIVATE).getBoolean("alwaysShow", false)) && chromeVisible) View.VISIBLE else View.INVISIBLE
         speechButton.text = if (speech?.busy == true) "…" else if (speech?.playing == true) "Ⅱ" else "▶"
         speechButton.contentDescription = if (speech?.playing == true || speech?.busy == true) "책 읽어주기 일시정지" else "책 읽어주기 재생"
-        val transport = speech?.playing == true || speech?.busy == true
+        val transport = listeningMode || speech?.playing == true || speech?.busy == true
         speechControls.visibility = if (transport) View.VISIBLE else View.GONE
         status.visibility = if (transport) View.GONE else View.VISIBLE
         for (i in 0..1) speechControls.getChildAt(i).isEnabled = speech?.playing == true && speech?.busy != true
@@ -827,7 +840,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::turnHost.isInitialized) turnHost.selecting = false
     }
 
-    fun closeReader(nextBook: Boolean = false) {
+    fun closeReader(nextBook: Boolean = false, manageFonts: Boolean = false) {
         if (!::session.isInitialized || session.closing) return
         speech?.pause()
         translation?.suspend()
@@ -840,7 +853,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             // If closing follows a settled page callback, finish its DOM read.
             // During a relayout retain the canonical pre-layout anchor.
             captureJob?.join()
-            ReaderRuntime.emit(session.event("closed", message = if (nextBook) "nextBook" else null)) { result ->
+            ReaderRuntime.emit(session.event("closed", message = if (manageFonts) "manageFonts" else if (nextBook) "nextBook" else null)) { result ->
                 if (result.isSuccess) {
                     if (ReaderRuntime.session === session) ReaderRuntime.session = null
                     finish()
@@ -848,7 +861,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     session.closing = false
                     AlertDialog.Builder(this@ReaderActivity).setTitle("읽기 기록 저장 실패")
                         .setMessage("기기 저장 공간을 확인한 뒤 다시 시도해 주세요.")
-                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook) }
+                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook, manageFonts) }
                         .setNegativeButton("계속 읽기", null).show()
                 }
             }

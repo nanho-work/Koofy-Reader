@@ -179,6 +179,7 @@ class LocalBookRepository implements BookRepository {
       description: description,
       localPath: owned.path,
       importSourcePath: path,
+      originalFileName: fileName,
       sourceHash: fingerprint,
     );
 

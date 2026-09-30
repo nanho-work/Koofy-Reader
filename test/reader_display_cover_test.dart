@@ -37,7 +37,7 @@ void main() {
   final imagePath = File('assets/branding/app_icon.png').absolute.path;
 
   test(
-    'cover is a separate first resource, body identity and old locators survive',
+    'cover occupies a body column without changing body nodes or content identity',
     () async {
       final before = await preparer.prepare(book: book);
       final after = await preparer.prepare(book: book.withCoverPath(imagePath));
@@ -49,15 +49,33 @@ void main() {
       expect(covered.files.first.compression, CompressionType.none);
       expect(covered.findFile(readerCoverHref), isNotNull);
       expect(
-        covered.findFile('EPUB/section-00000.xhtml')!.content,
-        original.findFile('EPUB/section-00000.xhtml')!.content,
+        XmlDocument.parse(
+              utf8.decode(
+                covered.findFile('EPUB/section-00000.xhtml')!.content,
+              ),
+            )
+            .findAllElements('body')
+            .first
+            .children
+            .map((n) => n.toXmlString())
+            .join(),
+        XmlDocument.parse(
+              utf8.decode(
+                original.findFile('EPUB/section-00000.xhtml')!.content,
+              ),
+            )
+            .findAllElements('body')
+            .first
+            .children
+            .map((n) => n.toXmlString())
+            .join(),
       );
       final opf = XmlDocument.parse(
         utf8.decode(covered.findFile('EPUB/package.opf')!.content),
       );
       expect(
         opf.findAllElements('itemref').first.getAttribute('idref'),
-        'koofy-reader-display-cover',
+        'section-00000',
       );
       final saved = before.textMap!.locatorAt(200);
       expect(after.restoreLocator(saved), saved);
@@ -72,7 +90,11 @@ void main() {
         'type': 'application/xhtml+xml',
         'locations': {'progression': 0},
       });
-      expect(after.restoreLocator(coverLocator), coverLocator);
+      expect(
+        jsonDecode(after.restoreLocator(coverLocator)!)['href'],
+        'EPUB/section-00000.xhtml',
+      );
+      expect(isReaderCoverLocator(after.restoreLocator(coverLocator)), true);
       expect(without.restoreLocator(coverLocator), isNull);
       // The normal hostile-input validator must also accept our generated file.
       final imported = Book.localFile(
@@ -165,12 +187,26 @@ void main() {
     );
     expect(
       ncx.findAllElements('content').first.getAttribute('src'),
-      '../$readerCoverHref',
+      '../EPUB/section-00000.xhtml',
     );
     expect(ncx.findAllElements('navPoint').last.getAttribute('playOrder'), '2');
     expect(
-      covered.findFile('EPUB/section-00000.xhtml')!.content,
-      source.findFile('EPUB/section-00000.xhtml')!.content,
+      XmlDocument.parse(
+            utf8.decode(covered.findFile('EPUB/section-00000.xhtml')!.content),
+          )
+          .findAllElements('body')
+          .first
+          .children
+          .map((n) => n.toXmlString())
+          .join(),
+      XmlDocument.parse(
+            utf8.decode(source.findFile('EPUB/section-00000.xhtml')!.content),
+          )
+          .findAllElements('body')
+          .first
+          .children
+          .map((n) => n.toXmlString())
+          .join(),
     );
   });
   test('original EPUB cover is not duplicated', () async {

@@ -16,7 +16,9 @@ class BookImportResult {
     this.failedNames, {
     this.addedIds = const [],
     this.skipped = 0,
+    this.importedIds = const [],
   });
+  final List<String> importedIds;
   final int added;
   final int skipped;
   final List<String> addedIds;
@@ -34,6 +36,7 @@ Future<BookImportResult> importBooks(
 }) async {
   final knownIds = (await repository.getBooks()).map((b) => b.id).toSet();
   var added = 0;
+  final importedIds = <String>{};
   final addedIds = <String>[];
   var existing = 0;
   var skipped = 0;
@@ -53,6 +56,7 @@ Future<BookImportResult> importBooks(
       } else {
         existing++;
       }
+      if (book != null) importedIds.add(book.id);
     } on BookImportSkipped {
       skipped++;
     } catch (_) {
@@ -66,5 +70,6 @@ Future<BookImportResult> importBooks(
     failed,
     addedIds: List.unmodifiable(addedIds),
     skipped: skipped,
+    importedIds: List.unmodifiable(importedIds),
   );
 }

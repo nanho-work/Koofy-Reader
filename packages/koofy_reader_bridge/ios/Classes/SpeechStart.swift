@@ -2,7 +2,7 @@ import Foundation
 import ReadiumShared
 
 func isReaderDisplayCover(_ locator: Locator?) -> Bool {
-    locator?.href.string.components(separatedBy: "#").first == "__koofy_reader_cover_v1__/cover.xhtml"
+    locator?.href.string.components(separatedBy: "#").first == "__koofy_reader_cover_v1__/cover.xhtml" || locator?.locations.otherLocations["koofyCover"]?.integer == 1
 }
 
 struct SpeechStart {

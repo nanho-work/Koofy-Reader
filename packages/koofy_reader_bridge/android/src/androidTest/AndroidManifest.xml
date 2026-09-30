@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Renderer instrumentation has no ad app ID and never requests ads. -->
+        <provider android:name="com.google.android.gms.ads.MobileAdsInitProvider" tools:node="remove" />
+    </application>
+</manifest>

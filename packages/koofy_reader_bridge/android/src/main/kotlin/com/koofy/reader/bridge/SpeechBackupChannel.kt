@@ -19,6 +19,7 @@ internal class SpeechBackupChannel(context: Context, messenger: BinaryMessenger)
                         "settings" to buildMap<String, Any> {
                             if (prefs.contains("speed")) put("speed", prefs.getFloat("speed", 1f).toDouble())
                             if (prefs.contains("voice")) prefs.getString("voice", null)?.let { put("voice", it) }
+                            if (prefs.contains("alwaysShow")) put("alwaysShow", prefs.getBoolean("alwaysShow", false))
                             if (prefs.contains("follow")) put("follow", prefs.getBoolean("follow", true))
                         },
                         "positions" to prefs.all.filter { it.key.startsWith("position.") && it.value is String }
@@ -31,6 +32,7 @@ internal class SpeechBackupChannel(context: Context, messenger: BinaryMessenger)
                         val speed = (settings["speed"] as? Number)?.toDouble()
                         require(speed == null || speed.isFinite() && speed in .5..2.0)
                         if (!prefs.contains("speed") && speed != null) edit.putFloat("speed", speed.toFloat())
+                        if (!prefs.contains("alwaysShow")) (settings["alwaysShow"] as? Boolean)?.let { edit.putBoolean("alwaysShow", it) }
                         if (!prefs.contains("follow")) (settings["follow"] as? Boolean)?.let { edit.putBoolean("follow", it) }
                         if (data["platform"] == "android" && !prefs.contains("voice")) (settings["voice"] as? String)?.let { edit.putString("voice", it) }
                         val positions = data["positions"] as? Map<*, *> ?: emptyMap<Any, Any>()

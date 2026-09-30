@@ -22,11 +22,13 @@ class SpeechBackup {
     final settings = Map<String, dynamic>.from(raw['settings'] as Map);
     final speed = settings['speed'],
         voice = settings['voice'],
-        follow = settings['follow'];
+        follow = settings['follow'],
+        alwaysShow = settings['alwaysShow'];
     if (speed != null &&
             (speed is! num || !speed.isFinite || speed < .5 || speed > 2) ||
         voice != null && (voice is! String || voice.length > 1000) ||
-        follow != null && follow is! bool) {
+        follow != null && follow is! bool ||
+        alwaysShow != null && alwaysShow is! bool) {
       throw const FormatException('듣기 설정이 올바르지 않습니다.');
     }
     final positions = <String, String>{};
@@ -56,6 +58,7 @@ class SpeechBackup {
         if (speed != null) 'speed': speed,
         if (voice != null) 'voice': voice,
         if (follow != null) 'follow': follow,
+        if (alwaysShow != null) 'alwaysShow': alwaysShow,
       },
       'positions': positions,
     };

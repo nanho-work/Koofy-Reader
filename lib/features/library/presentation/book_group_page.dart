@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
@@ -31,6 +32,7 @@ class BookGroupPage extends ConsumerStatefulWidget {
 
 class _BookGroupPageState extends ConsumerState<BookGroupPage> {
   bool _opening = false;
+  bool _coversBusy = false;
   bool _reordering = false;
   Future<void> _change(Future<Object?> Function() operation) async {
     if (_reordering) return;
@@ -213,6 +215,26 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                       .read(bookGroupRepositoryProvider)
                                       .setMemberCovers(group.id, value),
                                 ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _coversBusy || members.isEmpty
+                              ? null
+                              : () async {
+                                  setState(() => _coversBusy = true);
+                                  try {
+                                    await showBatchCovers(
+                                      context,
+                                      ref,
+                                      bookIds: members.map((b) => b.id).toSet(),
+                                    );
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _coversBusy = false);
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.collections_outlined),
+                          label: const Text('묶음 안의 표지 일괄 등록'),
                         ),
                         TextButton.icon(
                           onPressed: _reordering || members.length < 2

@@ -20,6 +20,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         press.cancelsTouchesInView = false; press.delegate = self; press.isEnabled = false
         return press
     }()
+    private var listeningMode = false
     private let speechButton = UIButton(type: .system)
     private let speechControls = UIStackView()
     private var speechTransportItem: UIBarButtonItem?
@@ -379,7 +380,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         try Self.validate(value)
         let sameLayout = value.fontScale == preferences.fontScale && value.columnCount == preferences.columnCount &&
             value.scroll == preferences.scroll && value.theme == preferences.theme &&
-            (value.fontId ?? "default") == (preferences.fontId ?? "default")
+            (value.fontId ?? "default") == (preferences.fontId ?? "default") &&
+            value.lineHeight == preferences.lineHeight && value.paragraphSpacing == preferences.paragraphSpacing && value.pageMargins == preferences.pageMargins
         if sameLayout {
             invalidatePageTurns()
             preferences = value
@@ -525,6 +527,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                var json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
                 var merged = json["locations"] as? [String: Any] ?? [:]
                 merged.removeValue(forKey: "fragments")
+                if locations["koofyCover"] as? Int == 1 { merged.removeValue(forKey: "koofyText"); merged.removeValue(forKey: "koofySpeechOrdinal") }
                 merged.merge(locations) { _, new in new }
                 json["locations"] = merged
                 json["text"] = snapshot["text"]
@@ -617,7 +620,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
     }
 
-    func close(nextBook: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
+    func close(nextBook: Bool = false, manageFonts: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
         speech?.pause()
         speechFollowTask?.cancel()
         guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
@@ -631,7 +634,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             await self.captureTask?.value
             do {
                 var closedEvent = try self.checkpoint(kind: "closed")
-                closedEvent.message = nextBook ? "nextBook" : nil
+                closedEvent.message = manageFonts ? "manageFonts" : nextBook ? "nextBook" : nil
                 self.openingTask?.cancel()
                 self.readyTimeout?.cancel()
                 self.settingsCompletion?(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
@@ -1050,10 +1053,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
     private func updateSpeechControls() {
         let playing = speech?.playing == true
+        if playing || speech?.busy == true { listeningMode = true }
         speechButton.setImage(UIImage(systemName: speech?.busy == true ? "hourglass" : playing ? "pause.fill" : "play.fill"), for: .normal)
         speechButton.accessibilityLabel = playing || speech?.busy == true ? "책 읽어주기 일시정지" : "책 읽어주기 재생"
-        speechButton.isHidden = !chromeVisible
-        let transport = playing || speech?.busy == true
+        speechButton.isHidden = !chromeVisible || !(listeningMode || playing || UserDefaults.standard.bool(forKey: "reader.speech.alwaysShow"))
+        let transport = listeningMode || playing || speech?.busy == true
         if let item = speechTransportItem, var items = toolbar.items,
            let index = items.firstIndex(where: { $0 === progressItem || $0 === item }) {
             items[index] = transport ? item : progressItem
@@ -1073,7 +1077,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             settings.accessibilityLabel = "듣기 설정, \(rate)배, \(timer)"
         }
     }
-    @objc private func speechTapped() { translation.stopVoice(); speech?.toggle() }
+    @objc private func speechTapped() { listeningMode = true; translation.stopVoice(); speech?.toggle(); updateSpeechControls() }
     @objc private func speechPrevious() { speech?.skip(false) }
     @objc private func speechNext() { speech?.skip(true) }
     @objc private func speechLongPressed(_ recognizer: UILongPressGestureRecognizer) {
@@ -1152,6 +1156,16 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             do { try self.apply(value, completion: completion) }
             catch { completion(.failure(error)) }
         }
+        settings.canShowSpread = { [weak self] in self?.canShowSpread ?? false }
+        settings.previewFont = { [weak self] in self?.readerFonts?.preview($0) }
+        settings.onStartSpeech = { [weak self, weak settings] in settings?.dismiss(animated: true) { self?.speechTapped() } }
+        settings.onEndSpeech = { [weak self, weak settings] in
+            self?.speech?.pause(); self?.listeningMode = false; self?.updateSpeechControls(); settings?.dismiss(animated: true)
+        }
+        settings.onSpeechVisibility = { [weak self] in self?.updateSpeechControls() }
+        settings.onManageFonts = { [weak self, weak settings] in
+            settings?.dismiss(animated: true) { self?.close(manageFonts: true) { _ in } }
+        }
         settings.translationEnabled = translation.enabled
         settings.onTranslation = { [weak self, weak settings] in
             settings?.dismiss(animated: true) { self?.toggleTranslation() }
@@ -1184,7 +1198,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         body.backgroundColor = palette.background
         toolbar.backgroundColor = palette.background
         bannerFooter?.applyPalette(palette)
-        speechButton.backgroundColor = palette.panel.withAlphaComponent(0.4)
+        speechButton.backgroundColor = palette.panel.withAlphaComponent(0.92)
         speechButton.layer.borderWidth = 1
         speechButton.layer.borderColor = palette.foreground.withAlphaComponent(0.28).cgColor
         speechButton.tintColor = palette.foreground

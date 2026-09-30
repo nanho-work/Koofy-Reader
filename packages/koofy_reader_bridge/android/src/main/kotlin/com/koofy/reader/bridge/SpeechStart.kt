@@ -11,7 +11,8 @@ import org.readium.r2.shared.util.tokenizer.DefaultTextContentTokenizer
 import org.readium.r2.shared.util.tokenizer.TextUnit
 
 internal fun isReaderDisplayCover(locator: Locator?): Boolean =
-    locator?.href?.toString()?.substringBefore('#') == "__koofy_reader_cover_v1__/cover.xhtml"
+    locator?.href?.toString()?.substringBefore('#') == "__koofy_reader_cover_v1__/cover.xhtml" ||
+        locator?.toJSON()?.optJSONObject("locations")?.optInt("koofyCover") == 1
 
 internal data class SpeechStart(val locator: Locator, val skip: Int)
 

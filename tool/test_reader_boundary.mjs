@@ -11,7 +11,7 @@ function atEnd(width, height, scrollWidth, scrollHeight, scrollX, scrollY) {
   const root = { scrollWidth, scrollHeight };
   return JSON.parse(runInNewContext(script, {
     window: { innerWidth: width, innerHeight: height, scrollX, scrollY },
-    document: { scrollingElement: root, documentElement: root, body: {}, createTreeWalker: () => ({ nextNode: () => null }) },
+    document: { scrollingElement: root, documentElement: root, body: { hasAttribute: () => false }, createTreeWalker: () => ({ nextNode: () => null }) },
     NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
   })).resourceEnd;
 }

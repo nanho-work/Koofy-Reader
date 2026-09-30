@@ -21,6 +21,7 @@ class PreparedReadingPublication {
     required this.title,
     this.textMap,
     this.hasDisplayCover = false,
+    this.coverBodyHref,
   });
 
   final String publicationId;
@@ -29,9 +30,18 @@ class PreparedReadingPublication {
   final String title;
   final TextPublicationMap? textMap;
   final bool hasDisplayCover;
+  final String? coverBodyHref;
 
-  String? restoreLocator(String? locator) =>
-      !hasDisplayCover && isReaderCoverLocator(locator) ? null : locator;
+  String? restoreLocator(String? locator) {
+    if (!isReaderCoverLocator(locator)) return locator;
+    if (!hasDisplayCover) return null;
+    if (coverBodyHref == null) return locator;
+    return jsonEncode({
+      'href': coverBodyHref,
+      'type': 'application/xhtml+xml',
+      'locations': {'progression': 0, 'koofyCover': 1},
+    });
+  }
 }
 
 /// A supported-subset error that can be displayed without losing the original.
@@ -112,7 +122,7 @@ class ReadingPublicationPreparer {
         ? await _readDisplayCover(book.coverPath)
         : null;
     final display = cover == null
-        ? (bytes: prepared.publicationBytes, added: false)
+        ? (bytes: prepared.publicationBytes, added: false, firstBodyHref: null)
         : await Isolate.run(
             () => _withDisplayCover(prepared.publicationBytes, cover),
           );
@@ -145,6 +155,7 @@ class ReadingPublicationPreparer {
       filePath: publication.absolute.path,
       title: title,
       hasDisplayCover: display.added,
+      coverBodyHref: display.firstBodyHref,
       textMap: source.extension == 'txt'
           ? TextPublicationMap(
               _decodeUnicode(

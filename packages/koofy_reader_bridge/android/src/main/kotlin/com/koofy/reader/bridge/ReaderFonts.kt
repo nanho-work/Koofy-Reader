@@ -52,13 +52,13 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
                     Face(file, face.getInt("weight"), requireNotNull(Url("__koofy_fonts/$hash.otf")))
                 })
         }
-        families = bundled + downloaded(context, downloadedDirectory)
+        families = bundled + downloaded(context, downloadedDirectory) + downloaded(context, File(context.filesDir, "personal_fonts"), personal = true)
     }
 
     val optionIds: List<String> get() = listOf("default") + families.map { it.id }
     val optionLabels: List<String> get() = listOf("기본") + families.map { it.label }
 
-    private fun downloaded(context: Context, overrideDirectory: File?): List<Family> {
+    private fun downloaded(context: Context, overrideDirectory: File?, personal: Boolean = false): List<Family> {
         val directory = overrideDirectory ?: File(context.filesDir, "cloud_reader/fonts")
         val manifest = File(directory, "catalog.json")
         if (!manifest.isFile || manifest.length() > 1_048_576) return emptyList()
@@ -69,12 +69,12 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
             (0 until entries.length()).mapNotNull { index -> runCatching {
                 val item = entries.getJSONObject(index)
                 val id = item.getString("id")
-                check(id.matches(Regex("remote_[a-f0-9]{32}")))
+                check(id.matches(Regex(if (personal) "personal_[a-f0-9]{32}" else "remote_[a-f0-9]{32}")))
                 val label = item.getString("label")
                 check(label.isNotBlank() && label.length <= 160)
                 val faces = item.getJSONArray("faces")
                 check(faces.length() in 1..9)
-                Family(id, label, "KoofyRemote_${id.removePrefix("remote_")}",
+                Family(id, label, if (personal) "KoofyPersonal_${id.removePrefix("personal_")}" else "KoofyRemote_${id.removePrefix("remote_")}",
                     (0 until faces.length()).map { faceIndex ->
                         val face = faces.getJSONObject(faceIndex)
                         val hash = face.getString("sha256")
@@ -91,6 +91,11 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
                     })
             }.getOrNull() }.distinctBy { it.id }
         }.getOrDefault(emptyList())
+    }
+
+    private val previews = mutableMapOf<String, android.graphics.Typeface?>()
+    fun preview(id: String): android.graphics.Typeface? = previews.getOrPut(id) {
+        families.firstOrNull { it.id == id }?.faces?.firstOrNull()?.let { runCatching { android.graphics.Typeface.createFromFile(it.file) }.getOrNull() }
     }
 
     fun family(id: String?): FontFamily? = families.firstOrNull { it.id == id }?.let { FontFamily(it.cssFamily) }
@@ -138,7 +143,7 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
 
     companion object {
         val ids = listOf("default", "maplestory", "hakgyoansim-siganpyo")
-        fun isValidId(id: String?) = (id ?: "default") in ids || id?.matches(Regex("remote_[a-f0-9]{32}")) == true
+        fun isValidId(id: String?) = (id ?: "default") in ids || id?.matches(Regex("(remote|personal)_[a-f0-9]{32}")) == true
         val labels = listOf("기본", "메이플스토리", "학교안심 시간표")
         private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it) }

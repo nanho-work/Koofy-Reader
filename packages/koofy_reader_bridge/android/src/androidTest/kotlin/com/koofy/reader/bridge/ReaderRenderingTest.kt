@@ -119,13 +119,12 @@ class ReaderRenderingTest {
         InstrumentationRegistry.getInstrumentation().context.assets.open("reader-display-cover.epub").use { input ->
             fixture.outputStream().use { input.copyTo(it) }
         }
-        launch(initial = null, preferences = ReaderPreferences(1.0, 2, false, "light"))
-        fun onCover() = ReaderRuntime.session!!.locatorJson?.contains("__koofy_reader_cover_v1__") == true
+        launch(initial = null, preferences = ReaderPreferences(1.0, 1, false, "light"))
+        fun onCover() = ReaderRuntime.session!!.locatorJson?.let { isReaderDisplayCover(org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(it))) } == true
         assertTrue(onCover())
-        val cover = snapshot("""JSON.stringify({columns:getComputedStyle(document.documentElement).columnCount,width:innerWidth,extent:document.documentElement.scrollWidth,image:document.querySelector('img').naturalWidth})""")
+        val cover = snapshot("""JSON.stringify({columns:getComputedStyle(document.documentElement).columnCount,width:innerWidth,extent:document.documentElement.scrollWidth,image:getComputedStyle(document.body,'::before').backgroundImage.includes('image.png')})""")
         assertEquals("1", cover.getString("columns"))
-        assertTrue(cover.getInt("extent") <= cover.getInt("width") + 2)
-        assertTrue(cover.getInt("image") > 0)
+        assertTrue(cover.getBoolean("image"))
         val done = CountDownLatch(1)
         var speechHref: String? = null
         scenario!!.onActivity { activity -> activity.lifecycleScope.launch {
@@ -179,6 +178,15 @@ class ReaderRenderingTest {
             ready
         }
         scenario!!.onActivity { assertEquals(0, it.pageTurns!!.fallbackCount) }
+        if (cover.getInt("width") >= 700) {
+            scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(columnCount = 2, pageTurnStyle = "instant")) }
+            awaitCondition("Spread did not settle") { snapshot("JSON.stringify({columns:getComputedStyle(document.documentElement).columnCount})").optString("columns") == "2" }
+            scenario!!.onActivity { it.goToLocator("""{"href":"EPUB/section-00000.xhtml","type":"application/xhtml+xml","locations":{"progression":0,"koofyCover":1}}""") }
+            awaitCondition("Body must be beside cover") {
+                val rect = snapshot("JSON.stringify({x:document.querySelector('p').getBoundingClientRect().left,width:innerWidth})")
+                rect.getDouble("x") >= rect.getDouble("width") / 2 && rect.getDouble("x") < rect.getDouble("width")
+            }
+        }
     }
 
     @Test fun speechStopsOnBackgroundAndManualNavigationWithoutOverwritingReadingCheckpoint() {
@@ -490,6 +498,44 @@ class ReaderRenderingTest {
             runCatching { !snapshot("JSON.stringify({family:getComputedStyle(document.querySelector('p')).fontFamily})").getString("family").contains("Koofy") }.getOrDefault(false)
         }
         assertTrue(anchorVisible(resume))
+    }
+
+    @Test fun personalFontRendersAndReaderMenuHidesUnavailableSpread() {
+        val directory = File(context.filesDir, "personal_fonts").apply { mkdirs() }
+        val manifest = File(directory, "catalog.json")
+        val previous = if (manifest.exists()) manifest.readBytes() else null
+        val face = ReaderFonts(context).families.first().faces.first()
+        val file = File(directory, face.file.name)
+        val existed = file.exists()
+        val id = "personal_" + face.file.nameWithoutExtension.take(32)
+        try {
+            face.file.copyTo(file, overwrite = true)
+            manifest.writeText("""{"version":1,"families":[{"id":"$id","label":"개인 글꼴 테스트","cssFamily":"KoofyPersonal_${id.removePrefix("personal_")}","faces":[{"file":"${file.name}","weight":400,"sha256":"${file.nameWithoutExtension}"}]}]}""")
+            launch(initial = null, preferences = ReaderPreferences(1.0, 1, false, "light", fontId = id))
+            assertTrue(snapshot("JSON.stringify({loaded:Array.from(document.fonts).some(f=>f.family.includes('KoofyPersonal_')&&f.status==='loaded')})").getBoolean("loaded"))
+            scenario!!.onActivity { activity ->
+                val speechButton = ReaderActivity::class.java.getDeclaredField("speechButton").apply { isAccessible = true }.get(activity) as android.widget.Button
+                assertEquals(android.view.View.INVISIBLE, speechButton.visibility)
+                var started = false
+                val settings = ReaderSettingsDialog(activity, { ReaderRuntime.session!!.preferences }, {}, canShowSpread = { false }, speechStart = { started = true })
+                settings.show()
+                val dialog = ReaderSettingsDialog::class.java.getDeclaredField("dialog").apply { isAccessible = true }.get(settings) as androidx.appcompat.app.AlertDialog
+                fun texts(view: android.view.View): List<android.widget.TextView> =
+                    (if (view is android.widget.TextView) listOf(view) else emptyList()) +
+                    (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
+                fun labels() = texts(dialog.window!!.decorView)
+                assertFalse(labels().any { it.text.toString().contains("두 페이지") && it is android.widget.Button })
+                assertFalse(labels().any { it.text.toString() == "줄간격" })
+                labels().first { it.text.toString().contains("글꼴·문단 설정") }.performClick()
+                assertTrue(labels().any { it.text.toString() == "줄간격" })
+                labels().first { it.text.toString() == "듣기" }.performClick()
+                labels().first { it.text.toString().contains("듣기 시작 / 재개") }.performClick()
+                assertTrue(started)
+            }
+        } finally {
+            if (previous == null) manifest.delete() else manifest.writeBytes(previous)
+            if (!existed) file.delete()
+        }
     }
 
     @Test fun downloadedFontCatalogLoadsVerifiedFacesAndSkipsCorruptOnes() {

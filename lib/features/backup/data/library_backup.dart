@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
 import 'speech_backup.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'dart:convert';
@@ -47,6 +48,8 @@ class LibraryBackupService {
   final ReadingPublicationPreparer preparer;
   final Directory directory;
   static const maxBytes = 100 * 1024 * 1024;
+  PersonalFontStore get personalFonts =>
+      PersonalFontStore(Directory('${directory.parent.path}/personal_fonts'));
   static const coverPrefix = 'library_cover_';
 
   Future<List<dynamic>> _hiddenBooks() async {
@@ -119,6 +122,16 @@ class LibraryBackupService {
       coverEntries[book.id] = add(await file.readAsBytes(), 'png');
     }
     final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
+    final fontEntries = <Map<String, dynamic>>[];
+    for (final family in await personalFonts.load()) {
+      final bytes = await personalFonts.fileFor(family).readAsBytes();
+      final extension = PersonalFontStore.validate(bytes);
+      fontEntries.add({
+        'id': family['id'],
+        'label': family['label'],
+        'source': add(bytes, extension),
+      });
+    }
     final manifest = <String, dynamic>{
       'format': 'koofy-reader-backup',
       'version': 1,
@@ -131,6 +144,7 @@ class LibraryBackupService {
       'completion': await LibraryCompletionRepository(storage).load(),
       'hidden': await _hiddenBooks(),
       'displayCover': await storage.getInt(readerCoverSettingKey) != 0,
+      'personalFonts': fontEntries,
       'speech': SpeechBackup.validated(await speech?.export(), ids),
     };
     final encoded = utf8.encode(jsonEncode(manifest));
@@ -177,7 +191,7 @@ class LibraryBackupService {
           file.isSymbolicLink ||
           (file.name != 'manifest.json' &&
               !RegExp(
-                r'^payload/[0-9]+\.(txt|epub|png)$',
+                r'^payload/[0-9]+\.(txt|epub|png|otf|ttf)$',
               ).hasMatch(file.name)) ||
           files.containsKey(file.name)) {
         throw const FormatException('올바르지 않은 백업 파일 경로입니다.');
@@ -264,6 +278,27 @@ class LibraryBackupService {
     if (manifest['displayCover'] != null && manifest['displayCover'] is! bool) {
       throw const FormatException('표지 표시 설정이 올바르지 않습니다.');
     }
+    final fontEntries = manifest['personalFonts'] ?? [];
+    if (fontEntries is! List || fontEntries.length > PersonalFontStore.maxFonts) {
+      throw const FormatException('개인 글꼴 백업이 올바르지 않습니다.');
+    }
+    final fontIds = <String>{};
+    for (final raw in fontEntries) {
+      if (raw is! Map ||
+          raw['source'] is! String ||
+          raw['label'] is! String ||
+          (raw['label'] as String).length > 120) {
+        throw const FormatException('글꼴 백업 정보가 올바르지 않습니다.');
+      }
+      final bytes = files[raw['source']];
+      if (bytes == null) throw const FormatException('글꼴 파일이 누락되었습니다.');
+      PersonalFontStore.validate(bytes);
+      final id =
+          'personal_${sha256.convert(bytes).toString().substring(0, 32)}';
+      if (raw['id'] != id || !fontIds.add(id)) {
+        throw const FormatException('글꼴 식별자가 올바르지 않습니다.');
+      }
+    }
     manifest['speech'] = SpeechBackup.validated(manifest['speech'], ids);
     final state = Map<String, dynamic>.from(manifest['reader'] as Map);
     preferencesFromJson(state['preferences'] as String);
@@ -300,6 +335,21 @@ class LibraryBackupService {
 
   Future<int> restore(LibraryBackup backup) => LibraryMutations.run(() async {
     final manifest = backup.manifest;
+    // Install immutable font files before committing preferences that refer to them.
+    // Existing fonts are retained; retrying a partially completed restore is idempotent.
+    for (final raw in manifest['personalFonts'] as List? ?? []) {
+      await personalFonts.install(
+        backup.files[raw['source']]!,
+        raw['label'] as String,
+      );
+    }
+    final restoredReader = Map<String, dynamic>.from(manifest['reader'] as Map);
+    final prefs = preferencesFromJson(restoredReader['preferences'] as String);
+    if (prefs.fontId?.startsWith('personal_') == true &&
+        !(await personalFonts.load()).any((f) => f['id'] == prefs.fontId)) {
+      prefs.fontId = 'default';
+      restoredReader['preferences'] = preferencesToJson(prefs);
+    }
     final current = await books.getBooks();
     final currentIds = current.map((b) => b.id).toSet();
     final rawLocal = await storage.getString(AppConstants.localBooksKey);
@@ -387,28 +437,21 @@ class LibraryBackupService {
       final restoreCover = oldCover == null && manifest['displayCover'] is bool;
       var coverWritten = false;
       try {
-        await reader.mergeBackup(
-          Map<String, dynamic>.from(manifest['reader'] as Map),
-          allIds,
-          () async {
-            for (final entry in pending.entries) {
-              written.add(entry.key);
-              await storage.setString(entry.key, entry.value);
-            }
-            if (restoreCover) {
-              coverWritten = true;
-              await storage.setInt(
-                readerCoverSettingKey,
-                manifest['displayCover'] == true ? 1 : 0,
-              );
-            }
-            final listening = SpeechBackup.validated(
-              manifest['speech'],
-              allIds,
+        await reader.mergeBackup(restoredReader, allIds, () async {
+          for (final entry in pending.entries) {
+            written.add(entry.key);
+            await storage.setString(entry.key, entry.value);
+          }
+          if (restoreCover) {
+            coverWritten = true;
+            await storage.setInt(
+              readerCoverSettingKey,
+              manifest['displayCover'] == true ? 1 : 0,
             );
-            if (listening.isNotEmpty) await speech?.merge(listening);
-          },
-        );
+          }
+          final listening = SpeechBackup.validated(manifest['speech'], allIds);
+          if (listening.isNotEmpty) await speech?.merge(listening);
+        });
       } catch (_) {
         if (coverWritten) await storage.remove(readerCoverSettingKey);
         for (final key in written.reversed) {

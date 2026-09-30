@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/storage/library_mutations.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -105,7 +106,24 @@ class NativeReaderStore extends GeneratedDatabase {
       id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL,
       sequence INTEGER NOT NULL, preferences_json TEXT NOT NULL)''');
 
-  Future<ReaderPreferences> _loadGlobalPreferences() async {
+  /// Called only while the native reader is closed, under the library mutation lease.
+  Future<void> setGlobalFont(String id) => LibraryMutations.run(
+    () => transaction(() async {
+      final value = await loadGlobalPreferences();
+      value.fontId = id;
+      final json = preferencesToJson(value);
+      preferencesFromJson(json);
+      final row = await customSelect(
+        'SELECT generation FROM reader_counter WHERE id=1',
+      ).getSingle();
+      await customStatement(
+        'INSERT OR REPLACE INTO reader_preferences VALUES (1, ?, 0, ?)',
+        [row.read<int>('generation'), json],
+      );
+    }),
+  );
+
+  Future<ReaderPreferences> loadGlobalPreferences() async {
     final row = await customSelect(
       'SELECT preferences_json FROM reader_preferences WHERE id=1',
     ).getSingleOrNull();
@@ -176,7 +194,7 @@ class NativeReaderStore extends GeneratedDatabase {
     String publicationId,
     String revision,
   ) async {
-    final preferences = await _loadGlobalPreferences();
+    final preferences = await loadGlobalPreferences();
     final row = await customSelect(
       'SELECT locator_json, preferences_json, bookmarks_json FROM reader_positions WHERE publication_id=? AND content_revision=?',
       variables: [
@@ -213,7 +231,7 @@ class NativeReaderStore extends GeneratedDatabase {
       JOIN reader_sessions s ON p.session_id=s.session_id ORDER BY p.generation''',
         ).get();
         return {
-          'preferences': preferencesToJson(await _loadGlobalPreferences()),
+          'preferences': preferencesToJson(await loadGlobalPreferences()),
           'positions': [
             for (final row in rows)
               if (bookIds.contains(row.read<String>('publication_id')))
@@ -400,7 +418,9 @@ String preferencesToJson(ReaderPreferences value) {
             'maplestory',
             'hakgyoansim-siganpyo',
           ].contains(value.fontId ?? 'default') &&
-          !RegExp(r'^remote_[a-f0-9]{32}$').hasMatch(value.fontId ?? ''))) {
+          !RegExp(
+            r'^(remote|personal)_[a-f0-9]{32}$',
+          ).hasMatch(value.fontId ?? ''))) {
     throw const FormatException('지원하지 않는 독서 설정입니다.');
   }
   return jsonEncode({

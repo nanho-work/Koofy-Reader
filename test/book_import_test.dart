@@ -115,6 +115,7 @@ void main() {
       );
       expect(result.added, 10);
       expect(result.addedIds, hasLength(10));
+      expect(result.importedIds.toSet(), result.addedIds.toSet());
       expect(
         result.addedIds.toSet(),
         (await repository.getBooks())
@@ -133,6 +134,13 @@ void main() {
       expect(retry.added, 0);
       expect(retry.addedIds, isEmpty);
       expect(retry.existing, 1);
+      expect(retry.importedIds, [result.addedIds.first]);
+      expect(
+        (await repository.getBooks())
+            .firstWhere((b) => b.id == result.addedIds.first)
+            .matchingFileName,
+        '1화.txt',
+      );
     },
   );
 }

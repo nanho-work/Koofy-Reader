@@ -55,7 +55,7 @@ final class RunnerTests: XCTestCase {
         let file = root.appendingPathComponent("test/fixtures/reader-display-cover.epub")
         let ready = expectation(description: "Cover ready")
         var events: [ReaderEvent] = []
-        let preferences = ReaderPreferences(fontScale: 1, columnCount: 2, scroll: false, theme: "light", pageTurnStyle: "instant")
+        let preferences = ReaderPreferences(fontScale: 1, columnCount: 1, scroll: false, theme: "light", pageTurnStyle: "instant")
         let reader = KoofyReaderViewController(request: ReaderLaunchRequest(protocolVersion: 1,
             sessionId: "display-cover", sessionGeneration: 1, publicationId: "cover", contentRevision: "body-v1",
             filePath: file.path, title: "표지 테스트", preferences: preferences),
@@ -72,14 +72,14 @@ final class RunnerTests: XCTestCase {
         defer { navigation.dismiss(animated: false) }
         await fulfillment(of: [ready], timeout: 35)
         func active() throws -> EPUBNavigatorViewController { try XCTUnwrap(reader.children.compactMap { $0 as? EPUBNavigatorViewController }.first) }
-        func onCover() -> Bool { events.last?.locatorJson?.contains("__koofy_reader_cover_v1__") == true }
+        func onCover() -> Bool { events.last?.locatorJson.flatMap { try? Locator(jsonString: $0) }.map(isReaderDisplayCover) == true }
         func waitCover(_ expected: Bool) async throws {
             for _ in 0..<100 { if onCover() == expected { return }; try await Task.sleep(nanoseconds: 100_000_000) }
             XCTFail("Cover navigation did not settle")
         }
         XCTAssertTrue(onCover())
         let nav = try active()
-        let onePage = try await nav.evaluateJavaScript("getComputedStyle(document.documentElement).columnCount === '1' && document.documentElement.scrollWidth <= innerWidth + 2 && document.querySelector('img').naturalWidth > 0").get()
+        let onePage = try await nav.evaluateJavaScript("getComputedStyle(document.documentElement).columnCount === '1' && document.body.hasAttribute('data-koofy-cover') && getComputedStyle(document.body,'::before').backgroundImage.includes('image.png')").get()
         XCTAssertEqual(onePage as? Bool, true)
         let target = try Locator(jsonString: XCTUnwrap(events.last?.locatorJson))
         let start = try await speechStart(publication: nav.publication, target: target)
@@ -118,6 +118,18 @@ final class RunnerTests: XCTestCase {
         try await waitCover(false)
         let bodyController = try await waitForCurl(in: reader)
         XCTAssertEqual(bodyController.frames.current.columns, reader.view.bounds.width >= 700 ? 2 : 1)
+        if reader.view.bounds.width >= 700 {
+            var spread = preferences; spread.columnCount = 2
+            try await applyForCurlTest(spread, to: reader)
+            try await move(target)
+            let spreadNav = try active()
+            let geometry = try await spreadNav.evaluateJavaScript("JSON.stringify({columns:parseInt(getComputedStyle(document.documentElement).columnCount),x:document.querySelector('p').getBoundingClientRect().left,width:innerWidth})").get() as? String
+            let data = try XCTUnwrap(geometry?.data(using: .utf8))
+            let rect = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Double])
+            XCTAssertEqual(rect["columns"], 2)
+            XCTAssertGreaterThan(try XCTUnwrap(rect["x"]), try XCTUnwrap(rect["width"]) / 2 - 2)
+            XCTAssertFalse(onCover(), "Spread must expose body text beside the cover")
+        }
         let completion: Result<Void, Error> = await withCheckedContinuation { c in reader.close { c.resume(returning: $0) } }
         try completion.get()
     }

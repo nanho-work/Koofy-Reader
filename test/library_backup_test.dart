@@ -120,6 +120,36 @@ LibraryBackupService serviceWithSpeech(
 );
 
 void main() {
+  test(
+    'personal font files and selected identity roundtrip in library backup',
+    () async {
+      final source = BackupFixture(
+        await Directory.systemTemp.createTemp('font-backup-src'),
+      );
+      final target = BackupFixture(
+        await Directory.systemTemp.createTemp('font-backup-dst'),
+      );
+      addTearDown(source.dispose);
+      addTearDown(target.dispose);
+      final bytes = await File(
+        'assets/fonts/Maplestory OTF Light.otf',
+      ).readAsBytes();
+      final id = await source.service.personalFonts.install(bytes, '나의 글꼴.otf');
+      await source.reader.setGlobalFont(id);
+      final zip = File('${source.root.path}/font.zip');
+      await zip.writeAsBytes(await source.service.export());
+      await target.service.restore(await LibraryBackupService.read(zip));
+      expect((await target.reader.loadGlobalPreferences()).fontId, id);
+      final restored = (await target.service.personalFonts.load()).single;
+      expect(
+        await target.service.personalFonts.fileFor(restored).readAsBytes(),
+        bytes,
+      );
+      await target.service.restore(await LibraryBackupService.read(zip));
+      expect(await target.service.personalFonts.load(), hasLength(1));
+    },
+  );
+
   TestWidgetsFlutterBinding.ensureInitialized();
   late BackupFixture source;
   late BackupFixture target;
@@ -290,6 +320,8 @@ void main() {
       final book = (await target.books.getBooks()).firstWhere(
         (b) => b.id == bookId,
       );
+      expect(book.matchingFileName, '1화.txt');
+      expect(book.importSourcePath, isNull);
       expect(await File(book.localPath!).readAsString(), contains('가나다라'));
       expect(await File(book.coverPath!).exists(), isTrue);
       expect(
