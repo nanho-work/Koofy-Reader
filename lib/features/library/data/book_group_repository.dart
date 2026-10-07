@@ -23,7 +23,11 @@ final bookGroupsProvider = FutureProvider<List<BookGroup>>((ref) async {
   final results = await Future.wait<Object>([booksFuture, groupsFuture]);
   final books = results[0] as List<Book>;
   final ids = books.map((book) => book.id).toSet();
+  final hiddenGroups = await LibraryTrashStore(
+    ref.read(localStorageProvider),
+  ).hiddenGroupIds();
   final groups = (results[1] as List<BookGroup>)
+      .where((group) => !hiddenGroups.contains(group.id))
       .map(
         (group) =>
             group.copyWith(bookIds: group.bookIds.where(ids.contains).toList()),
@@ -155,6 +159,72 @@ class BookGroupRepository {
     return _change((groups) {
       groups.removeAt(_index(groups, id));
     }, removed: [id]);
+  });
+
+  Future<void> trashGroup(String id, {required bool keepShelf}) =>
+      _serial(() async {
+        final groups = await load();
+        final group = groups[_index(groups, id)];
+        final trash = LibraryTrashStore(storage);
+        final hidden = await trash.hiddenBookIds();
+        final ids = group.bookIds.where((id) => !hidden.contains(id)).toList();
+        if (keepShelf && ids.isEmpty) return;
+        await trash.keepBundle(group, ids, keepShelf: keepShelf);
+        await _change((groups) {
+          final index = _index(groups, id);
+          if (keepShelf) {
+            groups[index] = groups[index].copyWith(bookIds: []);
+          } else {
+            groups.removeAt(index);
+          }
+        });
+      });
+
+  Future<void> restoreBundle(String entryId) => _serial(() async {
+    final trash = LibraryTrashStore(storage);
+    final data = await trash.load();
+    final entry = data[entryId];
+    if (entry == null) return;
+    if (entry['deleting'] == true) throw StateError('영구 삭제 중인 항목은 복원할 수 없습니다.');
+    final group = BookGroup.fromJson(
+      Map<String, dynamic>.from(entry['group'] as Map),
+    );
+    final available = (await LocalBookRepository(
+      storage,
+    ).allStoredBooks()).map((book) => book.id).toSet();
+    await _change((groups) {
+      final index = groups.indexWhere((value) => value.id == group.id);
+      final occupied = groups
+          .where((value) => value.id != group.id)
+          .expand((value) => value.bookIds)
+          .toSet();
+      final prior = index < 0 ? group.copyWith(bookIds: []) : groups[index];
+      final ids = <String>{
+        ...group.bookIds.where(
+          (id) => available.contains(id) && !occupied.contains(id),
+        ),
+        ...prior.bookIds,
+      };
+      final restored = prior.copyWith(bookIds: ids.toList());
+      if (index < 0) {
+        groups.add(restored);
+      } else {
+        groups[index] = restored;
+      }
+    });
+    await trash.forget(entryId);
+  });
+
+  Future<void> finishTrashedGroup(String id) async {
+    await _change((groups) => groups.removeWhere((group) => group.id == id));
+  }
+
+  Future<void> forgetBooks(Set<String> ids) => _change((groups) {
+    for (var i = 0; i < groups.length; i++) {
+      groups[i] = groups[i].copyWith(
+        bookIds: groups[i].bookIds.where((id) => !ids.contains(id)).toList(),
+      );
+    }
   });
 
   Future<void> restoreGroup(BookGroup group, Set<String> availableIds) =>

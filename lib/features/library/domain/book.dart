@@ -10,6 +10,7 @@ class Book {
     this.assetPath,
     this.localPath,
     this.coverPath,
+    this.coverAssetPath,
     this.importSourcePath,
     this.sourceHash,
     this.originalFileName,
@@ -21,6 +22,7 @@ class Book {
     required String author,
     required String description,
     required String assetPath,
+    String? coverAssetPath,
   }) {
     return Book(
       id: id,
@@ -29,6 +31,7 @@ class Book {
       description: description,
       sourceType: BookSourceType.asset,
       assetPath: assetPath,
+      coverAssetPath: coverAssetPath,
     );
   }
 
@@ -66,6 +69,9 @@ class Book {
   final String? localPath;
   final String? coverPath;
 
+  /// Bundled default; a personal file cover takes precedence.
+  final String? coverAssetPath;
+
   /// Original picker identity for duplicate selection; never used to read a book.
   final String? importSourcePath;
   final String? sourceHash;
@@ -86,6 +92,7 @@ class Book {
     assetPath: assetPath,
     localPath: localPath,
     coverPath: path,
+    coverAssetPath: coverAssetPath,
     importSourcePath: importSourcePath,
     sourceHash: sourceHash,
     originalFileName: originalFileName,
@@ -101,6 +108,7 @@ class Book {
       'assetPath': assetPath,
       'localPath': localPath,
       'coverPath': coverPath,
+      'coverAssetPath': coverAssetPath,
       'importSourcePath': importSourcePath,
       'sourceHash': sourceHash,
       'originalFileName': matchingFileName,
@@ -142,6 +150,9 @@ class Book {
           : null,
       coverPath: json['coverPath'] is String
           ? json['coverPath'] as String
+          : null,
+      coverAssetPath: json['coverAssetPath'] is String
+          ? json['coverAssetPath'] as String
           : null,
       importSourcePath: json['importSourcePath'] is String
           ? json['importSourcePath'] as String

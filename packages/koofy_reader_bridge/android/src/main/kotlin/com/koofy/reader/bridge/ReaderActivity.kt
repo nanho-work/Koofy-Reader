@@ -471,6 +471,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
+        if (session.ready && session.request.publicationId == "sample_mermaid_001" &&
+            url.toString() == "koofy-reader://catalog/mermaid") {
+            closeReader(downloadSeries = true)
+            return
+        }
         Toast.makeText(this, "외부 링크는 독서 화면에서 열지 않습니다.", Toast.LENGTH_SHORT).show()
     }
 
@@ -840,7 +845,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::turnHost.isInitialized) turnHost.selecting = false
     }
 
-    fun closeReader(nextBook: Boolean = false, manageFonts: Boolean = false) {
+    fun closeReader(nextBook: Boolean = false, manageFonts: Boolean = false, downloadSeries: Boolean = false) {
         if (!::session.isInitialized || session.closing) return
         speech?.pause()
         translation?.suspend()
@@ -853,7 +858,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             // If closing follows a settled page callback, finish its DOM read.
             // During a relayout retain the canonical pre-layout anchor.
             captureJob?.join()
-            ReaderRuntime.emit(session.event("closed", message = if (manageFonts) "manageFonts" else if (nextBook) "nextBook" else null)) { result ->
+            ReaderRuntime.emit(session.event("closed", message = if (manageFonts) "manageFonts" else if (nextBook) "nextBook" else if (downloadSeries) "downloadSeries" else null)) { result ->
                 if (result.isSuccess) {
                     if (ReaderRuntime.session === session) ReaderRuntime.session = null
                     finish()
@@ -861,7 +866,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     session.closing = false
                     AlertDialog.Builder(this@ReaderActivity).setTitle("읽기 기록 저장 실패")
                         .setMessage("기기 저장 공간을 확인한 뒤 다시 시도해 주세요.")
-                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook, manageFonts) }
+                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook, manageFonts, downloadSeries) }
                         .setNegativeButton("계속 읽기", null).show()
                 }
             }

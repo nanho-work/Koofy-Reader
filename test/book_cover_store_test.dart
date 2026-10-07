@@ -123,27 +123,31 @@ void main() {
   );
 
   test('replacement and reset clean up only managed cover files', () async {
-    await repository.setBookCover('sample_1', source.path);
+    await repository.setBookCover('sample_mermaid_001', source.path);
     final first = (await repository.getBooks()).first;
-    await repository.setBookCover('sample_1', source.path);
+    await repository.setBookCover('sample_mermaid_001', source.path);
     final second = (await repository.getBooks()).first;
     expect(second.coverPath, isNot(first.coverPath));
     expect(await File(first.coverPath!).exists(), isFalse);
     expect(await source.exists(), isTrue);
-    await repository.resetBookCover('sample_1');
+    await repository.resetBookCover('sample_mermaid_001');
     expect((await repository.getBooks()).first.coverPath, isNull);
+    expect(
+      (await repository.getBooks()).first.coverAssetPath,
+      'assets/books/sample_mermaid_001.jpg',
+    );
     expect(await File(second.coverPath!).exists(), isFalse);
     expect(await source.exists(), isTrue);
   });
 
   test('invalid and oversized images leave current cover intact', () async {
-    await repository.setBookCover('sample_1', source.path);
+    await repository.setBookCover('sample_mermaid_001', source.path);
     final before = (await repository.getBooks()).first.coverPath;
     final invalid = await File(
       '${temporary.path}/invalid.jpg',
     ).writeAsString('not an image');
     await expectLater(
-      repository.setBookCover('sample_1', invalid.path),
+      repository.setBookCover('sample_mermaid_001', invalid.path),
       throwsA(anything),
     );
     final large = await File(
@@ -152,7 +156,10 @@ void main() {
     await large.truncate(BookCoverStore.maxBytes + 1);
     await large.close();
     await expectLater(
-      repository.setBookCover('sample_1', '${temporary.path}/large.png'),
+      repository.setBookCover(
+        'sample_mermaid_001',
+        '${temporary.path}/large.png',
+      ),
       throwsFormatException,
     );
     expect((await repository.getBooks()).first.coverPath, before);

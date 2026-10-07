@@ -54,11 +54,13 @@ final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
 ) async {
   final repository = ref.watch(readerCatalogProvider);
   // Local deletion must immediately make a downloaded book available again.
-  if (kind == 'book') ref.watch(booksProvider);
+  if (kind == 'book' || kind.startsWith('series:')) ref.watch(booksProvider);
   final items = await ref.watch(catalogItemsProvider(kind).future);
   final installed = <String>{};
   for (final item in items) {
-    if (await repository.isInstalled(item)) installed.add(catalogItemKey(item));
+    if (item.kind != 'series' && await repository.isInstalled(item)) {
+      installed.add(catalogItemKey(item));
+    }
   }
   return installed;
 });
@@ -96,6 +98,9 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
           );
       ref.invalidate(booksProvider);
       ref.invalidate(catalogInstalledProvider(item.kind));
+      if (item.seriesId != null) {
+        ref.invalidate(catalogInstalledProvider('series:${item.seriesId}'));
+      }
     } finally {
       state = const CatalogDownloadState();
     }
@@ -107,6 +112,11 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
 final catalogFontPreviewProvider = FutureProvider.autoDispose
     .family<Uint8List?, CatalogItem>((ref, item) {
       return ref.watch(readerCatalogProvider).fontPreview(item);
+    });
+
+final catalogCoverProvider = FutureProvider.autoDispose
+    .family<Uint8List?, CatalogItem>((ref, item) {
+      return ref.watch(readerCatalogProvider).coverPreview(item);
     });
 
 class CatalogException implements Exception {
@@ -152,6 +162,11 @@ class CatalogItem {
       license = json['license'] as String,
       category = json['category'] as String? ?? '기타',
       source = json['source'] as String? ?? '',
+      seriesId = json['seriesId'] as String?,
+      episodeNumber = json['episodeNumber'] as int?,
+      episodeTitle = json['episodeTitle'] as String?,
+      seriesStatus = json['seriesStatus'] as String? ?? 'ongoing',
+      episodeCount = json['episodeCount'] as int? ?? 0,
       preview = json['preview'] is Map<String, dynamic>
           ? CatalogAsset.fromJson(json['preview'] as Map<String, dynamic>)
           : null,
@@ -162,11 +177,23 @@ class CatalogItem {
       ) {
     if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(id) ||
         version < 1 ||
-        !const ['book', 'font'].contains(kind) ||
+        !const ['book', 'font', 'series'].contains(kind) ||
         title.trim().isEmpty ||
         assets.isEmpty ||
         assets.length > 9) {
       throw const FormatException('올바르지 않은 콘텐츠 정보입니다.');
+    }
+    if ((seriesId != null &&
+            (kind != 'book' ||
+                !RegExp(r'^[a-f0-9]{32}$').hasMatch(seriesId!) ||
+                episodeNumber == null ||
+                episodeNumber! < 1 ||
+                episodeTitle == null ||
+                episodeTitle!.trim().isEmpty)) ||
+        (seriesId == null && episodeNumber != null) ||
+        episodeCount < 0 ||
+        !const ['ongoing', 'completed'].contains(seriesStatus)) {
+      throw const FormatException('올바르지 않은 회차 정보입니다.');
     }
     if (preview != null &&
         (kind != 'font' ||
@@ -176,7 +203,9 @@ class CatalogItem {
     }
     for (final entry in assets.entries) {
       final asset = entry.value;
-      final valid = kind == 'book'
+      final valid = kind == 'series'
+          ? entry.key == 'cover' && asset.extension == 'webp'
+          : kind == 'book'
           ? (entry.key == 'epub' && asset.extension == 'epub') ||
                 (entry.key == 'txt' && asset.extension == 'txt') ||
                 (entry.key == 'cover' && asset.extension == 'webp')
@@ -195,6 +224,13 @@ class CatalogItem {
   final int version;
   final Map<String, CatalogAsset> assets;
   final CatalogAsset? preview;
+  final String? seriesId, episodeTitle;
+  final int? episodeNumber;
+  final int episodeCount;
+  final String seriesStatus;
+  String get seriesStatusLabel => seriesStatus == 'completed' ? '완결' : '연재 중';
+  String get displayTitle =>
+      seriesId == null ? title : '$episodeNumber화 · $episodeTitle';
   String get bookId => 'catalog_${id}_$version';
   String get fontId => 'remote_$id';
   int get totalSize => assets.values.fold(0, (sum, asset) => sum + asset.size);
@@ -271,9 +307,12 @@ class ReaderCatalog {
   }
 
   Future<CatalogPage> list(String kind, {String? after}) async {
+    final seriesId = kind.startsWith('series:') ? kind.substring(7) : null;
     final data = await _json({
-      'kind': kind,
-      if (kind == 'book') 'supportsTxt': '1',
+      'kind': seriesId != null ? 'book' : kind,
+      if (kind == 'book' || seriesId != null) 'supportsTxt': '1',
+      if (kind == 'book') 'supportsSeries': '1',
+      if (seriesId != null) 'seriesId': seriesId,
       if (after != null) 'after': after,
     });
     return CatalogPage(
@@ -299,6 +338,7 @@ class ReaderCatalog {
   }
 
   Future<bool> isInstalled(CatalogItem item) async {
+    if (item.kind == 'series') return false;
     if (item.kind == 'book') {
       final matches = (await books.getBooks()).where(
         (book) => book.id == item.bookId,
@@ -410,10 +450,25 @@ class ReaderCatalog {
     return file.readAsBytes();
   }
 
+  Future<Uint8List?> coverPreview(CatalogItem item) async {
+    if (item.kind != 'series') return null;
+    final root = await _root();
+    final file = await _download(
+      item,
+      'cover',
+      Directory('${root.path}/previews'),
+      (_) {},
+    );
+    return file.readAsBytes();
+  }
+
   Future<void> install(
     CatalogItem item, {
     void Function(double)? progress,
   }) async {
+    if (item.kind == 'series') {
+      throw const CatalogException('작품 안에서 내려받을 회차를 선택해 주세요.');
+    }
     if (_installing) throw const CatalogException('진행 중인 다운로드를 기다려 주세요.');
     _installing = true;
     try {

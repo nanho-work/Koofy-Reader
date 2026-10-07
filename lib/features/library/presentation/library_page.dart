@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/application/cover_matching.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
@@ -351,17 +352,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       horizontal: 20,
                       vertical: 6,
                     ),
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.download_outlined),
-                      label: const Text('도서·글꼴 다운로드'),
-                      onPressed: () =>
-                          Navigator.pushNamed(context, AppRoutes.catalog),
-                    ),
+                    child: _libraryActions(context, wide: false),
                   ),
                 ),
               ],
               if (books.isNotEmpty || groups.isNotEmpty) shelf,
-              const SliverToBoxAdapter(child: SizedBox(height: 28)),
+              SliverToBoxAdapter(
+                child: SizedBox(height: 28 + AdOverlayInsets.bottomOf(context)),
+              ),
             ],
           ),
         );
@@ -401,19 +399,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         horizontal: 24,
                         vertical: 8,
                       ),
-                      child: Semantics(
-                        expanded: _downloadsExpanded,
-                        child: OutlinedButton.icon(
-                          key: const ValueKey('toggle-downloads'),
-                          onPressed: () => _showDownloads(!_downloadsExpanded),
-                          icon: Icon(
-                            _downloadsExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                          ),
-                          label: const Text('도서·글꼴 다운로드'),
-                        ),
-                      ),
+                      child: _libraryActions(context, wide: true),
                     ),
                   ),
                   SliverLayoutBuilder(
@@ -437,6 +423,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       ),
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: AdOverlayInsets.bottomOf(context)),
+                  ),
                 ],
               ),
             ),
@@ -445,6 +434,55 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ],
         );
       },
+    );
+  }
+
+  Widget _libraryActions(BuildContext context, {required bool wide}) {
+    final download = OutlinedButton.icon(
+      key: wide
+          ? const ValueKey('toggle-downloads')
+          : const ValueKey('open-downloads'),
+      onPressed: () => wide
+          ? _showDownloads(!_downloadsExpanded)
+          : Navigator.pushNamed(context, AppRoutes.catalog),
+      icon: Icon(
+        wide && _downloadsExpanded
+            ? Icons.expand_less
+            : Icons.download_outlined,
+        size: 18,
+      ),
+      label: const Text('도서·글꼴 다운로드'),
+    );
+    final add = OutlinedButton.icon(
+      key: const ValueKey('add-books'),
+      onPressed: _importing || _updatingCover ? null : _importBook,
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text('책 추가'),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, box) {
+            final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            if (box.maxWidth < 280 * scale) {
+              return Wrap(spacing: 8, runSpacing: 8, children: [download, add]);
+            }
+            return Row(
+              children: [
+                Expanded(child: download),
+                const SizedBox(width: 8),
+                add,
+              ],
+            );
+          },
+        ),
+        if (_importing)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_importProgress),
+          ),
+      ],
     );
   }
 
@@ -637,13 +675,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           : _batchCovers,
                       icon: const Icon(Icons.collections_outlined, size: 18),
                       label: const Text('표지 일괄 등록'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _importing || _updatingCover
-                          ? null
-                          : _importBook,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(_importing ? _importProgress : '책 가져오기'),
                     ),
                   ],
                 ),
@@ -916,7 +947,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ),
               ListTile(
                 leading: const Icon(Icons.add_photo_alternate_outlined),
-                title: Text(book.coverPath == null ? '표지 이미지 등록' : '표지 이미지 변경'),
+                title: Text(
+                  book.coverPath == null && book.coverAssetPath == null
+                      ? '표지 이미지 등록'
+                      : '표지 이미지 변경',
+                ),
                 enabled: !_updatingCover,
                 onTap: () => Navigator.pop(context, 'cover'),
               ),
@@ -924,7 +959,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ListTile(
                   leading: const Icon(Icons.restore),
                   title: const Text('표지 초기화'),
-                  subtitle: const Text('제목이 표시되는 기본 표지로 되돌립니다.'),
+                  subtitle: Text(
+                    book.coverAssetPath != null
+                        ? '처음 제공된 표지로 되돌립니다.'
+                        : '제목이 표시되는 기본 표지로 되돌립니다.',
+                  ),
                   enabled: !_updatingCover,
                   onTap: () => Navigator.pop(context, 'resetCover'),
                 ),

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/backup/data/speech_backup.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'package:koofy_reader/features/library/data/library_trash_store.dart';
@@ -223,6 +224,31 @@ void main() {
     await source.dispose();
     await target.dispose();
   });
+
+  test(
+    'bundled covers, hidden samples and legacy book survive backup restore',
+    () async {
+      await source.storage.setString(BundledBooks.retainLegacyKey, 'true');
+      await source.books.removeBookFromLibrary(BundledBooks.mermaidId);
+      final backup = LibraryBackupService.decode(await source.service.export());
+      await target.service.restore(backup);
+      final books = await target.books.getBooks();
+      expect(books.map((book) => book.id), contains('sample_1'));
+      expect(
+        books.map((book) => book.id),
+        isNot(contains(BundledBooks.mermaidId)),
+      );
+      expect(
+        books.singleWhere((book) => book.id == 'sample_2').coverAssetPath,
+        BundledBooks.guide.coverAssetPath,
+      );
+      expect(
+        await target.storage.getString(BundledBooks.retainLegacyKey),
+        'true',
+      );
+      expect(await target.service.restore(backup), 0);
+    },
+  );
 
   test(
     'speech and cover settings roundtrip; missing legacy fields and existing device preference survive',

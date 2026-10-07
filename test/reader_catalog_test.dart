@@ -41,6 +41,8 @@ void main() {
   late LocalBookRepository books;
   var corrupt = false;
   var textBooks = false;
+  var seriesCatalog = false;
+  Map<String, String> lastListQuery = {};
   final requestedSlots = <String>[];
   String? requestedTxtSupport;
   final files = {
@@ -84,6 +86,8 @@ void main() {
     books = LocalBookRepository(MemoryStorage());
     corrupt = false;
     textBooks = false;
+    seriesCatalog = false;
+    lastListQuery = {};
     requestedTxtSupport = null;
     requestedSlots.clear();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -102,11 +106,30 @@ void main() {
           }),
         );
       } else {
+        lastListQuery = request.uri.queryParameters;
         requestedTxtSupport = request.uri.queryParameters['supportsTxt'];
+        final parent = request.uri.queryParameters['seriesId'];
+        final responseItem = seriesCatalog
+            ? parent == null
+                  ? {
+                      ...itemJson('series'),
+                      'assets': {'cover': asset('cover')},
+                      'episodeCount': 40,
+                      'seriesStatus': 'ongoing',
+                    }
+                  : {
+                      ...itemJson('book'),
+                      'id': 'b' * 32,
+                      'title': '테스트 40화 — 마지막 파도',
+                      'seriesId': parent,
+                      'episodeNumber': 40,
+                      'episodeTitle': '마지막 파도',
+                    }
+            : itemJson(request.uri.queryParameters['kind']!);
         request.response.headers.contentType = ContentType.json;
         request.response.write(
           jsonEncode({
-            'items': [itemJson(request.uri.queryParameters['kind']!)],
+            'items': [responseItem],
             'nextCursor': null,
           }),
         );
@@ -124,6 +147,59 @@ void main() {
     await server.close(force: true);
     await directory.delete(recursive: true);
   });
+
+  test(
+    'series and episode requests preserve grouping and full library titles',
+    () async {
+      seriesCatalog = true;
+      final series = (await catalog.list('book')).items.single;
+      expect(lastListQuery['supportsSeries'], '1');
+      expect(series.kind, 'series');
+      expect(series.episodeCount, 40);
+      expect(await catalog.coverPreview(series), files['cover']);
+      expect(await catalog.coverPreview(series), files['cover']);
+      expect(requestedSlots, ['cover']);
+      expect(await catalog.isInstalled(series), false);
+      await expectLater(
+        catalog.install(series),
+        throwsA(isA<CatalogException>()),
+      );
+      final episode = (await catalog.list('series:${series.id}')).items.single;
+      expect(lastListQuery, {
+        'kind': 'book',
+        'supportsTxt': '1',
+        'seriesId': series.id,
+      });
+      expect(episode.displayTitle, '40화 · 마지막 파도');
+      await catalog.install(episode);
+      expect(
+        (await books.getBooks())
+            .singleWhere((book) => book.id == episode.bookId)
+            .title,
+        '테스트 40화 — 마지막 파도',
+      );
+    },
+  );
+
+  test(
+    'series cover checksum failure cannot create an installed book',
+    () async {
+      seriesCatalog = true;
+      final series = (await catalog.list('book')).items.single;
+      corrupt = true;
+      await expectLater(
+        catalog.coverPreview(series),
+        throwsA(isA<CatalogException>()),
+      );
+      expect(await catalog.isInstalled(series), false);
+      expect(
+        (await books.getBooks()).where(
+          (book) => book.id.startsWith('catalog_'),
+        ),
+        isEmpty,
+      );
+    },
+  );
 
   test(
     'preview fetches only a PNG and reuses its verified cache without installing fonts',

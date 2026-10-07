@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/app_footer_ad_shell.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -61,6 +62,7 @@ Future<void> pumpLibrary(
   List<NativeLibraryPosition> Function()? nativePositions,
   bool realCompletion = false,
   List<CatalogItem> catalog = const [],
+  Widget? overlayBanner,
 }) async {
   const captureDirectory = String.fromEnvironment('LIBRARY_CAPTURE_DIR');
   if (captureDirectory.isNotEmpty) {
@@ -115,7 +117,12 @@ Future<void> pumpLibrary(
             displayFeatures: features,
             platformBrightness: brightness,
           ),
-          child: RepaintBoundary(key: const ValueKey('capture'), child: child!),
+          child: RepaintBoundary(
+            key: const ValueKey('capture'),
+            child: overlayBanner == null
+                ? child!
+                : AppBannerOverlay(banner: overlayBanner, child: child!),
+          ),
         ),
         home: const LibraryPage(),
         onGenerateRoute: (settings) {
@@ -157,6 +164,87 @@ Future<void> capture(WidgetTester tester, String name) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final size in [
+    const Size(320, 700),
+    const Size(390, 844),
+    const Size(840, 900),
+  ]) {
+    testWidgets(
+      'download and add share one row and book menu is on cover top at $size',
+      (tester) async {
+        await pumpLibrary(tester, size: size);
+        await tester.pumpAndSettle();
+        final add = find.byKey(const ValueKey('add-books'));
+        final download = find.byKey(
+          ValueKey(size.width >= 720 ? 'toggle-downloads' : 'open-downloads'),
+        );
+        expect(
+          tester.getCenter(add).dy,
+          closeTo(tester.getCenter(download).dy, 1),
+        );
+        expect(find.text('책 가져오기'), findsNothing);
+        final tile = find.byKey(const ValueKey('b0'));
+        await tester.scrollUntilVisible(
+          tile,
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('library-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final cover = find.descendant(
+          of: tile,
+          matching: find.byType(BookCover),
+        );
+        final more = find.descendant(
+          of: tile,
+          matching: find.byTooltip('${demoBooks[0].title} 더보기'),
+        );
+        expect(
+          tester.getCenter(more).dy,
+          lessThan(tester.getTopLeft(cover).dy + 50),
+        );
+        expect(
+          tester.getCenter(more).dx,
+          greaterThan(tester.getCenter(cover).dx),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('library end remains reachable above the floating ad', (
+    tester,
+  ) async {
+    const adKey = ValueKey('preview-ad');
+    await pumpLibrary(
+      tester,
+      overlayBanner: const ColoredBox(key: adKey, color: Colors.blue),
+    );
+    await tester.pumpAndSettle();
+    final scroll = tester
+        .widget<CustomScrollView>(
+          find.byKey(const PageStorageKey('library-scroll')),
+        )
+        .controller!;
+    scroll.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    // Lazy grid estimates settle after the last row has been laid out.
+    scroll.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    final tiles = find.byType(BookTile).evaluate();
+    final lastBottom = tiles
+        .map(
+          (element) => tester.getBottomLeft(find.byWidget(element.widget)).dy,
+        )
+        .reduce((a, b) => a > b ? a : b);
+    expect(lastBottom, lessThan(tester.getTopLeft(find.byKey(adKey)).dy));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [390.0, 840.0]) {
     testWidgets(
       'resume uses group cover without changing member book at $width',

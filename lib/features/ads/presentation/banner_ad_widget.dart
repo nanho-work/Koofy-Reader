@@ -5,7 +5,8 @@ import '../config/levelplay_ids.dart';
 import '../data/levelplay_service.dart';
 
 class BannerAdWidget extends StatefulWidget {
-  const BannerAdWidget({super.key});
+  const BannerAdWidget({super.key, this.showStatusMessages = true});
+  final bool showStatusMessages;
   @override
   State<BannerAdWidget> createState() => _BannerAdWidgetState();
 }
@@ -64,32 +65,38 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       if (constraints.maxWidth < 320) return const SizedBox(height: 50);
-      return SizedBox(
-        height: 50,
-        child: Center(
+      return IgnorePointer(
+        ignoring: !widget.showStatusMessages && !_loaded,
+        child: Opacity(
+          opacity: widget.showStatusMessages || _loaded ? 1 : 0,
           child: SizedBox(
-            width: 320,
             height: 50,
-            child: Stack(
-              children: [
-                if (!_loaded)
-                  Center(
-                    child: Text(
-                      _message,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                if (_ready)
-                  LevelPlayBannerAdView(
-                    key: _key,
-                    adUnitId: LevelPlayIds.libraryBanner,
-                    adSize: LevelPlayAdSize.BANNER,
-                    listener: this,
-                    onPlatformViewCreated: () {
-                      unawaited(_key.currentState?.loadAd());
-                    },
-                  ),
-              ],
+            child: Center(
+              child: SizedBox(
+                width: 320,
+                height: 50,
+                child: Stack(
+                  children: [
+                    if (!_loaded)
+                      Center(
+                        child: Text(
+                          _message,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    if (_ready)
+                      LevelPlayBannerAdView(
+                        key: _key,
+                        adUnitId: LevelPlayIds.libraryBanner,
+                        adSize: LevelPlayAdSize.BANNER,
+                        listener: this,
+                        onPlatformViewCreated: () {
+                          unawaited(_key.currentState?.loadAd());
+                        },
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -114,7 +121,9 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
 
   @override
   void onAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error) {
-    debugPrint('KoofyAds library_banner display_failed code=${error.errorCode}');
+    debugPrint(
+      'KoofyAds library_banner display_failed code=${error.errorCode}',
+    );
     if (mounted) {
       setState(() {
         _loaded = false;
@@ -122,6 +131,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
       });
     }
   }
+
   @override
   void onAdDisplayed(LevelPlayAdInfo adInfo) {}
   @override

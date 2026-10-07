@@ -176,14 +176,14 @@ extension _LibraryGroups on _LibraryPageState {
           groupId: group.id,
           onOpen: _openReader,
           onBookMenu: _bookMenu,
-          onGroupMenu: _groupMenu,
+          onGroupMenu: (group) => _groupMenu(group, inside: true),
           onAdd: _addGroupBooks,
         ),
       ),
     );
   }
 
-  Future<void> _groupMenu(BookGroup group) async {
+  Future<void> _groupMenu(BookGroup group, {bool inside = false}) async {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -221,6 +221,20 @@ extension _LibraryGroups on _LibraryPageState {
                   onTap: () => Navigator.pop(context, 'reset'),
                 ),
               ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('묶음책 삭제'),
+                subtitle: const Text('묶음과 안의 책을 함께 휴지통으로 옮깁니다.'),
+                onTap: () => Navigator.pop(context, 'trash'),
+              ),
+              if (inside)
+                ListTile(
+                  leading: const Icon(Icons.cleaning_services_outlined),
+                  title: const Text('묶음책장 비우기'),
+                  subtitle: const Text('책만 휴지통으로 옮기고 빈 묶음은 남깁니다.'),
+                  enabled: group.bookIds.isNotEmpty,
+                  onTap: () => Navigator.pop(context, 'empty'),
+                ),
+              ListTile(
                 leading: const Icon(Icons.folder_off_outlined),
                 title: const Text('묶음 해제'),
                 subtitle: const Text('책은 모두 서재로 돌아갑니다.'),
@@ -233,6 +247,39 @@ extension _LibraryGroups on _LibraryPageState {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'trash':
+      case 'empty':
+        final keepShelf = action == 'empty';
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(keepShelf ? '묶음책장 비우기' : '묶음책 삭제'),
+            content: Text(
+              '“${group.title}”의 책 ${group.bookIds.length}권을 휴지통으로 옮길까요?\n${keepShelf ? '빈 묶음은 유지됩니다.' : '묶음도 함께 이동합니다.'} 설정의 휴지통에서 한 번에 복원할 수 있습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('휴지통으로 이동'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || confirmed != true) return;
+        try {
+          await ref
+              .read(bookGroupRepositoryProvider)
+              .trashGroup(group.id, keepShelf: keepShelf);
+          ref.invalidate(booksProvider);
+          ref.invalidate(bookGroupsProvider);
+          if (mounted) _snack('휴지통으로 옮겼습니다. 설정에서 복원할 수 있습니다.');
+        } catch (_) {
+          if (mounted) _snack('작업을 완료하지 못했습니다. 휴지통과 목록을 확인해 주세요.');
+        }
       case 'add':
         await _addGroupBooks(group);
       case 'rename':

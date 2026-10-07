@@ -1,4 +1,6 @@
 import 'dart:isolate';
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'library_trash_store.dart';
@@ -15,7 +17,16 @@ import 'package:koofy_reader/features/library/data/book_cover_store.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 
 final bookRepositoryProvider = Provider<BookRepository>(
-  (ref) => LocalBookRepository(ref.watch(localStorageProvider)),
+  (ref) => LocalBookRepository(
+    ref.watch(localStorageProvider),
+    hasLegacyPublication: () async {
+      final support = await getApplicationSupportDirectory();
+      final key = sha256.convert(utf8.encode(BundledBooks.legacy.id));
+      return File(
+        '${support.path}/native_reader_v1/publications/references/$key.json',
+      ).exists();
+    },
+  ),
 );
 
 final booksProvider = FutureProvider<List<Book>>(
@@ -36,8 +47,10 @@ class LocalBookRepository implements BookRepository {
   LocalBookRepository(
     this._storage, {
     BookCoverStore? covers,
+    Future<bool> Function()? hasLegacyPublication,
     Future<Directory> Function()? sourceDirectory,
-  }) : _covers = covers ?? BookCoverStore(_storage),
+  }) : _hasLegacyPublication = hasLegacyPublication,
+       _covers = covers ?? BookCoverStore(_storage),
        _sourceDirectory = sourceDirectory ?? _defaultSourceDirectory;
 
   final Future<Directory> Function() _sourceDirectory;
@@ -45,24 +58,32 @@ class LocalBookRepository implements BookRepository {
     '${(await getApplicationSupportDirectory()).path}/library_sources',
   );
 
+  final Future<bool> Function()? _hasLegacyPublication;
   final LocalStorage _storage;
   final BookCoverStore _covers;
-  static final List<Book> _books = [
-    Book.asset(
-      id: 'sample_1',
-      title: '새벽의 쿠피',
-      author: 'Koofy Studio',
-      description: '오프라인에서도 바로 열 수 있는 샘플 소설',
-      assetPath: 'assets/books/sample_1.txt',
-    ),
-    Book.asset(
-      id: 'sample_2',
-      title: '사용 방법 안내',
-      author: 'Koofy Team',
-      description: '앱 기능을 빠르게 익히는 사용자 가이드',
-      assetPath: 'assets/books/sample_2.txt',
-    ),
-  ];
+  Future<bool> _retainLegacySample() async {
+    if (await _storage.getString(BundledBooks.retainLegacyKey) == 'true') {
+      return true;
+    }
+    final id = BundledBooks.legacy.id;
+    final groups = await BookGroupRepository(_storage).load();
+    final hasHistory =
+        await _storage.getString('${AppConstants.readingProgressPrefix}$id') !=
+            null ||
+        await _storage.getString('${AppConstants.readingBookmarkPrefix}$id') !=
+            null ||
+        await _storage.getString('library_completion_v1:$id') != null ||
+        await _storage.getString(
+              'library_cover_${base64Url.encode(utf8.encode(id))}',
+            ) !=
+            null ||
+        groups.any((group) => group.bookIds.contains(id)) ||
+        (await _hasLegacyPublication?.call() ?? false);
+    if (hasHistory) {
+      await _storage.setString(BundledBooks.retainLegacyKey, 'true');
+    }
+    return hasHistory;
+  }
 
   @override
   Future<List<Book>> getBooks() => LibraryMutations.run(() async {
@@ -71,7 +92,11 @@ class LocalBookRepository implements BookRepository {
       ...await _loadHiddenBookIds(),
       ...await LibraryTrashStore(_storage).hiddenBookIds(),
     };
-    final visibleSamples = _books
+    final bundled = [
+      ...BundledBooks.defaults,
+      if (await _retainLegacySample()) BundledBooks.legacy,
+    ];
+    final visibleSamples = bundled
         .where((book) => !hiddenIds.contains(book.id))
         .toList(growable: false);
     return _covers.apply([
@@ -79,6 +104,24 @@ class LocalBookRepository implements BookRepository {
       ...visibleSamples,
     ]);
   });
+
+  Future<List<Book>> allStoredBooks() async => [
+    ...await _loadLocalBooks(),
+    ...BundledBooks.defaults,
+    BundledBooks.legacy,
+  ];
+
+  Future<void> forgetPermanently(Set<String> ids) =>
+      LibraryMutations.run(() async {
+        await _saveLocalBooks(
+          (await _loadLocalBooks())
+              .where((book) => !ids.contains(book.id))
+              .toList(),
+        );
+        final hidden = await _loadHiddenBookIds();
+        hidden.addAll(ids.where(BundledBooks.ids.contains));
+        await _saveHiddenBookIds(hidden);
+      });
 
   @override
   Future<void> setBookCover(String bookId, String imagePath) =>
@@ -190,6 +233,7 @@ class LocalBookRepository implements BookRepository {
 
   @override
   Future<void> saveDownloadedBook(Book book) => LibraryMutations.run(() async {
+    await LibraryTrashStore(_storage).ensureRestorable(book.id);
     if (!book.isLocalFile ||
         book.localPath == null ||
         !await File(book.localPath!).exists()) {
@@ -211,7 +255,7 @@ class LocalBookRepository implements BookRepository {
         if (localDeleted) {
           return true;
         }
-        final sampleExists = _books.any((book) => book.id == bookId);
+        final sampleExists = BundledBooks.ids.contains(bookId);
         if (!sampleExists) {
           return false;
         }

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
 import 'speech_backup.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
@@ -121,7 +122,7 @@ class LibraryBackupService {
       }
       coverEntries[book.id] = add(await file.readAsBytes(), 'png');
     }
-    final ids = {...allBooks.map((b) => b.id), 'sample_1', 'sample_2'};
+    final ids = {...allBooks.map((b) => b.id), ...BundledBooks.ids};
     final fontEntries = <Map<String, dynamic>>[];
     for (final family in await personalFonts.load()) {
       final bytes = await personalFonts.fileFor(family).readAsBytes();
@@ -226,7 +227,7 @@ class LibraryBackupService {
         throw const FormatException('손상된 백업 파일입니다. 원래 백업을 다시 선택해 주세요.');
       }
     }
-    final ids = <String>{'sample_1', 'sample_2'};
+    final ids = <String>{...BundledBooks.ids};
     final bookIds = <String>{};
     for (final raw in manifest['books'] as List) {
       final json = Map<String, dynamic>.from(raw as Map);
@@ -250,8 +251,7 @@ class LibraryBackupService {
                     : AppConstants.maxEpubBytes)) {
           throw const FormatException('책 원본이 누락되거나 지원 용량을 초과했습니다.');
         }
-      } else if (!const ['sample_1', 'sample_2'].contains(book.id) ||
-          book.assetPath != 'assets/books/${book.id}.txt') {
+      } else if (!BundledBooks.isSupported(book)) {
         throw const FormatException('지원하지 않는 기본 책입니다.');
       }
     }
@@ -279,7 +279,8 @@ class LibraryBackupService {
       throw const FormatException('표지 표시 설정이 올바르지 않습니다.');
     }
     final fontEntries = manifest['personalFonts'] ?? [];
-    if (fontEntries is! List || fontEntries.length > PersonalFontStore.maxFonts) {
+    if (fontEntries is! List ||
+        fontEntries.length > PersonalFontStore.maxFonts) {
       throw const FormatException('개인 글꼴 백업이 올바르지 않습니다.');
     }
     final fontIds = <String>{};
@@ -359,7 +360,7 @@ class LibraryBackupService {
     // Trashed books are retained in the index; do not duplicate or unhide them on restore.
     currentIds.addAll(local.map((raw) => (raw as Map)['id'] as String));
     // Hidden samples are still installed, so never introduce duplicate sample entries.
-    currentIds.addAll(['sample_1', 'sample_2']);
+    currentIds.addAll(BundledBooks.ids);
     final restored = <String>{};
     final pending = <String, String>{};
     await directory.create(recursive: true);
@@ -379,6 +380,11 @@ class LibraryBackupService {
         json.remove('source');
         local.add(json);
         restored.add(id);
+      }
+      if ((manifest['books'] as List).any(
+        (raw) => raw['id'] == BundledBooks.legacy.id,
+      )) {
+        pending[BundledBooks.retainLegacyKey] = 'true';
       }
       pending[AppConstants.localBooksKey] = jsonEncode(local);
       pending[AppConstants.localBooksBackupKey] = jsonEncode(local);

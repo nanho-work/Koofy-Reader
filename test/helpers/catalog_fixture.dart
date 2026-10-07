@@ -10,6 +10,9 @@ CatalogItem catalogFixture(
   String? title,
   String author = '쿠피 작가',
   String category = '시',
+  String? seriesId,
+  int? episodeNumber,
+  int episodeCount = 0,
 }) {
   Map<String, dynamic> asset(String extension) => {
     'sha256': 'a' * 64,
@@ -27,7 +30,15 @@ CatalogItem catalogFixture(
     'description': '조용한 하루에 어울리는 문장들.',
     'license': '테스트용 배포 허가',
     'version': 1,
-    'assets': kind == 'book'
+    if (seriesId != null) ...{
+      'seriesId': seriesId,
+      'episodeNumber': episodeNumber,
+      'episodeTitle': title ?? '이야기 $index',
+    },
+    if (kind == 'series') 'episodeCount': episodeCount,
+    'assets': kind == 'series'
+        ? {'cover': asset('webp')}
+        : kind == 'book'
         ? {'txt': asset('txt'), 'cover': asset('webp')}
         : {'font400': asset('otf')},
   });
@@ -54,7 +65,16 @@ class FakeReaderCatalog extends ReaderCatalog {
   Future<CatalogPage> list(String kind, {String? after}) async {
     calls.add('$kind:$after');
     if (fail) throw const CatalogException('연결 실패');
-    final filtered = items.where((item) => item.kind == kind).toList();
+    final filtered = items
+        .where(
+          (item) => kind.startsWith('series:')
+              ? item.seriesId == kind.substring(7)
+              : kind == 'book'
+              ? (item.kind == 'book' && item.seriesId == null) ||
+                    item.kind == 'series'
+              : item.kind == kind,
+        )
+        .toList();
     final start = int.parse(after ?? '0');
     return CatalogPage(
       filtered.skip(start).take(40).toList(),
@@ -68,6 +88,9 @@ class FakeReaderCatalog extends ReaderCatalog {
     if (previewFails) throw const CatalogException('미리보기 연결 실패');
     return previews[item.id];
   }
+
+  @override
+  Future<Uint8List?> coverPreview(CatalogItem item) async => null;
 
   @override
   Future<bool> isInstalled(CatalogItem item) async =>

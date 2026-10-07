@@ -1,4 +1,6 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'book_catalog_row.dart';
+import 'series_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
@@ -7,18 +9,22 @@ import 'package:koofy_reader/features/catalog/presentation/font_catalog_row.dart
 const catalogBookCategories = ['시', '소설', '에세이', '기타'];
 
 class ReaderCatalogPage extends StatelessWidget {
-  const ReaderCatalogPage({super.key});
+  const ReaderCatalogPage({super.key, this.initialBookQuery = ''});
+  final String initialBookQuery;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('도서·글꼴 다운로드')),
-    body: const SafeArea(child: ReaderCatalogBrowser()),
+    body: SafeArea(
+      child: ReaderCatalogBrowser(initialBookQuery: initialBookQuery),
+    ),
   );
 }
 
 /// The same catalog is used in the wide library sidebar and the phone route.
 /// Both tabs retain their own query, category and scroll position.
 class ReaderCatalogBrowser extends ConsumerStatefulWidget {
-  const ReaderCatalogBrowser({super.key});
+  const ReaderCatalogBrowser({super.key, this.initialBookQuery = ''});
+  final String initialBookQuery;
   @override
   ConsumerState<ReaderCatalogBrowser> createState() =>
       _ReaderCatalogBrowserState();
@@ -78,7 +84,10 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
             child: IndexedStack(
               index: _tab,
               children: [
-                const _CatalogList(kind: 'book'),
+                _CatalogList(
+                  kind: 'book',
+                  initialQuery: widget.initialBookQuery,
+                ),
                 if (_fontsVisited)
                   const _CatalogList(kind: 'font')
                 else
@@ -93,17 +102,26 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
 }
 
 class _CatalogList extends ConsumerStatefulWidget {
-  const _CatalogList({required this.kind});
+  const _CatalogList({required this.kind, this.initialQuery = ''});
+  final String initialQuery;
   final String kind;
   @override
   ConsumerState<_CatalogList> createState() => _CatalogListState();
 }
 
 class _CatalogListState extends ConsumerState<_CatalogList> {
-  final _search = TextEditingController();
+  late final _search = TextEditingController(text: widget.initialQuery);
   final _scroll = ScrollController();
   String? _category;
+  bool _openedInitialSeries = false;
   bool get _books => widget.kind == 'book';
+
+  void _openSeries(CatalogItem series) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ReaderSeriesPage(series: series)),
+    );
+  }
+
   @override
   void dispose() {
     _search.dispose();
@@ -156,6 +174,26 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
     final installed = ref.watch(catalogInstalledProvider(widget.kind));
     final download = ref.watch(catalogDownloadProvider);
     final query = _search.text.trim().toLowerCase();
+    if (_books &&
+        !_openedInitialSeries &&
+        widget.initialQuery.trim().isNotEmpty &&
+        catalog.hasValue &&
+        !catalog.isLoading) {
+      final matching = catalog.value!
+          .where(
+            (item) =>
+                item.kind == 'series' &&
+                item.title.trim().toLowerCase() ==
+                    widget.initialQuery.trim().toLowerCase(),
+          )
+          .toList();
+      if (matching.length == 1) {
+        _openedInitialSeries = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openSeries(matching.single);
+        });
+      }
+    }
     final items = (catalog.valueOrNull ?? const <CatalogItem>[])
         .where(
           (item) =>
@@ -252,7 +290,10 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                 key: PageStorageKey('catalog-list-${widget.kind}'),
                 controller: _scroll,
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: AdOverlayInsets.padding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                ),
                 itemCount: 1 + items.length,
                 itemBuilder: (context, index) {
                   if (index == 0) {
@@ -286,7 +327,14 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 24),
                             child: Text(
-                              query.isNotEmpty || _category != null
+                              widget.initialQuery.isNotEmpty &&
+                                      query ==
+                                          widget.initialQuery
+                                              .trim()
+                                              .toLowerCase() &&
+                                      _category == null
+                                  ? '아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.'
+                                  : query.isNotEmpty || _category != null
                                   ? '검색 조건에 맞는 ${_books ? '도서가' : '글꼴이'} 없습니다.'
                                   : '아직 공개된 ${_books ? '도서가' : '글꼴이'} 없습니다.',
                               textAlign: TextAlign.center,
@@ -296,6 +344,13 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                     );
                   }
                   final item = items[index - 1];
+                  if (item.kind == 'series') {
+                    return SeriesCatalogRow(
+                      key: ValueKey('series-${item.id}'),
+                      series: item,
+                      onOpen: () => _openSeries(item),
+                    );
+                  }
                   final key = catalogItemKey(item);
                   final downloaded =
                       installed.valueOrNull?.contains(key) ?? false;

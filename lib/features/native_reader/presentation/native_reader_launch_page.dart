@@ -1,3 +1,5 @@
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'dart:io';
 import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
 import 'package:koofy_reader/features/fonts/presentation/personal_fonts_page.dart';
@@ -246,6 +248,11 @@ class _NativeReaderLaunchPageState
             !_leaveRequested) {
           unawaited(_manageFonts());
         } else if (_error == null &&
+            event.message == 'downloadSeries' &&
+            BundledBooks.hasContinuation(_book) &&
+            !_leaveRequested) {
+          _showSeriesCatalog();
+        } else if (_error == null &&
             event.message == 'nextBook' &&
             _nextBook != null &&
             !_leaveRequested) {
@@ -258,6 +265,23 @@ class _NativeReaderLaunchPageState
           _returnToLibrary();
         }
     }
+  }
+
+  void _showSeriesCatalog() {
+    // Replace the closed reader route; Back returns to the library containing
+    // any newly downloaded books, rather than reopening the finished sample.
+    if (_popScheduled) return;
+    _popScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(
+          builder: (_) => const ReaderCatalogPage(
+            initialBookQuery: BundledBooks.mermaidSeries,
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _manageFonts() async {

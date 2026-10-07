@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -156,7 +157,10 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                           ),
                   )
                 : ReorderableListView.builder(
-                    padding: const EdgeInsets.all(20),
+                    padding: AdOverlayInsets.padding(
+                      context,
+                      const EdgeInsets.all(20),
+                    ),
                     buildDefaultDragHandles: false,
                     header: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

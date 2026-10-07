@@ -1,3 +1,7 @@
+import 'helpers/catalog_fixture.dart';
+import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'dart:async';
 import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
 import 'dart:io';
@@ -130,10 +134,13 @@ void main() {
   Future<void> mount(
     WidgetTester tester, {
     Directory? support,
+    Book? initialBook,
     String? initialLocator,
     List<Book>? library,
     List<BookGroup>? groups,
   }) async {
+    final catalog = FakeReaderCatalog([]);
+    addTearDown(catalog.close);
     final services = NativeReaderServices(
       preparer: preparer,
       coordinator: coordinator,
@@ -142,6 +149,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          readerCatalogProvider.overrideWithValue(catalog),
           if (library != null)
             booksProvider.overrideWith((ref) async => library),
           if (groups != null)
@@ -156,7 +164,7 @@ void main() {
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => NativeReaderLaunchPage(
-                      book: book,
+                      book: initialBook ?? book,
                       initialLocatorJson: initialLocator,
                       initialContentRevision: initialLocator == null
                           ? null
@@ -188,9 +196,61 @@ void main() {
   }
 
   testWidgets(
+    'sample continuation checkpoints then opens the filtered catalog',
+    (tester) async {
+      preparer.publications[BundledBooks.mermaidId] =
+          const PreparedReadingPublication(
+            publicationId: BundledBooks.mermaidId,
+            contentRevision: 'revision',
+            filePath: '/prepared.epub',
+            title: '인어공주는 파도를 벤다 1화',
+          );
+      gateway.recovery.complete([]);
+      await mount(
+        tester,
+        initialBook: BundledBooks.mermaid,
+        library: BundledBooks.defaults,
+        groups: [],
+      );
+      await pumpUntil(tester, () => gateway.openCalls == 1);
+      final active = gateway.request!;
+      gateway.controller.add(
+        ReaderEvent(
+          protocolVersion: 1,
+          sessionId: active.sessionId,
+          sessionGeneration: active.sessionGeneration,
+          publicationId: active.publicationId,
+          contentRevision: active.contentRevision,
+          sequence: 1,
+          kind: 'closed',
+          message: 'downloadSeries',
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.byType(ReaderCatalogPage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(coordinator.activeSessionId, isNull);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        BundledBooks.mermaidSeries,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('서재'), findsOneWidget);
+      expect(gateway.openCalls, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'personal font management returns to the latest location, not the initial bookmark',
     (tester) async {
-      final support = (await tester.runAsync(() => Directory.systemTemp.createTemp('font-route')))!;
+      final support = (await tester.runAsync(
+        () => Directory.systemTemp.createTemp('font-route'),
+      ))!;
       addTearDown(() => support.delete(recursive: true));
       preparer.complete();
       gateway.recovery.complete([]);

@@ -55,7 +55,7 @@ class NativeReaderStore extends GeneratedDatabase {
       NativeReaderStore(NativeDatabase.createInBackground(file));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => const [];
@@ -78,8 +78,10 @@ class NativeReaderStore extends GeneratedDatabase {
         preferences_json TEXT NOT NULL, bookmarks_json TEXT NOT NULL DEFAULT '[]',
         PRIMARY KEY(publication_id, content_revision))''');
       await _createGlobalPreferences();
+      await _createDeletedSessions();
     },
     onUpgrade: (_, from, to) async {
+      if (from < 5) await _createDeletedSessions();
       if (from < 4) {
         await customStatement(
           "ALTER TABLE reader_positions ADD COLUMN bookmarks_json TEXT NOT NULL DEFAULT '[]'",
@@ -100,6 +102,27 @@ class NativeReaderStore extends GeneratedDatabase {
       }
     },
   );
+
+  Future<void> _createDeletedSessions() => customStatement(
+    'CREATE TABLE reader_deleted_sessions (session_id TEXT PRIMARY KEY)',
+  );
+
+  Future<void> deleteBooks(Set<String> ids) => transaction(() async {
+    for (final id in ids) {
+      await customStatement(
+        'INSERT OR IGNORE INTO reader_deleted_sessions SELECT session_id FROM reader_sessions WHERE publication_id=?',
+        [id],
+      );
+      await customStatement(
+        'DELETE FROM reader_positions WHERE publication_id=?',
+        [id],
+      );
+      await customStatement(
+        'DELETE FROM reader_sessions WHERE publication_id=?',
+        [id],
+      );
+    }
+  });
 
   Future<void> _createGlobalPreferences() => customStatement('''
     CREATE TABLE reader_preferences (
@@ -311,6 +334,13 @@ class NativeReaderStore extends GeneratedDatabase {
           'closed',
         }.contains(event.kind)) {
       throw const FormatException('지원하지 않는 독서 기록 형식입니다.');
+    }
+    if (await customSelect(
+          'SELECT 1 FROM reader_deleted_sessions WHERE session_id=?',
+          variables: [Variable.withString(event.sessionId)],
+        ).getSingleOrNull() !=
+        null) {
+      return;
     }
     final session = await customSelect(
       'SELECT generation, publication_id, content_revision FROM reader_sessions WHERE session_id=?',

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/domain/book_order.dart';
@@ -104,7 +105,10 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                       ),
               ),
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: AdOverlayInsets.padding(
+                  context,
+                  const EdgeInsets.all(20),
+                ),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(

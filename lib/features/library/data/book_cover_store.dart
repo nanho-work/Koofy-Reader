@@ -33,7 +33,7 @@ class BookCoverStore {
     return books.map((book) {
       final name = entries[_key(book.id)];
       if (name == null) return book;
-      // Empty overrides explicitly restore the generated title cover.
+      // Empty overrides restore the bundled cover, or generated title cover.
       if (name.isEmpty) return book.withCoverPath(null);
       if (!_fileName.hasMatch(name)) return book;
       return book.withCoverPath('${directory.path}/$name');

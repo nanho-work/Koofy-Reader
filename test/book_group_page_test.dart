@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/data/library_trash_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
@@ -36,6 +37,49 @@ void main() {
     await tester.tap(cover);
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'group delete is available on shelf; empty shelf is available inside',
+    (tester) async {
+      await create();
+      await shelf_test.pumpLibrary(
+        tester,
+        books: shelf_test.demoBooks.take(3).toList(),
+      );
+      await tester.pumpAndSettle();
+      final group = (await repository.load()).single;
+      final menu = find.byTooltip('${group.title} 더보기');
+      await tester.scrollUntilVisible(
+        menu,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const PageStorageKey('library-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      expect(find.text('묶음책 삭제'), findsOneWidget);
+      expect(find.text('묶음책장 비우기'), findsNothing);
+      Navigator.of(tester.element(find.text('묶음책 삭제'))).pop();
+      await tester.pumpAndSettle();
+      await openGroup(tester);
+      await tester.tap(find.byTooltip('묶음 관리'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('묶음책장 비우기'));
+      await tester.tap(find.text('묶음책장 비우기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, '휴지통으로 이동'));
+      await tester.pumpAndSettle();
+      expect((await repository.load()).single.bookIds, isEmpty);
+      final entries = await LibraryTrashStore(SharedPrefsLocalStorage()).load();
+      expect(entries.values.single['kind'], 'bundle');
+      expect(entries.values.single['books'], ['b0', 'b1', 'b2']);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'create from menu hides individual shelf entries and opens members',

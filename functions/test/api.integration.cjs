@@ -185,3 +185,94 @@ test('admin categories persist, deduplicate and require super-admin', async () =
   await getFirestore().collection('readerSettings').doc('bookCategories').set({ names: Array.from({ length: 96 }, (_, i) => `분류${i}`) });
   assert.equal((await api('addCategory', { name: '초과' })).status, 400);
 });
+
+test('series workflow isolates drafts, inherits cover, reserves numbers and hides private episodes', async () => {
+  const sharp = require('sharp');
+  const fields = { title: '연재 통합 테스트', author: '연재 작가', description: '작품 소개', license: '개인 열람', category: '소설', source: '직접 제공', seriesStatus: 'ongoing' };
+  const created = await api('create', { kind: 'series', metadata: fields });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  let series = created.body;
+  async function upload(item, slot, bytes) {
+    const response = await fetch(base + `readerAdmin?action=upload&id=${item.id}&revision=${item.revision}&slot=${slot}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' }, body: bytes });
+    const body = await response.json(); assert.equal(response.status, 200, JSON.stringify(body)); return body;
+  }
+  const simultaneous = await Promise.all([1, 2].map(() => api('create', { kind: 'book', seriesId: series.id, metadata: { title: '첫 번째 이야기', episodeNumber: 1 } })));
+  assert.deepEqual(simultaneous.map(value => value.status).sort(), [201, 409]);
+  let episode = simultaneous.find(value => value.status === 201).body;
+  assert.equal(episode.author, fields.author);
+  assert.equal((await api('create', { kind: 'font', seriesId: series.id, metadata: fields })).status, 400);
+  assert.equal((await api('create', { kind: 'book', seriesId: episode.id, metadata: { title: '잘못된 부모', episodeNumber: 2 } })).status, 400);
+  episode = await upload(episode, 'txt', Buffer.from('테스트 본문'));
+  assert.equal((await api('publish', { id: episode.id, revision: episode.revision })).status, 400);
+  series = await upload(series, 'cover', await sharp({ create: { width: 10, height: 15, channels: 3, background: '#abcdef' } }).png().toBuffer());
+  series = (await api('publish', { id: series.id, revision: series.revision })).body;
+  const published = await api('publish', { id: episode.id, revision: episode.revision });
+  assert.equal(published.status, 200, JSON.stringify(published.body)); episode = published.body;
+  const originalCover = episode.publishedContent.assets.cover;
+  assert.equal(originalCover.path, series.publishedContent.assets.cover.path);
+  assert.equal((await api('save', { id: episode.id, revision: episode.revision, metadata: { title: '바꾼 제목', episodeNumber: 2 } })).status, 400);
+  series = (await api('save', { id: series.id, revision: series.revision, metadata: { ...fields, author: '미공개 변경', license: '미공개 조건', seriesStatus: 'completed' } })).body;
+  episode = (await api('save', { id: episode.id, revision: episode.revision, metadata: { title: '수정된 1화', episodeNumber: 1 } })).body;
+  episode = (await api('publish', { id: episode.id, revision: episode.revision })).body;
+  assert.equal(episode.publishedContent.author, fields.author);
+  assert.equal(episode.publishedContent.license, fields.license);
+  const second = await api('create', { kind: 'book', seriesId: series.id, metadata: { title: '두 번째 이야기', episodeNumber: 2 } });
+  assert.equal(second.status, 201);
+  assert.equal((await api('save', { id: second.body.id, revision: second.body.revision, metadata: { title: '중복 번호', episodeNumber: 1 } })).status, 409);
+  const episodes = await (await fetch(base + `readerCatalog?kind=book&seriesId=${series.id}&supportsTxt=1`)).json();
+  assert.equal(episodes.items.length, 1); assert.equal(episodes.items[0].episodeNumber, 1);
+  assert.equal('path' in episodes.items[0].assets.cover, false);
+  const download = base + `readerCatalog?action=download&id=${episode.id}&slot=cover&version=${episode.publishedContent.version}`;
+  assert.equal((await fetch(download)).status, 200);
+  assert.equal((await api('delete', { id: series.id, revision: series.revision })).status, 400);
+  series = (await api('unpublish', { id: series.id, revision: series.revision })).body;
+  assert.equal((await fetch(download)).status, 404);
+  assert.equal((await fetch(base + `readerCatalog?kind=book&seriesId=${series.id}&supportsTxt=1`)).status, 404);
+  const legacy = await (await fetch(base + 'readerCatalog?kind=book&supportsTxt=1')).json();
+  assert(!legacy.items.some(item => item.id === episode.id));
+  series = (await api('publish', { id: series.id, revision: series.revision })).body;
+  assert.equal((await fetch(download)).status, 200);
+  assert.equal(episode.publishedContent.license, fields.license);
+  assert.equal((await api('delete', { id: second.body.id, revision: second.body.revision })).status, 200);
+  assert.equal((await api('create', { kind: 'book', seriesId: series.id, metadata: { title: '재등록 2화', episodeNumber: 2 } })).status, 201);
+});
+
+test('100 published episodes occupy one catalog entry while pagination and legacy books remain intact', async () => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const { randomUUID } = require('node:crypto');
+  const { publish } = require('../lib/src/content.js');
+  const db = getFirestore();
+  const parentId = randomUUID().replaceAll('-', '');
+  const cover = { path: `readerContent/${parentId}/fixture/cover.webp`, sha256: 'a'.repeat(64), size: 10, extension: 'webp', contentType: 'image/webp' };
+  let series = { id: parentId, kind: 'series', title: '100화 연재', author: '테스트', description: '', license: '테스트', category: '소설', revision: 1, assets: { cover }, published: true, updatedAt: new Date().toISOString(), publishedContent: null };
+  series.publishedContent = publish(series);
+  const batch = db.batch(); batch.create(db.collection('readerContent').doc(parentId), series);
+  for (let number = 1; number <= 100; number++) {
+    const id = randomUUID().replaceAll('-', '');
+    const episode = { ...series, id, kind: 'book', title: `제목 ${number}`, seriesId: parentId, seriesTitle: series.title, episodeNumber: number, assets: { txt: { ...cover, path: `readerContent/${id}/fixture/body.txt`, extension: 'txt' } } };
+    episode.publishedContent = publish(episode, series);
+    batch.create(db.collection('readerContent').doc(id), episode);
+  }
+  await batch.commit();
+  async function all(query) {
+    const items = []; let cursor; const visited = new Set();
+    do {
+      const response = await fetch(base + 'readerCatalog?' + query + (cursor ? `&after=${cursor}` : ''));
+      assert.equal(response.status, 200); const page = await response.json();
+      items.push(...page.items); cursor = page.nextCursor;
+      if (cursor) { assert(!visited.has(cursor)); visited.add(cursor); }
+    } while (cursor);
+    return items;
+  }
+  const grouped = await all('kind=book&supportsTxt=1&supportsSeries=1');
+  assert.equal(grouped.filter(item => item.id === parentId).length, 1);
+  assert.equal(grouped.find(item => item.id === parentId).episodeCount, 100);
+  assert.equal(grouped.filter(item => item.seriesId === parentId).length, 0);
+  const episodes = await all(`kind=book&supportsTxt=1&seriesId=${parentId}`);
+  assert.equal(episodes.length, 100);
+  assert.equal(new Set(episodes.map(item => item.episodeNumber)).size, 100);
+  const legacy = await all('kind=book&supportsTxt=1');
+  assert(!legacy.some(item => item.kind === 'series'));
+  assert.equal(legacy.filter(item => item.seriesId === parentId).length, 100);
+  assert(legacy.some(item => !item.seriesId));
+});

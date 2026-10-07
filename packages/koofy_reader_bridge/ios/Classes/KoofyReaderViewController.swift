@@ -620,7 +620,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
     }
 
-    func close(nextBook: Bool = false, manageFonts: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
+    func close(nextBook: Bool = false, manageFonts: Bool = false, downloadSeries: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
         speech?.pause()
         speechFollowTask?.cancel()
         guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
@@ -634,7 +634,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             await self.captureTask?.value
             do {
                 var closedEvent = try self.checkpoint(kind: "closed")
-                closedEvent.message = manageFonts ? "manageFonts" : nextBook ? "nextBook" : nil
+                closedEvent.message = manageFonts ? "manageFonts" : nextBook ? "nextBook" : downloadSeries ? "downloadSeries" : nil
                 self.openingTask?.cancel()
                 self.readyTimeout?.cancel()
                 self.settingsCompletion?(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
@@ -719,6 +719,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         report(error, code: "resource_failed", fatal: !hasSentReady)
     }
     func navigator(_ navigator: Navigator, presentExternalURL url: URL) {
+        if isReady, request.publicationId == "sample_mermaid_001",
+           url.absoluteString == "koofy-reader://catalog/mermaid" {
+            close(downloadSeries: true) { _ in }
+            return
+        }
         let alert = UIAlertController(title: "외부 링크", message: "책 밖의 링크는 이 독서 화면에서 열지 않습니다.", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         if presentedViewController == nil { present(alert, animated: true) }

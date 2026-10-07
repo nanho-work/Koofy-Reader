@@ -125,3 +125,43 @@ test('custom categories normalize Unicode and reject empty or invalid names', ()
     assert.throws(() => categoryName(value), ApiError);
   }
 });
+
+test('series publishes a cover and episodes inherit only the published parent metadata', async () => {
+  const { episodeMetadata, seriesMetadata } = await import('../src/content');
+  const cover = { path: 'parent/cover', sha256: 'b'.repeat(64), size: 100, extension: 'webp', contentType: 'image/webp' };
+  const parent: Content = { ...item, id: 'c'.repeat(32), kind: 'series', ...seriesMetadata({ ...item, title: '인어공주는 파도를 벤다' }), assets: { cover } };
+  assert.equal(publish(parent).seriesStatus, 'ongoing');
+  const published = { ...parent, published: true, publishedContent: publish(parent) };
+  const episode: Content = { ...item, ...episodeMetadata({ title: '물이 듣지 않는 날', episodeNumber: 1 }, parent, parent.id), assets: { txt: { ...cover, path: 'episode/body', extension: 'txt' } } };
+  assert.throws(() => publish(episode, parent));
+  const snapshot = publish(episode, { ...published, author: 'UNPUBLISHED AUTHOR', license: 'UNPUBLISHED LICENSE' });
+  assert.equal(snapshot.author, item.author);
+  assert.equal(snapshot.license, item.license);
+  assert.equal(snapshot.assets.cover.path, cover.path);
+  const visible = publicItem({ ...episode, published: true, publishedContent: snapshot });
+  assert.equal(visible.title, '인어공주는 파도를 벤다 1화 — 물이 듣지 않는 날');
+  assert.equal(visible.episodeTitle, '물이 듣지 않는 날');
+  assert.equal('path' in visible.assets.cover, false);
+  assert.equal(episode.assets.cover, undefined);
+  const ownCover = { ...cover, path: 'episode/cover' };
+  assert.equal(publish({ ...episode, assets: { ...episode.assets, cover: ownCover } }, published).assets.cover.path, ownCover.path);
+  assert.throws(() => publish(episode, { ...published, published: false }));
+  assert.throws(() => publish(episode, { ...published, deleting: true }));
+  assert.throws(() => publish(episode, { ...published, id: 'd'.repeat(32) }));
+});
+
+test('series and episode metadata validate status and numeric sequence', async () => {
+  const { episodeMetadata, seriesMetadata } = await import('../src/content');
+  assert.equal(seriesMetadata({ ...item, seriesStatus: 'completed' }).seriesStatus, 'completed');
+  assert.throws(() => seriesMetadata({ ...item, seriesStatus: 'unknown' }));
+  for (const episodeNumber of [undefined, 0, -1, 1.5, '2', 100001]) {
+    assert.throws(() => episodeMetadata({ title: '회차', episodeNumber }, item, item.id));
+  }
+  const fields = episodeMetadata({ title: '제목', episodeNumber: 40, author: 'forged', license: 'forged', source: 'forged' }, item, item.id);
+  assert.equal(fields.author, item.author);
+  assert.equal(fields.license, item.license);
+  assert.equal(fields.episodeNumber, 40);
+  assert.equal(fields.description, '');
+  assert.throws(() => episodeMetadata({ title: '', episodeNumber: 2 }, item, item.id));
+  await assert.rejects(validateUpload('series', 'txt', Buffer.from('series has no body')));
+});

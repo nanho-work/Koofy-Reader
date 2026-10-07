@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -85,7 +86,7 @@ class _AdvertisingChoicesPageState
       appBar: AppBar(title: Text(widget.firstRun ? '쿠피리더 시작하기' : '광고 선택 변경')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
           children: [
             Text('개인정보와 광고', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
@@ -199,7 +200,7 @@ class PrivacySettingsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('개인정보 및 광고')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
         children: [
           if (!service.isIOS)
             ListTile(
@@ -373,7 +374,7 @@ class _ReaderPrivacyPolicyPageState extends State<ReaderPrivacyPolicyPage> {
         final data = snapshot.data!;
         final document = data['translations']['ko'];
         return ListView(
-          padding: const EdgeInsets.all(20),
+          padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
           children: [
             Text(
               document['title'],
@@ -421,7 +422,7 @@ class ReaderSupportPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(reportAd ? '부적절한 광고 신고' : '문의하기')),
     body: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
       children: [
         Text(
           reportAd

@@ -54,7 +54,8 @@ final class ReaderBannerFooter: UIView {
         }
     }
     func applyPalette(_ palette: ReaderPalette) {
-        backgroundColor = palette.background
+        backgroundColor = .clear
+        isOpaque = false
         message.textColor = palette.secondary
     }
     func updateHiddenUntil(_ epochMs: Int64?) { hiddenUntil = epochMs; refresh() }

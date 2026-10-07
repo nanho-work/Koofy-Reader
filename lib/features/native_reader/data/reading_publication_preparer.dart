@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'dart:io' as io;
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -115,12 +116,21 @@ class ReadingPublicationPreparer {
     final source = await _readSource(book);
     final title = book.title.trim().isEmpty ? '제목 없는 책' : book.title;
     final author = book.author;
+    // Renaming the guide in the library must not invalidate existing locators.
+    final bodyTitle = BundledBooks.matches(book, BundledBooks.guide)
+        ? '사용 방법 안내'
+        : title;
+    final continuation = BundledBooks.hasContinuation(book);
     final prepared = await Isolate.run(
-      () => _prepareContent(source.bytes, source.extension, title, author),
+      () => _prepareContent(
+        source.bytes,
+        source.extension,
+        bodyTitle,
+        author,
+        continuation: continuation,
+      ),
     );
-    final cover = showRegisteredCover
-        ? await _readDisplayCover(book.coverPath)
-        : null;
+    final cover = showRegisteredCover ? await _readDisplayCover(book) : null;
     final display = cover == null
         ? (bytes: prepared.publicationBytes, added: false, firstBodyHref: null)
         : await Isolate.run(
@@ -298,11 +308,18 @@ _PreparedContent _prepareContent(
   Uint8List bytes,
   String extension,
   String title,
-  String author,
-) {
+  String author, {
+  bool continuation = false,
+}) {
   final sourceHash = sha256.convert(bytes).toString();
   final publication = extension == 'txt'
-      ? _textToEpub(bytes, sourceHash, title, author)
+      ? _textToEpub(
+          bytes,
+          sourceHash,
+          title,
+          author,
+          continuation: continuation,
+        )
       : bytes;
   if (extension == 'epub') _validateEpub(bytes);
   return _PreparedContent(
@@ -389,8 +406,9 @@ Uint8List _textToEpub(
   List<int> bytes,
   String sourceHash,
   String title,
-  String author,
-) {
+  String author, {
+  bool continuation = false,
+}) {
   final text = _decodeUnicode(
     bytes,
   ).replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -461,6 +479,16 @@ Uint8List _textToEpub(
       );
     }
   }
+  if (continuation) {
+    // A separate spine resource always starts after the story, even when font
+    // size changes. The supplied TXT and its paragraph mapping remain intact.
+    add('EPUB/continue.xhtml', _sampleContinuationPage);
+    manifest.writeln(
+      '<item id="continue" href="continue.xhtml" media-type="application/xhtml+xml"/>',
+    );
+    spine.writeln('<itemref idref="continue"/>');
+    navigation.writeln('<li><a href="continue.xhtml">다음 이야기</a></li>');
+  }
   add(
     'EPUB/nav.xhtml',
     '''<?xml version="1.0" encoding="UTF-8"?>
@@ -473,6 +501,25 @@ Uint8List _textToEpub(
   );
   return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2000));
 }
+
+const _sampleContinuationPage =
+    '''<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ko" xml:lang="ko">
+<head><title>다음 이야기</title><style>
+body { line-height: 1.7; padding: 1em; }
+.kicker { font-size: .85em; letter-spacing: .08em; }
+h1 { font-size: 1.5em; line-height: 1.4; margin: 1.2em 0; }
+p { margin: 1em 0; }
+a { display: inline-block; padding: .7em 1em; border: 1px solid currentColor; border-radius: .4em; text-decoration: underline; }
+.note { font-size: .85em; }
+</style></head><body>
+<p class="kicker">인어공주는 파도를 벤다 · 1화 끝</p>
+<h1>이야기는 계속됩니다</h1>
+<p>다음 이야기가 궁금하신가요?<br/>쿠피리더 도서 다운로드에서 공개된 다음 화를 확인해 보세요.</p>
+<p><a href="${BundledBooks.continuationUrl}">공개된 다음 화 확인하기 →</a></p>
+<p class="note">서재의 ‘도서·글꼴 다운로드’에서도 작품명으로 찾을 수 있습니다. 아직 다음 화가 없다면 공개 후 다시 확인해 주세요.</p>
+<p class="note">목록 확인과 다운로드에는 인터넷 연결이 필요합니다. 내려받은 책은 오프라인에서도 읽을 수 있습니다.</p>
+</body></html>''';
 
 void _validateEpub(Uint8List bytes) {
   try {

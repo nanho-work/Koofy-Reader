@@ -17,17 +17,24 @@ bool isReaderCoverLocator(String? locator) {
   }
 }
 
-Future<Uint8List?> _readDisplayCover(String? path) async {
-  if (path == null || path.isEmpty) return null;
+Future<Uint8List?> _readDisplayCover(Book book) async {
+  if (book.coverPath == null && book.coverAssetPath == null) return null;
   ui.ImmutableBuffer? buffer;
   ui.ImageDescriptor? descriptor;
   ui.Codec? codec;
   ui.Image? image;
   try {
-    final file = io.File(path);
-    final length = await file.length();
-    if (length == 0 || length > 20 * 1024 * 1024) return null;
-    buffer = await ui.ImmutableBuffer.fromUint8List(await file.readAsBytes());
+    final Uint8List bytes;
+    if (book.coverPath != null) {
+      final file = io.File(book.coverPath!);
+      final length = await file.length();
+      if (length == 0 || length > 20 * 1024 * 1024) return null;
+      bytes = await file.readAsBytes();
+    } else {
+      final data = await rootBundle.load(book.coverAssetPath!);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    }
+    buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     descriptor = await ui.ImageDescriptor.encoded(buffer);
     if (descriptor.width <= 0 ||
         descriptor.height <= 0 ||

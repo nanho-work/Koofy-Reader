@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -249,7 +250,10 @@ class _BatchCoverPageState extends State<BatchCoverPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: AdOverlayInsets.padding(
+                context,
+                const EdgeInsets.all(16),
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(

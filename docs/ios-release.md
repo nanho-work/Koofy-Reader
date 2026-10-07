@@ -232,3 +232,55 @@ Apple의 처리 결과 메일에서 빌드 1의 거부 원인이 확인됐다. `
 - 기존 승인 후 자동 출시 설정을 유지했다. 승인·App Store 업데이트 제공 완료를 의미하지 않는다.
 - 웹 개인정보처리방침 2026-09-29 AdMob·UMP 안내 공개 반영을 확인한 후 제출했다.
 - 증빙: `/tmp/koofy-ads-20260929/apple-submitted.png`.
+
+## 2026-10-02 1.3.3 (11) 아카이브 및 배포 차단
+
+- 최신 앱 변경을 포함해 `READER_UPDATE_CHANNEL=store`로 아카이브 생성 성공.
+- `build/ios/archive/Runner.xcarchive` 내부 버전 1.3.3, 빌드 11, Bundle ID 및 사진·추적 목적 설명 확인.
+- IPA 내보내기 단계에서 Apple의 `Unable to process request - PLA Update available` 및 `No signing certificate "iOS Distribution" found` 오류가 발생했다. 업로드·심사 제출은 아직 완료되지 않았다.
+- 계정 소유자에게 Apple Developer 새 계약 검토·동의 및 App Store Connect 재로그인을 요청했다. 완료 후 같은 아카이브를 배포 서명하여 업로드를 재개한다.
+- 로그: `work/ios-release-build11/build.log`. 기존 빌드 IPA가 남아 있더라도 빌드 11 산출물로 사용하면 안 된다.
+
+### 1.3.3 (11) 계약 동의 후 업로드 성공
+
+- 사용자가 새 프로그램 계약 동의를 완료한 뒤 동일 아카이브의 배포 서명과 업로드에 성공했다. 2026-10-02 14:16 KST 로그에서 `Upload succeeded`, `EXPORT SUCCEEDED` 확인.
+- App Store Connect TestFlight에서 1.3.3(11), 생성 2026-10-02 14:16, **처리 중**을 확인했다. 업로드 성공과 Apple 처리 완료·심사 접수는 별개다.
+- 새 스토어 버전 1.3.3을 생성하고 한국어 출시 노트 및 빌드 11에 맞는 심사 안내를 저장했다.
+- 업로드 로그: `work/ios-release-build11/upload-after-agreement.log`.
+
+### 1.3.3 (11) 최종 심사 접수 완료
+
+- 2026-10-02 14:22 KST **심사를 위해 제출** 완료. 제출 상세에서 iOS 앱 1.3.3 / 1.3.3(11) / **심사 대기 중** 확인.
+- 빌드 ID: `bb32d7ec-9c8e-4194-a773-99eb883464a4`. 제출 ID: `c15ebd2e-4610-4869-8cc5-463c654e7512`.
+- 빌드 처리 완료 후 암호화 유형은 기존과 동일한 표준 암호화 알고리즘, 프랑스 배포는 아니요로 저장했다. 실제 국가 설정에서 174개 사용 가능 및 프랑스 사용 불가를 확인했다.
+- 사진·추적 목적 설명, 버전 및 Bundle ID, 시스템 인증서 저장소를 이용한 아카이브 코드 서명 검증 통과.
+- 기존 승인 후 자동 출시 / 모든 사용자에게 즉시 업데이트 / 기존 평점 유지 설정을 유지했다. App Store 승인이나 배포 완료를 의미하지 않는다.
+- 증빙: `work/ios-release-build11/apple-submitted.png`.
+
+## 2026-10-06 기본 제공 도서 업데이트 1.3.4 (12)
+
+- 사용자 요청으로 새 기본 소설·표지·다음 화 안내 및 설명서 표지를 포함한 1.3.4(12)를 준비한다. 기존 Team W8A4759K5F, Bundle ID, 승인 후 자동 출시 설정을 유지한다.
+- `flutter build ipa --release --no-pub --build-name=1.3.4 --build-number=12 --dart-define=READER_UPDATE_CHANNEL=store --export-options-plist=work/ios-release-build12/ExportOptions-export.plist` 성공.
+- IPA: `work/ios-release-build12/KoofyReader-1.3.4-12.ipa`, 53,299,658 bytes. SHA-256: `85fcaa1b148638f260679a31a585c3d84907db77cf574090c6aa9ea99b1dfe56`.
+- ZIP 무결성, Bundle ID·1.3.4(12)·iOS 15.5·사진/추적 목적 설명·배포 entitlements 확인. 시스템 인증서 저장소 접근 권한을 갖춘 `codesign --verify --deep --strict` 검증 통과. 새 원고·두 표지 및 기존 기본 책 자산 5개가 소스와 일치한다.
+- Xcode의 기존 계정으로 exportArchive 업로드를 시작했다. 웹 App Store Connect 세션은 만료되어 사용자에게 기존 계정 재로그인을 요청했다.
+- 업로드·Apple 처리·심사 접수 결과는 아래 후속 기록을 따른다. 업로드 전 검사로 실기기 실행 검증을 대신했다고 주장하지 않는다.
+
+### 1.3.4 (12) 업로드 성공
+
+- 2026-10-06 23:21 KST Xcode exportArchive 업로드 성공. 로그의 `Uploaded package is processing.`, `Upload succeeded.`, `EXPORT SUCCEEDED` 및 종료 코드 0을 확인했다.
+- 업로드 로그: `work/ios-release-build12/upload.log`. Apple 처리 완료·빌드 선택·최종 심사 접수는 웹 App Store Connect 재인증 후 이어서 확인한다.
+
+### 1.3.4 (12) 심사 준비 완료
+
+- 기존 계정 재로그인 후 새 App Store 버전 1.3.4를 생성하고 한국어 출시 노트 및 새 기본 책·다운로드 안내 경로를 담은 심사 메모를 저장했다.
+- Apple 처리 완료된 빌드 12를 연결했다. 빌드 ID: `687a6fc1-6f64-468b-8c20-ed741dabb6f4`.
+- 실제 국가 설정에서 174개 사용 가능 및 프랑스만 사용 불가를 확인했다. 기존과 동일한 표준 암호화 알고리즘 및 프랑스 미배포 답변을 저장해 수출 규정 누락을 해소했다.
+- 승인 후 자동 출시, 모든 사용자에게 즉시 업데이트, 기존 평점 유지 및 기존 연락처·로그인 불필요 설정을 유지했다. 최종 접수 결과는 아래를 따른다.
+
+### 1.3.4 (12) 최종 심사 접수 완료
+
+- 2026-10-06 23:30 KST **심사를 위해 제출** 완료. 제출 상세에서 **iOS 앱 1.3.4 / 1.3.4 (12) / 심사 대기 중**을 확인했다.
+- 제출 ID: `18aaa743-eac1-4708-8ac4-5a2627a25f24`. 제출 항목은 앱 버전 1개다.
+- 기존 승인 후 자동 출시 설정을 유지했다. 실제 App Store 업데이트 제공은 Apple 승인 이후다.
+- 증빙: `work/ios-release-build12/apple-submitted.png`.

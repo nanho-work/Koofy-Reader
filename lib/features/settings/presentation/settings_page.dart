@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
 import 'package:koofy_reader/features/library/presentation/library_trash_page.dart';
 import 'dart:async';
@@ -58,7 +59,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,

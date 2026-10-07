@@ -46,7 +46,7 @@ internal class ReaderBannerFooter(
     }
 
     fun applyPalette(palette: ReaderPalette) {
-        setBackgroundColor(palette.background)
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
         message.setTextColor(palette.secondary)
     }
 

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/backup/data/speech_backup.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'dart:io';
@@ -139,7 +140,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     child: Scaffold(
       appBar: AppBar(title: const Text('서재 백업·복원')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
         children: [
           FutureBuilder<int?>(
             future: _initialBackup,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/features/ads/presentation/app_ad_route_observer.dart';
 import 'branding/startup_splash.dart';
 import 'package:koofy_reader/features/ads/presentation/app_footer_ad_shell.dart';
 import 'package:koofy_reader/app/router.dart';
@@ -14,7 +15,7 @@ class KoofyReaderApp extends StatefulWidget {
 }
 
 class _KoofyReaderAppState extends State<KoofyReaderApp> {
-  final _ads = _AdRouteObserver();
+  final _ads = AppAdRouteObserver();
   @override
   void dispose() {
     _ads.visible.dispose();
@@ -45,21 +46,5 @@ class _KoofyReaderAppState extends State<KoofyReaderApp> {
         );
       },
     );
-  }
-}
-
-class _AdRouteObserver extends NavigatorObserver {
-  final visible = ValueNotifier(true);
-  int _revision = 0;
-  @override
-  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
-    final name = topRoute.settings.name;
-    final show = name != AppRoutes.reader && name != AppRoutes.nativeReader;
-    final revision = ++_revision;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (navigator?.mounted == true && revision == _revision) {
-        visible.value = show;
-      }
-    });
   }
 }

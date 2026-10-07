@@ -25,6 +25,23 @@ ReaderEvent checkpoint(
 );
 
 void main() {
+  test(
+    'permanent removal clears reading state and acknowledges stale checkpoints',
+    () async {
+      final store = NativeReaderStore(NativeDatabase.memory());
+      addTearDown(store.close);
+      final session = await store.beginSession('book', 'r1');
+      await store.acceptCheckpoint(checkpoint(session));
+      await store.deleteBooks({'book'});
+      expect((await store.loadPosition('book', 'r1')).locatorJson, isNull);
+      await store.acceptCheckpoint(checkpoint(session, sequence: 2));
+      expect((await store.loadPosition('book', 'r1')).locatorJson, isNull);
+      final fresh = await store.beginSession('book', 'r1');
+      await store.acceptCheckpoint(checkpoint(fresh));
+      expect((await store.loadPosition('book', 'r1')).locatorJson, isNotNull);
+    },
+  );
+
   test('spacing survives native codec and can reset to publisher defaults', () {
     final preferences = defaultReaderPreferences()
       ..lineHeight = 1.8

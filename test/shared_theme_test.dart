@@ -46,13 +46,7 @@ void main() {
       final theme = Theme.of(context);
       final canvas = theme.scaffoldBackgroundColor;
       expect(theme.appBarTheme.backgroundColor, canvas);
-      final footer = tester.widgetList<Container>(
-        find.ancestor(
-          of: find.text('네트워크 연결 필요'),
-          matching: find.byType(Container),
-        ),
-      );
-      expect(footer.first.color, canvas);
+      expect(find.text('오프라인에서도 독서를 계속할 수 있습니다.'), findsNothing);
       final shell = tester.widgetList<ColoredBox>(
         find.descendant(
           of: find.byType(AppFooterAdShell),

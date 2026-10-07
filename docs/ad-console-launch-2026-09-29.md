@@ -109,3 +109,13 @@ AdMob 인스턴스는 이미 비활성 상태여서 현재 광고 공급에 참�
 - iOS 1.3.0(10) 배포 서명 IPA 검증·Xcode 업로드·수출 규정 답변·빌드 연결·최종 심사 접수 완료. 제출 ID `6f91000b-848a-4734-9cec-0248f84fe4f4`, 심사 대기 중이다. Apple 개인정보 신고에 충돌·기타 진단 데이터도 추가 게시했다.
 - Google AdMob 공급원은 여전히 비활성이다. 실기기 지역별 UMP·ATT·광고·보상 검증 및 AdMob 앱 인증/활성화는 별도 후속 작업이다.
 - 상세 산출물·해시·검증 기록은 `android-release.md`, `ios-release.md`를 따른다.
+
+## iOS Google 입찰 활성화 (2026-10-04)
+
+- 사용자의 AdMob 활성화 의사에 따라 현재 콘솔 상태를 확인했다. 아래 기록은 앞선 9월 29일의 비활성·인증 미완료 상태를 갱신한다.
+- AdMob iOS 앱 `ca-app-pub-5773331970563455~6582912109`의 앱 개요에서 승인 상태 `준비됨`을 확인했다. 기존 배너 `/3465794176`, 리워드 `/5829242795`가 LevelPlay에 저장된 ID와 일치했다.
+- LevelPlay iOS 앱 `283bb91a5`의 Google / Bidding에서 `koofy_banner`와 `koofy_rewarded`를 활성화하고 저장했다. 배너는 `reader_banner`, `library_banner`의 All Countries 그룹 두 곳, 리워드는 `hide_ads_rewarded`의 All Countries 그룹에 배정됐다.
+- 저장 성공 알림과 Instances 목록의 Google Rewarded·Banner 활성 체크를 확인했다. 기존 Unity Ads 활성 및 ironSource 비활성 구성을 유지했다. 광고 빈도·차단·동의 설정과 앱 코드는 변경하지 않았다.
+- Android AdMob 앱 `ca-app-pub-5773331970563455~3449808968`은 `검토 필요`, 앱 스토어 세부정보 미연결 상태였다. 스토어 연결 화면에서 실제 패키지 `com.koofylab.koofyreader`를 검색했으나 결과가 없었다. Android Google 입찰 활성화 및 스토어 연결 변경은 수행하지 않았다.
+- 검증 범위는 콘솔 승인 상태·광고 ID·그룹 배정·활성화 저장이다. 실제 기기 광고 노출·보상 지급이나 수익 발생을 검증한 것은 아니다. Android는 스토어 검색·연결이 가능해진 뒤 승인 상태를 확인하고 활성화한다.
+- iOS 활성화 증빙: `/tmp/koofy-admob-20261004/ios-google-active.jpg`.
