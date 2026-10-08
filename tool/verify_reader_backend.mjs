@@ -5,7 +5,7 @@ const base = 'https://asia-northeast3-koofy-reader.cloudfunctions.net/';
 const origin = 'https://admin.koofy.co.kr';
 const fetchTimed = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(60000) });
 let verifiedAssets = 0;
-for (const kind of ['book', 'font']) {
+for (const kind of ['book', 'font', 'series']) {
   const response = await fetchTimed(`${base}readerCatalog?kind=${kind}${kind === 'book' ? '&supportsTxt=1' : ''}`);
   assert.equal(response.status, 200, `${kind} catalog must return 200`);
   const catalog = await response.json();
@@ -37,6 +37,12 @@ for (const kind of ['book', 'font']) {
     }
   }
 }
+const groupedResponse = await fetchTimed(`${base}readerCatalog?kind=book&supportsTxt=1&supportsSeries=1`);
+assert.equal(groupedResponse.status, 200, 'Grouped catalog must return 200');
+const grouped = await groupedResponse.json();
+assert(Array.isArray(grouped.items));
+assert(grouped.items.every(item => !item.seriesId), 'Grouped catalog must not expose individual episodes');
+console.log(`PASS grouped catalog (${grouped.items.length} works or standalone books on first page)`);
 const denied = await fetchTimed(`${base}readerAdmin?kind=book`, {headers: {Origin: origin}});
 assert.equal(denied.status, 401, 'Unauthenticated admin must be rejected by the application');
 assert.equal(denied.headers.get('access-control-allow-origin'), origin);

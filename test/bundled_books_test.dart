@@ -159,7 +159,7 @@ void main() {
     },
   );
 
-  test('guide title and cover preserve its previous body revision', () async {
+  test('guide title and cover do not change the same text body revision', () async {
     final directory = await Directory.systemTemp.createTemp(
       'guide-publication-',
     );
@@ -178,6 +178,10 @@ void main() {
     expect(guide.title, '쿠피리더 시작하기');
     expect(guide.contentRevision, previous.contentRevision);
     expect(guide.hasDisplayCover, isTrue);
+    if (const bool.fromEnvironment('GENERATE_BUNDLED_FIXTURE')) {
+      await Directory('work/guide-readability').create(recursive: true);
+      await File(guide.filePath).copy('work/guide-readability/guide.epub');
+    }
     final original = await rootBundle.load('assets/books/sample_2.txt');
     final savedSource = await preparer.backupSource(BundledBooks.guide);
     expect(

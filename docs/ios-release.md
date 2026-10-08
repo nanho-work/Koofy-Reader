@@ -284,3 +284,29 @@ Apple의 처리 결과 메일에서 빌드 1의 거부 원인이 확인됐다. `
 - 제출 ID: `18aaa743-eac1-4708-8ac4-5a2627a25f24`. 제출 항목은 앱 버전 1개다.
 - 기존 승인 후 자동 출시 설정을 유지했다. 실제 App Store 업데이트 제공은 Apple 승인 이후다.
 - 증빙: `work/ios-release-build12/apple-submitted.png`.
+
+## 2026-10-08 iOS 1.4.0 (13) 업데이트
+
+- 사용자 요청으로 최신 연재 작품·회차 목록, 휴지통 영구 삭제·비우기, 묶음책 관리 및 서재 버튼·비독서 화면 광고 배치 개선을 포함해 빌드했다. 기존 1.3.4(12)의 App Store Connect `배포 준비됨`을 확인한 뒤 새 버전 1.4.0을 생성했다.
+- `flutter build ipa --release --no-pub --build-name=1.4.0 --build-number=13 --dart-define=READER_UPDATE_CHANNEL=store --export-options-plist=work/ios-release-build13/ExportOptions-export.plist` 성공.
+- IPA: `work/ios-release-build13/KoofyReader-1.4.0-13.ipa`, 53,345,894 bytes. SHA-256 `ab9b451f366707db1fc2f0f8a8f05a75f9f7338b10be0f05326009a7721cc07d`.
+- ZIP 무결성, Bundle ID·버전·iOS 15.5·사진/추적 목적 설명·배포 entitlements, 기본 책 자산 5개 및 시스템 인증서 저장소를 이용한 배포 서명 검증 통과. 동일 앱 코드에 대한 Android 릴리스 당시 Flutter 테스트 68개·정적 분석 통과 기록을 확인했다. 이번 작업에서 실기기 독서·광고 노출을 새로 검증했다고 주장하지 않는다.
+- 한국어 출시 노트와 영어 심사 메모 저장. 기존 자동 출시·즉시 업데이트·평점 유지 설정을 유지한다. 업로드·Apple 처리·최종 제출 결과는 아래 후속 기록을 따른다.
+- 통계 기능과 Remote Config 값은 변경하지 않았다.
+
+### 1.4.0 (13) 업로드 성공
+
+- 2026-10-08 14:40 KST, Xcode 로그의 `Upload succeeded`, `EXPORT SUCCEEDED` 및 종료 코드 0 확인. 업로드 로그: `work/ios-release-build13/upload.log`.
+- Apple 처리 완료·빌드 연결·최종 심사 접수는 아직 확인 전이다. 로그인된 Chrome에서 사용자 작업과 제어가 겹쳐 마지막 제출을 잠시 대기한다. 별도 브라우저 프로필에는 Apple 로그인이 없다.
+
+### 1.4.0 (13) Apple 처리 완료 및 수출 규정 확인 대기
+
+- 처리 완료된 빌드 13을 새 버전 1.4.0의 빌드 선택 화면에서 선택했다. 빌드 ID: `c58fe006-4803-4441-bc87-dcac5aaee66b`.
+- 수출 규정의 표준 암호화 선택 시 자동 승인 검토가 규제성 선언에 대한 명시적 승인을 요구해 차단했다. 기존 답변(표준 암호화 / 프랑스 미배포)으로 진행할지 사용자에게 확인을 요청했다. 수출 규정 저장과 최종 심사 접수는 아직 미완료다.
+
+### 1.4.0 (13) 최종 심사 접수 완료
+
+- 사용자가 수출 규정 답변을 직접 완료했다고 알려준 뒤 콘솔에서 문서 누락 경고 해소를 확인했다. 빌드 연결을 저장하고 `심사에 추가` → `심사를 위해 제출`을 완료했다.
+- 2026-10-08 14:53 KST, 제출 상세의 **iOS 앱 1.4.0 / 1.4.0 (13) / 심사 대기 중** 확인. 제출 ID: `7e6a4d75-24cb-420c-ac2d-fc0b886e83a0`.
+- 기존 승인 후 자동 출시·모든 사용자에게 즉시 업데이트·기존 평점 유지 설정을 확인했다. 승인 및 실제 스토어 제공 완료를 의미하지 않는다.
+- 증빙: `work/ios-release-build13/apple-submitted.png`. Remote Config는 변경하지 않았다. 승인 후 실제 업데이트 제공을 확인하면 `ios_update_latest_version`을 `1.4.0`으로 지정할 수 있다.
