@@ -40,7 +40,7 @@ enum SpeechBackupChannel {
                 result(nil)
             default: result(FlutterMethodNotImplemented)
             }
-        } catch { result(FlutterError(code: "speech_backup_failed", message: "듣기 기록을 백업·복원하지 못했습니다.", details: nil)) }
+        } catch { result(FlutterError(code: "speech_backup_failed", message: L("듣기 기록을 백업·복원하지 못했습니다."), details: nil)) }
     }
     private enum BackupError: Error { case invalid }
 }

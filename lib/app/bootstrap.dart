@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 
 /// Storage must be ready before the library can write. Startup failures remain
@@ -39,20 +40,22 @@ class _ReaderBootstrapState extends State<ReaderBootstrap> {
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            '앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.',
+                          Text(
+                            tr(
+                              "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.",
+                            ),
                           ),
                           const SizedBox(height: 16),
                           FilledButton(
                             onPressed: () => setState(() {
                               _startup = Future.sync(widget.initialize);
                             }),
-                            child: const Text('다시 시도'),
+                            child: Text(tr("다시 시도")),
                           ),
                         ],
                       )
-                    : const CircularProgressIndicator(
-                        semanticsLabel: '기록을 안전하게 준비하는 중',
+                    : CircularProgressIndicator(
+                        semanticsLabel: tr("기록을 안전하게 준비하는 중"),
                       ),
               ),
             ),

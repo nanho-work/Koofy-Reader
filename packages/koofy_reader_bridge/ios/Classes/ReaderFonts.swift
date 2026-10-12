@@ -9,7 +9,7 @@ import ReadiumShared
 /// files, so a future downloader can supply fonts through the same interface.
 final class ReaderFonts {
     static let ids = ["default", "maplestory", "hakgyoansim-siganpyo"]
-    static let labels = ["기본", "메이플스토리", "학교안심 시간표"]
+    static var labels: [String] { [L("기본"), "메이플스토리", "학교안심 시간표"] }
 
     private struct Catalog: Decodable {
         let version: Int
@@ -69,7 +69,7 @@ final class ReaderFonts {
                 alternates: [.sansSerif], fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
         }
         var loadedIds = ["default"] + catalog.families.map(\.id)
-        var loadedLabels = ["기본"] + catalog.families.map(\.label)
+        var loadedLabels = [L("기본")] + catalog.families.map(\.label)
         let support = try FileManager.default.url(for: .applicationSupportDirectory,
             in: .userDomainMask, appropriateFor: nil, create: true)
         for remoteDirectory in [downloadedDirectory ?? support.appendingPathComponent("cloud_reader/fonts", isDirectory: true), support.appendingPathComponent("personal_fonts", isDirectory: true)] {
@@ -125,6 +125,6 @@ final class ReaderFonts {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
     private static func invalidFont() -> Error {
-        PigeonError(code: "font_install_failed", message: "글꼴 파일을 준비하지 못했습니다. 앱을 다시 실행해 주세요.", details: nil)
+        PigeonError(code: "font_install_failed", message: L("글꼴 파일을 준비하지 못했습니다. 앱을 다시 실행해 주세요."), details: nil)
     }
 }

@@ -98,7 +98,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
               ["light", "sepia", "dark"].contains(preferences.theme),
               ["instant", "curl"].contains(preferences.pageTurnStyle ?? "instant"),
               ReaderFonts.isValidId(preferences.fontId) else {
-            throw failure("invalid_preferences", "지원하지 않는 독서 설정입니다.")
+            throw failure("invalid_preferences", L("지원하지 않는 독서 설정입니다."))
         }
     }
 
@@ -106,7 +106,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         super.viewDidLoad()
         title = request.title
         view.backgroundColor = .systemBackground
-        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "서재", style: .plain, target: self, action: #selector(closeTapped))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(title: L("서재"), style: .plain, target: self, action: #selector(closeTapped))
         navigationItem.leftBarButtonItem?.accessibilityIdentifier = "reader.close"
         configureMenu()
         body.translatesAutoresizingMaskIntoConstraints = false
@@ -154,14 +154,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         progress.numberOfLines = 2
         progress.lineBreakMode = .byTruncatingTail
         progress.widthAnchor.constraint(lessThanOrEqualToConstant: 140).isActive = true
-        progress.text = "책을 여는 중"
+        progress.text = L("책을 여는 중")
         progress.accessibilityIdentifier = "reader.progress"
         progressItem = UIBarButtonItem(customView: progress)
         let returnButton = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"), style: .plain, target: self, action: #selector(returnToReading))
-        returnButton.accessibilityLabel = "이동 전 위치로"; returnButton.isEnabled = false; returnItem = returnButton
-        let previous = UIBarButtonItem(title: "이전", style: .plain, target: self, action: #selector(previousTapped))
+        returnButton.accessibilityLabel = L("이동 전 위치로"); returnButton.isEnabled = false; returnItem = returnButton
+        let previous = UIBarButtonItem(title: L("이전"), style: .plain, target: self, action: #selector(previousTapped))
         previous.accessibilityIdentifier = "reader.previous"
-        let next = UIBarButtonItem(title: "다음", style: .plain, target: self, action: #selector(nextTapped))
+        let next = UIBarButtonItem(title: L("다음"), style: .plain, target: self, action: #selector(nextTapped))
         next.accessibilityIdentifier = "reader.next"
         nextPageItem = next
         toolbar.items = [returnButton, previous, .flexibleSpace(), progressItem, .flexibleSpace(), next]
@@ -200,8 +200,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         ])
         configureSpeechControls()
         spinner.startAnimating()
-        NotificationCenter.default.addObserver(self, selector: #selector(flushBackground), name: UIApplication.willResignActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(resumeForeground), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(sceneWillDeactivate(_:)), name: UIScene.willDeactivateNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(sceneDidActivate(_:)), name: UIScene.didActivateNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(motionPreferenceChanged), name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(motionPreferenceChanged), name: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil)
         openingTask = Task { [weak self] in await self?.openPublication() }
@@ -250,14 +250,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             let retriever = AssetRetriever(httpClient: OfflineHTTPClient())
             let opener = PublicationOpener(parser: EPUBParser())
             guard let file = FileURL(url: URL(fileURLWithPath: request.filePath)) else {
-                throw failure("file_access", "책 파일 주소가 올바르지 않습니다.")
+                throw failure("file_access", L("책 파일 주소가 올바르지 않습니다."))
             }
             let asset = try await retriever.retrieve(url: file).get()
             let publication = try await opener.open(asset: asset, allowUserInteraction: false).get()
             guard !Task.isCancelled, !isClosing else { return }
             guard publication.conforms(to: .epub), !publication.isRestricted,
                   publication.metadata.layout != .fixed, !publication.readingOrder.isEmpty else {
-                throw failure("unsupported_publication", "현재는 DRM 없는 리플로우 EPUB을 지원합니다.")
+                throw failure("unsupported_publication", L("현재는 DRM 없는 리플로우 EPUB을 지원합니다."))
             }
             self.publication = publication
             speech = ReaderSpeech(publication: publication, request: request,
@@ -281,7 +281,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
 
     private func mountNavigator(at locator: Locator?, kind: String) throws {
         speech?.pause()
-        guard let publication else { throw failure("reader_not_ready", "책을 여는 중입니다.") }
+        guard let publication else { throw failure("reader_not_ready", L("책을 여는 중입니다.")) }
         moveOperation += 1
         moveTask?.cancel()
         programmaticMovePending = false
@@ -323,7 +323,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled, let self, self.renderGeneration == generation,
                   !self.isReady, !self.isClosing else { return }
-            self.report(failure("render_timeout", "본문 표시가 완료되지 않았습니다. 책을 닫고 다시 열어 주세요."), code: "render_timeout", fatal: true)
+            self.report(failure("render_timeout", L("본문 표시가 완료되지 않았습니다. 책을 닫고 다시 열어 주세요.")), code: "render_timeout", fatal: true)
         }
     }
 
@@ -376,7 +376,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     func apply(_ value: ReaderPreferences, completion: @escaping (Result<Void, Error>) -> Void) throws {
-        guard isReady, !isClosing, !turnBusy else { throw failure("reader_not_ready", "본문 표시가 완료된 뒤 변경해 주세요.") }
+        guard isReady, !isClosing, !turnBusy else { throw failure("reader_not_ready", L("본문 표시가 완료된 뒤 변경해 주세요.")) }
         try Self.validate(value)
         let sameLayout = value.fontScale == preferences.fontScale && value.columnCount == preferences.columnCount &&
             value.scroll == preferences.scroll && value.theme == preferences.theme &&
@@ -392,7 +392,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
         // Recreate at an exact content anchor. This avoids saving transient page
         // starts while Readium's CSS layout is changing asynchronously.
-        settingsCompletion?(.failure(failure("superseded", "새 설정으로 대체되었습니다.")))
+        settingsCompletion?(.failure(failure("superseded", L("새 설정으로 대체되었습니다."))))
         settingsCompletion = completion
         preferences = value
         do { try mountNavigator(at: lastLocator, kind: "preferencesChanged") }
@@ -403,7 +403,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     func go(to locator: Locator, turnForward: Bool? = nil, completion: @escaping (Result<Void, Error>) -> Void) throws {
-        guard isReady, !isClosing, let navigator else { throw failure("reader_not_ready", "본문 표시가 완료된 뒤 이동해 주세요.") }
+        guard isReady, !isClosing, let navigator else { throw failure("reader_not_ready", L("본문 표시가 완료된 뒤 이동해 주세요.")) }
         speech?.userNavigation()
         try validateLocation(locator)
         if !turnCommitInFlight { invalidatePageTurns() }
@@ -428,7 +428,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             self.captureGeneration += 1
             self.programmaticMovePending = false
             self.needsTurnRestoration = true
-            self.finishNavigation(.failure(failure("navigation_timeout", "본문 이동을 완료하지 못했습니다.")))
+            self.finishNavigation(.failure(failure("navigation_timeout", L("본문 이동을 완료하지 못했습니다."))))
             self.turnCommitInFlight = false
             self.turnBusy = false
             if UIApplication.shared.applicationState == .active { self.resumeForeground() }
@@ -447,7 +447,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             }
             guard self.moveOperation == operation else { return }
             guard !Task.isCancelled, self.navigator === navigator, !self.isClosing else {
-                self.finishNavigation(.failure(failure("navigation_cancelled", "본문 이동이 취소되었습니다.")))
+                self.finishNavigation(.failure(failure("navigation_cancelled", L("본문 이동이 취소되었습니다."))))
                 return
             }
             if success {
@@ -457,7 +457,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 self.programmaticMovePending = false
                 self.restorationAnchor = nil
                 self.isReady = true
-                self.finishNavigation(.failure(failure("navigation_failed", "요청한 본문 위치로 이동할 수 없습니다.")))
+                self.finishNavigation(.failure(failure("navigation_failed", L("요청한 본문 위치로 이동할 수 없습니다."))))
             }
         }
     }
@@ -471,7 +471,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private func validateLocation(_ locator: Locator) throws {
         guard let publication,
               publication.readingOrder.firstIndexWithHREF(locator.href) != nil else {
-            throw failure("invalid_locator", "이 책에 없는 본문 위치입니다.")
+            throw failure("invalid_locator", L("이 책에 없는 본문 위치입니다."))
         }
     }
 
@@ -503,7 +503,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 guard let resourceURL = bundle.url(forResource: "KoofyReaderAssets", withExtension: "bundle"),
                       let resources = Bundle(url: resourceURL),
                       let scriptURL = resources.url(forResource: "reader_anchor", withExtension: "js") else {
-                    throw failure("anchor_script_missing", "읽기 위치 계산 파일을 찾지 못했습니다.")
+                    throw failure("anchor_script_missing", L("읽기 위치 계산 파일을 찾지 못했습니다."))
                 }
                 let script = try String(contentsOf: scriptURL, encoding: .utf8)
                     .replacingOccurrences(of: "__KOOFY_RESTORE__", with: self.restorationAnchor != nil ? "true" : "false")
@@ -511,7 +511,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 let value = try await current.evaluateJavaScript(script).get()
                 guard let raw = value as? String, let data = raw.data(using: .utf8),
                       let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    throw failure("anchor_capture_failed", "본문 위치를 확인하지 못했습니다.")
+                    throw failure("anchor_capture_failed", L("본문 위치를 확인하지 못했습니다."))
                 }
                 snapshot = result
             } catch {
@@ -568,12 +568,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             self.atBookEnd = snapshot["resourceEnd"] as? Bool == true &&
                 self.publication?.readingOrder.firstIndexWithHREF(fallback.href) == (self.publication?.readingOrder.count ?? 0) - 1
             let offerNext = self.atBookEnd && self.request.nextBookTitle != nil
-            self.nextPageItem?.title = offerNext ? "이어서 읽기" : "다음"
-            self.nextPageItem?.accessibilityLabel = offerNext ? "다음 권 \(self.request.nextBookTitle ?? "") 이어서 읽기" : "다음 페이지"
+            self.nextPageItem?.title = offerNext ? L("이어서 읽기") : L("다음")
+            self.nextPageItem?.accessibilityLabel = offerNext ? L("다음 권 {0} 이어서 읽기", self.request.nextBookTitle ?? "") : L("다음 페이지")
             self.progress.text = self.atBookEnd
-                ? self.request.nextBookTitle.map { "마지막 페이지\n다음: \($0)" } ?? "마지막 페이지"
+                ? self.request.nextBookTitle.map { L("마지막 페이지\n다음: {0}", $0) } ?? L("마지막 페이지")
                 : String(format: "%.1f%%", (fallback.locations.totalProgression ?? 0) * 100)
-            if isReaderDisplayCover(self.lastLocator) { self.progress.text = "표지" }
+            if isReaderDisplayCover(self.lastLocator) { self.progress.text = L("표지") }
             self.progress.sizeToFit()
             do {
                 let kind = self.hasSentReady ? (wasReady ? "locationChanged" : self.pendingKind) : "ready"
@@ -612,6 +612,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             guard let self, !self.isClosing, self.layoutGeneration == layout else { return }
             self.isRotating = false
             if self.hasSentReady {
+                // Duo briefly reports its closed size while moving to Home.
+                // Rebuild once the scene is active and its final viewport is ready.
+                guard self.viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive else {
+                    self.needsTurnRestoration = true
+                    return
+                }
                 do {
                     try self.mountNavigator(at: self.lastLocator,
                         kind: self.isReady ? "locationChanged" : self.pendingKind)
@@ -623,12 +629,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     func close(nextBook: Bool = false, manageFonts: Bool = false, downloadSeries: Bool = false, completion: @escaping (Result<Void, Error>) -> Void) {
         speech?.pause()
         speechFollowTask?.cancel()
-        guard !isClosing else { completion(.failure(failure("reader_closing", "독서 화면을 닫는 중입니다."))); return }
+        guard !isClosing else { completion(.failure(failure("reader_closing", L("독서 화면을 닫는 중입니다.")))); return }
         cancelUncommittedTurn()
         translation.suspend()
         isClosing = true
         moveTask?.cancel()
-        finishNavigation(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
+        finishNavigation(.failure(failure("reader_closed", L("독서 화면이 종료되었습니다."))))
         Task { [weak self] in
             guard let self else { return }
             await self.captureTask?.value
@@ -637,7 +643,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 closedEvent.message = manageFonts ? "manageFonts" : nextBook ? "nextBook" : downloadSeries ? "downloadSeries" : nil
                 self.openingTask?.cancel()
                 self.readyTimeout?.cancel()
-                self.settingsCompletion?(.failure(failure("reader_closed", "독서 화면이 종료되었습니다.")))
+                self.settingsCompletion?(.failure(failure("reader_closed", L("독서 화면이 종료되었습니다."))))
                 self.settingsCompletion = nil
                 self.navigationController?.dismiss(animated: true) {
                     self.onClosed?()
@@ -690,7 +696,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             invalidatePageTurns()
             finishNavigation(.failure(error))
         }
-        let message = (error as? PigeonError)?.message ?? "책을 처리하지 못했습니다: \(error.localizedDescription)"
+        let message = (error as? PigeonError)?.message ?? L("책을 처리하지 못했습니다: {0}", error.localizedDescription)
         let effectiveCode = (error as? PigeonError)?.code ?? code
         sequence += 1
         sendEvent(ReaderEvent(protocolVersion: request.protocolVersion, sessionId: request.sessionId,
@@ -706,10 +712,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             isReady = false
             spinner.stopAnimating()
             statusLabel.text = message
-            progress.text = "책을 열지 못함"
+            progress.text = L("책을 열지 못함")
         } else if presentedViewController == nil {
-            let alert = UIAlertController(title: code == "checkpoint_failed" ? "읽기 기록 저장 실패" : "독서 화면", message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            let alert = UIAlertController(title: code == "checkpoint_failed" ? L("읽기 기록 저장 실패") : L("독서 화면"), message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L("확인"), style: .default))
             present(alert, animated: true)
         }
     }
@@ -724,12 +730,24 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             close(downloadSeries: true) { _ in }
             return
         }
-        let alert = UIAlertController(title: "외부 링크", message: "책 밖의 링크는 이 독서 화면에서 열지 않습니다.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        let alert = UIAlertController(title: L("외부 링크"), message: L("책 밖의 링크는 이 독서 화면에서 열지 않습니다."), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L("확인"), style: .default))
         if presentedViewController == nil { present(alert, animated: true) }
     }
 
-    @objc private func flushBackground() {
+    @objc private func sceneWillDeactivate(_ notification: Notification) {
+        guard let scene = notification.object as? UIWindowScene,
+              scene === viewIfLoaded?.window?.windowScene else { return }
+        flushBackground()
+    }
+
+    @objc private func sceneDidActivate(_ notification: Notification) {
+        guard let scene = notification.object as? UIWindowScene,
+              scene === viewIfLoaded?.window?.windowScene else { return }
+        resumeForeground()
+    }
+
+    private func flushBackground() {
         translation.suspend()
         speech?.foreground(false)
         speechFollowTask?.cancel()
@@ -928,13 +946,13 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             captureGeneration += 1
             restorationAnchor = lastLocator
             isReady = false
-            finishNavigation(.failure(failure("navigation_cancelled", "본문 이동이 취소되었습니다.")))
+            finishNavigation(.failure(failure("navigation_cancelled", L("본문 이동이 취소되었습니다."))))
         }
         invalidatePageTurns()
         turnBusy = false
     }
 
-    @objc private func resumeForeground() {
+    private func resumeForeground() {
         translation.resume()
         speech?.foreground(true)
         guard !isClosing, !renderFailed else { return }
@@ -1035,12 +1053,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             button.setImage(UIImage(systemName: symbol), for: .normal)
             button.accessibilityLabel = label
             button.addTarget(self, action: action, for: .touchUpInside)
-            button.widthAnchor.constraint(equalToConstant: label == "듣기 설정" ? 76 : 48).isActive = true
+            button.widthAnchor.constraint(equalToConstant: label == L("듣기 설정") ? 76 : 48).isActive = true
             speechControls.addArrangedSubview(button)
         }
-        control("backward.end.fill", "이전 문장", #selector(speechPrevious))
-        control("forward.end.fill", "다음 문장", #selector(speechNext))
-        control("slider.horizontal.3", "듣기 설정", #selector(showSpeechSettings))
+        control("backward.end.fill", L("이전 문장"), #selector(speechPrevious))
+        control("forward.end.fill", L("다음 문장"), #selector(speechNext))
+        control("slider.horizontal.3", L("듣기 설정"), #selector(showSpeechSettings))
         speechTransportItem = UIBarButtonItem(customView: speechControls)
         NSLayoutConstraint.activate([
             speechButton.topAnchor.constraint(equalTo: body.topAnchor, constant: 8),
@@ -1060,7 +1078,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         let playing = speech?.playing == true
         if playing || speech?.busy == true { listeningMode = true }
         speechButton.setImage(UIImage(systemName: speech?.busy == true ? "hourglass" : playing ? "pause.fill" : "play.fill"), for: .normal)
-        speechButton.accessibilityLabel = playing || speech?.busy == true ? "책 읽어주기 일시정지" : "책 읽어주기 재생"
+        speechButton.accessibilityLabel = playing || speech?.busy == true ? L("책 읽어주기 일시정지") : L("책 읽어주기 재생")
         speechButton.isHidden = !chromeVisible || !(listeningMode || playing || UserDefaults.standard.bool(forKey: "reader.speech.alwaysShow"))
         let transport = listeningMode || playing || speech?.busy == true
         if let item = speechTransportItem, var items = toolbar.items,
@@ -1073,13 +1091,13 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         if let settings = speechControls.arrangedSubviews.last as? UIButton {
             let rate = String(format: "%g", speech?.speed ?? 1)
             let minutes = speech?.timerMinutes ?? 0
-            let timer = minutes > 0 ? "\(minutes)분" : "타이머 꺼짐"
+            let timer = minutes > 0 ? L("{0}분", String(minutes)) : L("타이머 꺼짐")
             settings.setImage(nil, for: .normal)
-            settings.setTitle("\(rate)배\n\(timer)", for: .normal)
+            settings.setTitle(L("{0}배\n{1}", rate, timer), for: .normal)
             settings.titleLabel?.numberOfLines = 2
             settings.titleLabel?.textAlignment = .center
             settings.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)
-            settings.accessibilityLabel = "듣기 설정, \(rate)배, \(timer)"
+            settings.accessibilityLabel = L("듣기 설정, {0}배, {1}", rate, timer)
         }
     }
     @objc private func speechTapped() { listeningMode = true; translation.stopVoice(); speech?.toggle(); updateSpeechControls() }
@@ -1101,8 +1119,8 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
     private func speechMessage(_ message: String) {
         guard !isClosing, UIApplication.shared.applicationState == .active else { return }
-        let alert = UIAlertController(title: "책 읽어주기", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .cancel))
+        let alert = UIAlertController(title: L("책 읽어주기"), message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L("확인"), style: .cancel))
         (presentedViewController ?? self).present(alert, animated: true)
     }
     private func followSpeech(_ locator: Locator?) {
@@ -1124,15 +1142,15 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         navigationController?.overrideUserInterfaceStyle = overrideUserInterfaceStyle
         let settings = UIBarButtonItem(image: UIImage(systemName: "textformat.size"), style: .plain,
             target: self, action: #selector(preferencesTapped(_:)))
-        settings.accessibilityLabel = "독서 설정"
+        settings.accessibilityLabel = L("독서 설정")
         settings.accessibilityIdentifier = "reader.preferences"
-        let contents = UIBarButtonItem(title: "목차", style: .plain, target: self, action: #selector(contentsTapped))
+        let contents = UIBarButtonItem(title: L("목차"), style: .plain, target: self, action: #selector(contentsTapped))
         contents.accessibilityIdentifier = "reader.contents"
         let tools = UIBarButtonItem(image: UIImage(systemName: "magnifyingglass"), style: .plain, target: self, action: #selector(toolsTapped(_:)))
-        tools.accessibilityLabel = "본문 검색 · 책갈피"
+        tools.accessibilityLabel = L("본문 검색 · 책갈피")
         navigationItem.rightBarButtonItems = [settings, contents, tools]
         if request.nextBookTitle != nil {
-            let next = UIBarButtonItem(title: "다음 권", style: .plain,
+            let next = UIBarButtonItem(title: L("다음 권"), style: .plain,
                 target: self, action: #selector(nextBookTapped))
             navigationItem.rightBarButtonItems?.append(next)
         }
@@ -1144,9 +1162,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     @objc private func nextBookTapped() {
         speech?.pause()
         guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let title = request.nextBookTitle else { return }
-        let alert = UIAlertController(title: "다음 권 읽기", message: title, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        alert.addAction(UIAlertAction(title: "열기", style: .default) { [weak self] _ in
+        let alert = UIAlertController(title: L("다음 권 읽기"), message: title, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L("취소"), style: .cancel))
+        alert.addAction(UIAlertAction(title: L("열기"), style: .default) { [weak self] _ in
             self?.close(nextBook: true) { _ in }
         })
         present(alert, animated: true)
@@ -1290,34 +1308,34 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
     @objc private func toolsTapped(_ sender: UIBarButtonItem) {
         guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let publication else { return }
-        let menu = UIAlertController(title: "찾기 · 책갈피", message: nil, preferredStyle: .actionSheet)
-        menu.addAction(UIAlertAction(title: "본문 검색", style: .default) { [weak self] _ in
+        let menu = UIAlertController(title: L("찾기 · 책갈피"), message: nil, preferredStyle: .actionSheet)
+        menu.addAction(UIAlertAction(title: L("본문 검색"), style: .default) { [weak self] _ in
             self?.presentTool(ReaderSearchViewController(publication: publication) { [weak self] location in self?.jumpFromTools(location) })
         })
-        menu.addAction(UIAlertAction(title: "현재 위치에 책갈피 추가", style: .default) { [weak self] _ in self?.addBookmark() })
-        menu.addAction(UIAlertAction(title: "책갈피 목록", style: .default) { [weak self] _ in
+        menu.addAction(UIAlertAction(title: L("현재 위치에 책갈피 추가"), style: .default) { [weak self] _ in self?.addBookmark() })
+        menu.addAction(UIAlertAction(title: L("책갈피 목록"), style: .default) { [weak self] _ in
             guard let self else { return }
             do { self.presentTool(ReaderBookmarksViewController(rows: try ReaderBookmark.decode(self.bookmarksJson), save: { [weak self] rows in try self?.saveBookmarks(rows) }, jump: { [weak self] location in self?.jumpFromTools(location) })) }
             catch { self.report(error, code: "bookmarks_failed", fatal: false) }
         })
-        menu.addAction(UIAlertAction(title: "닫기", style: .cancel))
+        menu.addAction(UIAlertAction(title: L("닫기"), style: .cancel))
         menu.popoverPresentationController?.barButtonItem = sender
         present(menu, animated: true)
     }
     private func addBookmark() {
         guard isReady, !isClosing, let locator = lastLocator else { return }
         do {
-            guard !isReaderDisplayCover(locator) else { throw failure("cover_bookmark", "책갈피는 본문에서 추가해 주세요.") }
+            guard !isReaderDisplayCover(locator) else { throw failure("cover_bookmark", L("책갈피는 본문에서 추가해 주세요.")) }
             let rows = try ReaderBookmark.decode(bookmarksJson)
-            guard rows.count < 100 else { throw failure("bookmark_limit", "책갈피는 책마다 100개까지 저장할 수 있습니다.") }
-            guard !rows.contains(where: { $0.locator == locator }) else { throw failure("bookmark_exists", "이미 저장한 위치입니다.") }
-            let alert = UIAlertController(title: "책갈피 이름", message: nil, preferredStyle: .alert)
+            guard rows.count < 100 else { throw failure("bookmark_limit", L("책갈피는 책마다 100개까지 저장할 수 있습니다.")) }
+            guard !rows.contains(where: { $0.locator == locator }) else { throw failure("bookmark_exists", L("이미 저장한 위치입니다.")) }
+            let alert = UIAlertController(title: L("책갈피 이름"), message: nil, preferredStyle: .alert)
             alert.addTextField { $0.text = String(ReaderBookmark.snippet(locator).prefix(120)) }
-            alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-            alert.addAction(UIAlertAction(title: "저장", style: .default) { [weak self, weak alert] _ in
+            alert.addAction(UIAlertAction(title: L("취소"), style: .cancel))
+            alert.addAction(UIAlertAction(title: L("저장"), style: .default) { [weak self, weak alert] _ in
                 guard let self else { return }
-                let label = ReaderBookmark.label(alert?.textFields?.first?.text ?? "책갈피")
-                do { try self.saveBookmarks(rows + [ReaderBookmark(id: UUID().uuidString, label: label.isEmpty ? "책갈피" : label, locator: locator)]) }
+                let label = ReaderBookmark.label(alert?.textFields?.first?.text ?? L("책갈피"))
+                do { try self.saveBookmarks(rows + [ReaderBookmark(id: UUID().uuidString, label: label.isEmpty ? L("책갈피") : label, locator: locator)]) }
                 catch { self.report(error, code: "bookmark_save_failed", fatal: false) }
             })
             present(alert, animated: true)
@@ -1370,7 +1388,7 @@ private final class KoofyContentsViewController: UITableViewController {
         self.choose = choose
         self.theme = theme
         super.init(style: .insetGrouped)
-        title = "목차"
+        title = L("목차")
     }
 
     required init?(coder: NSCoder) { fatalError("Use init(links:choose:)") }
@@ -1389,7 +1407,7 @@ private final class KoofyContentsViewController: UITableViewController {
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = palette.accent
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "닫기", style: .done,
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: L("닫기"), style: .done,
             target: self, action: #selector(closeSheet))
     }
 
@@ -1402,7 +1420,7 @@ private final class KoofyContentsViewController: UITableViewController {
         cell.textLabel?.textColor = palette.foreground
         cell.tintColor = palette.accent
         let (link, depth) = rows[indexPath.row]
-        cell.textLabel?.text = link.title ?? "항목 \(indexPath.row + 1)"
+        cell.textLabel?.text = link.title ?? L("항목 {0}", String(indexPath.row + 1))
         cell.textLabel?.numberOfLines = 0
         cell.textLabel?.font = .preferredFont(forTextStyle: .body)
         cell.indentationLevel = min(depth, 5)

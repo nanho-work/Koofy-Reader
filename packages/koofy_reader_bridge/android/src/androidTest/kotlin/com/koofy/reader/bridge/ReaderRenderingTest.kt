@@ -623,6 +623,78 @@ class ReaderRenderingTest {
         assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
     }
 
+    @Test fun englishReaderLabelsPreserveBookText() = localizedReader("en", "Library", "Reading settings")
+    @Test fun japaneseReaderLabelsPreserveBookText() = localizedReader("ja", "本棚", "読書設定")
+
+    private fun localizedReader(language: String, library: String, settings: String) {
+        ReaderStrings.language = language
+        try {
+            launch()
+            scenario!!.onActivity { activity ->
+                fun texts(view: android.view.View): List<String> =
+                    (if (view is android.widget.TextView) listOf(view.text.toString()) else emptyList()) +
+                    (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
+                val labels = texts(activity.window.decorView)
+                assertTrue(labels.toString(), labels.contains(library))
+                assertTrue(labels.toString(), labels.contains(settings))
+                assertTrue("Book title must stay in its original language", labels.contains("한글 독서 엔진 검증"))
+                ReaderActivity::class.java.getDeclaredMethod("showSettings").apply { isAccessible = true }.invoke(activity)
+            }
+            Thread.sleep(500)
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                    "screencap -p /sdcard/Download/koofy-reader-$language.png")
+            ).use { it.readBytes() }
+        } finally { ReaderStrings.language = "ko" }
+    }
+
+    @Test fun foldableViewportAndCheckpointSurviveFoldUnfoldAndBackground() {
+        val args = InstrumentationRegistry.getArguments()
+        val closed = args.getString("foldClosedState")
+        val opened = args.getString("foldOpenedState")
+        assumeTrue("Requires explicit emulator fold state IDs", closed != null && opened != null)
+        fun shell(command: String): String = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        ).bufferedReader().use { it.readText() }
+        fun width(): Int {
+            var result = 0
+            scenario!!.onActivity { activity ->
+                result = activity.window.decorView.width
+                assertEquals("App window must fill the active display width",
+                    activity.windowManager.maximumWindowMetrics.bounds.width(), result)
+            }
+            return result
+        }
+        fun capture(name: String) {
+            shell("screencap -p /sdcard/Download/koofy-fold-$name.png")
+        }
+        try {
+            shell("cmd device_state state reset")
+            launch()
+            val wide = width()
+            val anchor = requireNotNull(ReaderRuntime.session!!.locatorJson)
+            capture("opened")
+            android.util.Log.i("KoofyFoldTest", "REQUEST_FOLD")
+            awaitCondition("Closed display did not resize and restore the text") {
+                width() < wide && anchorVisible(anchor)
+            }
+            capture("closed")
+            android.util.Log.i("KoofyFoldTest", "REQUEST_UNFOLD")
+            awaitCondition("Open display did not restore its width and text") {
+                width() == wide && anchorVisible(anchor)
+            }
+            scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            awaitCondition("Background return lost the reading anchor") { anchorVisible(anchor) }
+            capture("returned")
+            val before = snapshot().visibleIds()
+            scenario!!.onActivity { navigator(it).goForward(false) }
+            awaitCondition("Page turn after unfolding did not advance") { snapshot().visibleIds() != before }
+        } finally {
+            shell("cmd device_state state reset")
+        }
+    }
+
     @Test fun twoPagesAreActualCssColumnsOnWideViewport() {
         launch()
         // Android 16 ignores app orientation requests on large displays. They

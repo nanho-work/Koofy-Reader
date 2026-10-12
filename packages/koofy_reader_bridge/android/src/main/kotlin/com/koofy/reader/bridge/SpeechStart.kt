@@ -45,7 +45,7 @@ internal suspend fun speechStart(publication: Publication, target: Locator): Spe
         }
         skip += ranges.size
     }
-    error("읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요.")
+    error(L("읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요."))
 }
 internal fun compactSpeech(value: String) = value.filterNot { it.isWhitespace() }
 internal fun speechQuoteOffset(text: String, before: String?, highlight: String?, after: String?): Int? {

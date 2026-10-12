@@ -4,10 +4,19 @@ Run on macOS with Pillow; no font files are copied into the app.
 """
 from pathlib import Path
 import re
+import argparse
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--language', choices=['ko', 'en', 'ja'], default='ko')
+lang = parser.parse_args().language
+labels = {
+    'ko': ('쿠피리더', '시작하기', '책 가져오기부터', '나만의 독서 설정까지', '사용자 가이드'),
+    'en': ('Getting', 'started', 'From adding books', 'to reading your way', 'USER GUIDE'),
+    'ja': ('はじめての', '使い方', '本の追加から', '自分好みの読書設定まで', 'ユーザーガイド'),
+}[lang]
 SCALE = 2
 image = Image.new('RGB', (1024 * SCALE, 1536 * SCALE), '#284B3B')
 draw = ImageDraw.Draw(image)
@@ -15,8 +24,8 @@ cream, muted, line = '#F7F1DF', '#BDCFBA', '#698771'
 
 
 def text(x, y, label, size, bold=False, fill=cream):
-    font = ImageFont.truetype('/System/Library/Fonts/AppleSDGothicNeo.ttc',
-                              size * SCALE, index=6 if bold else 0)
+    font_path = '/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc' if lang == 'ja' else '/System/Library/Fonts/AppleSDGothicNeo.ttc'
+    font = ImageFont.truetype(font_path, size * SCALE, index=0 if lang == 'ja' else (6 if bold else 0))
     draw.text((x * SCALE, y * SCALE), label, font=font, fill=fill, anchor='lt')
 
 
@@ -29,10 +38,10 @@ draw.rectangle((32 * SCALE, 32 * SCALE, 992 * SCALE, 1504 * SCALE),
                outline=line, width=2 * SCALE)
 text(100, 111, 'KOOFY READER', 29, fill=muted)
 rule(100, 183, 924, 183)
-text(94, 264, '쿠피리더', 140, bold=True)
-text(94, 426, '시작하기', 140, bold=True)
-text(100, 633, '책 가져오기부터', 36, fill=muted)
-text(100, 687, '나만의 독서 설정까지', 36, fill=muted)
+text(94, 264, labels[0], 140, bold=True)
+text(94, 426, labels[1], 140, bold=True)
+text(100, 633, labels[2], 36, fill=muted)
+text(100, 687, labels[3], 36, fill=muted)
 
 # Reuse the supplied book.svg geometry without its embedded Adobe metadata.
 svg = ET.parse(ROOT / 'assets/branding/book.svg').getroot()
@@ -70,7 +79,7 @@ for element in svg.findall('{http://www.w3.org/2000/svg}path'):
                   for x, y in points], fill=cream)
 
 rule(100, 1332, 924, 1332)
-text(100, 1380, '사용자 가이드', 29, fill=muted)
+text(100, 1380, labels[4], 29, fill=muted)
 image.resize((1024, 1536), Image.Resampling.LANCZOS).save(
-    ROOT / 'assets/books/reader_guide.png', optimize=True)
-print('Generated assets/books/reader_guide.png')
+    ROOT / ('assets/books/reader_guide.png' if lang == 'ko' else f'assets/books/reader_guide_{lang}.png'), optimize=True)
+print(f'Generated guide cover: {lang}')

@@ -42,8 +42,8 @@ final class ReaderTranslation {
         script = resources?.url(forResource: "reader_selection", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "null"
         view.axis = .vertical; view.isHidden = true; view.clipsToBounds = true
         view.isLayoutMarginsRelativeArrangement = true; view.directionalLayoutMargins = .init(top: 0, leading: 12, bottom: 2, trailing: 12)
-        heading.text = "영어 → 한국어 · 번역"; heading.font = .preferredFont(forTextStyle: .caption1)
-        closeButton.setTitle("끄기", for: .normal); closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        heading.text = L("영어 → 한국어 · 번역"); heading.font = .preferredFont(forTextStyle: .caption1)
+        closeButton.setTitle(L("끄기"), for: .normal); closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.widthAnchor.constraint(equalToConstant: 52).isActive = true
         let header = UIStackView(arrangedSubviews: [heading, closeButton]); let headerHeight = header.heightAnchor.constraint(equalToConstant: 40); headerHeight.priority = .init(999); headerHeight.isActive = true
         view.addArrangedSubview(header)
@@ -51,8 +51,8 @@ final class ReaderTranslation {
         text.translatesAutoresizingMaskIntoConstraints = false; scroll.addSubview(text)
         NSLayoutConstraint.activate([text.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor), text.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor), text.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor), text.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor), text.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor)])
         view.addArrangedSubview(scroll)
-        originalButton.setTitle("원문 듣기", for: .normal); originalButton.addTarget(self, action: #selector(speakOriginal), for: .touchUpInside)
-        translatedButton.setTitle("번역 듣기", for: .normal); translatedButton.addTarget(self, action: #selector(speakTranslation), for: .touchUpInside)
+        originalButton.setTitle(L("원문 듣기"), for: .normal); originalButton.addTarget(self, action: #selector(speakOriginal), for: .touchUpInside)
+        translatedButton.setTitle(L("번역 듣기"), for: .normal); translatedButton.addTarget(self, action: #selector(speakTranslation), for: .touchUpInside)
         prepareButton.addTarget(self, action: #selector(prepare), for: .touchUpInside)
         let actions = UIStackView(arrangedSubviews: [originalButton, translatedButton, prepareButton]); actions.distribution = .fillEqually
         let actionsHeight = actions.heightAnchor.constraint(equalToConstant: 44); actionsHeight.priority = .init(999); actionsHeight.isActive = true
@@ -79,25 +79,25 @@ final class ReaderTranslation {
         enabled = true; view.isHidden = false
         translator = Translator.translator(options: TranslatorOptions(sourceLanguage: .english, targetLanguage: .korean))
         ready = ModelManager.modelManager().downloadedTranslateModels.contains { $0.language == .korean }
-        text.text = "단어를 길게 누르고 선택 범위를 조절하세요. 처음에는 Wi-Fi에서 번역 데이터를 준비합니다."
+        text.text = L("단어를 길게 누르고 선택 범위를 조절하세요. 처음에는 Wi-Fi에서 번역 데이터를 준비합니다.")
         controls(); resume()
     }
     private func controls() {
         originalButton.isEnabled = !source.isEmpty; translatedButton.isEnabled = !translated.isEmpty
-        prepareButton.setTitle(downloading ? "준비 중…" : ready ? "다시 번역" : "번역 준비 · Wi-Fi", for: .normal)
+        prepareButton.setTitle(downloading ? L("준비 중…") : ready ? L("다시 번역") : L("번역 준비 · Wi-Fi"), for: .normal)
         prepareButton.isEnabled = !downloading
     }
     @objc private func prepare() {
         if ready { identity = ""; return }
         guard let translator else { return }
-        downloading = true; controls(); text.text = "Wi-Fi에서 번역 데이터를 준비하고 있습니다. 끄기를 눌러 독서를 계속할 수 있습니다."
+        downloading = true; controls(); text.text = L("Wi-Fi에서 번역 데이터를 준비하고 있습니다. 끄기를 눌러 독서를 계속할 수 있습니다.")
         modelGeneration += 1; let token = modelGeneration
         preparationTimeout?.cancel()
         preparationTimeout = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: 180_000_000_000) } catch { return }
             guard let self, self.enabled, self.downloading, token == self.modelGeneration else { return }
             self.modelGeneration += 1; self.downloading = false
-            self.text.text = "번역 준비가 지연되고 있습니다. Wi-Fi 연결을 확인하고 다시 시도하세요."
+            self.text.text = L("번역 준비가 지연되고 있습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.")
             self.controls()
         }
         translator.downloadModelIfNeeded(with: ModelDownloadConditions(allowsCellularAccess: false, allowsBackgroundDownloading: false)) { [weak self] error in
@@ -105,7 +105,7 @@ final class ReaderTranslation {
                 guard let self, self.enabled, token == self.modelGeneration else { return }
                 self.preparationTimeout?.cancel()
                 self.downloading = false; self.ready = error == nil; self.identity = ""
-                self.text.text = error == nil ? "준비됐습니다. 단어나 문장을 길게 눌러 선택하세요." : "번역 데이터를 준비하지 못했습니다. Wi-Fi 연결을 확인하고 다시 시도하세요."
+                self.text.text = error == nil ? L("준비됐습니다. 단어나 문장을 길게 눌러 선택하세요.") : L("번역 데이터를 준비하지 못했습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.")
                 self.controls()
             }
         }
@@ -134,19 +134,19 @@ final class ReaderTranslation {
         let key = (snapshot["resource"] as? String ?? "") + "\n" + value
         if key != pending {
             pending = key; identity = ""; changedAt = Date(); generation += 1; stopVoice(); source = value; translated = ""; controls()
-            if value.isEmpty { text.text = "단어나 문장을 길게 눌러 선택하세요." }
-            else { pauseBook?(); text.text = value.utf16.count > 2000 ? "한 번에 2,000자까지 선택해 주세요." : "\(value)\n\n선택을 마치면 번역합니다." }
+            if value.isEmpty { text.text = L("단어나 문장을 길게 눌러 선택하세요.") }
+            else { pauseBook?(); text.text = value.utf16.count > 2000 ? L("한 번에 2,000자까지 선택해 주세요.") : value + "\n\n" + L("선택을 마치면 번역합니다.") }
         }
         guard !value.isEmpty, value.utf16.count <= 2000, snapshot["busy"] as? Bool != true,
               key != identity, Date().timeIntervalSince(changedAt) >= 0.5 else { return }
-        guard ready else { if !downloading { text.text = "\(value)\n\n번역 준비를 눌러 언어 데이터를 내려받으세요." }; return }
+        guard ready else { if !downloading { text.text = value + "\n\n" + L("번역 준비를 눌러 언어 데이터를 내려받으세요.") }; return }
         identity = key; generation += 1; let token = generation
-        text.text = "\(value)\n\n번역 중…"
+        text.text = value + "\n\n" + L("번역 중…")
         translator?.translate(value) { [weak self] output, error in
             Task { @MainActor in
                 guard let self, self.enabled, self.foreground, token == self.generation else { return }
                 self.translated = error == nil ? output ?? "" : ""
-                self.text.text = "\(value)\n\n" + (self.translated.isEmpty ? "번역하지 못했습니다. 다시 번역을 눌러 주세요." : self.translated)
+                self.text.text = "\(value)\n\n" + (self.translated.isEmpty ? L("번역하지 못했습니다. 다시 번역을 눌러 주세요.") : self.translated)
                 self.controls()
             }
         }
@@ -155,7 +155,7 @@ final class ReaderTranslation {
         guard !text.isEmpty, text.utf16.count <= 8000, foreground else { return }
         pauseBook?(); stopVoice()
         guard let voice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.hasPrefix(language) }) else {
-            self.text.text = "기기 설정 → 손쉬운 사용 → 읽기 및 말하기에서 \(language == "en" ? "영어" : "한국어") 음성을 설치해 주세요."; return
+            self.text.text = L("기기 설정 → 손쉬운 사용 → 읽기 및 말하기에서 {0} 음성을 설치해 주세요.", L(language == "en" ? "영어" : "한국어")); return
         }
         let utterance = AVSpeechUtterance(string: text); utterance.voice = voice; utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
         synthesizer.speak(utterance)

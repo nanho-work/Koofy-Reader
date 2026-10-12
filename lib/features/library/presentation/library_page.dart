@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/localization/language_button.dart';
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/application/cover_matching.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
@@ -46,7 +48,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   LibraryBookStatus? _filter;
   bool _titleSort = false;
   bool _importing = false;
-  String _importProgress = '가져오는 중…';
+  String _importProgress = tr("가져오는 중…");
   bool _opening = false;
   bool _updatingCover = false;
   bool _groupBusy = false;
@@ -101,6 +103,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
+    Localizations.localeOf(
+      context,
+    ); // Rebuild app-owned labels when language changes.
     final media = MediaQuery.of(context);
     final theme = KoofyTheme.forBrightness(media.platformBrightness);
     // Horizontal hinges (tabletop posture) must not cut through the app. Narrow
@@ -128,13 +133,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               appBar: AppBar(
                 toolbarHeight: 48,
                 actions: [
+                  const LanguageButton(),
                   IconButton(
-                    tooltip: '책 묶음 만들기',
+                    tooltip: tr("책 묶음 만들기"),
                     icon: const Icon(Icons.create_new_folder_outlined),
                     onPressed: _groupBusy ? null : () => _createGroup(),
                   ),
                   IconButton(
-                    tooltip: '설정',
+                    tooltip: tr("설정"),
                     icon: const Icon(Icons.settings_outlined),
                     onPressed: () =>
                         Navigator.pushNamed(context, AppRoutes.settings),
@@ -168,12 +174,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       final content = booksAsync.hasError || groupsAsync.hasError
           ? _message(
               context,
-              '서재를 불러오지 못했습니다.',
-              action: '다시 시도',
+              tr("서재를 불러오지 못했습니다."),
+              action: tr("다시 시도"),
               onAction: _refresh,
             )
-          : const Center(
-              child: CircularProgressIndicator(semanticsLabel: '서재 불러오는 중'),
+          : Center(
+              child: CircularProgressIndicator(semanticsLabel: tr("서재 불러오는 중")),
             );
       return MediaQuery(
         data: media,
@@ -331,12 +337,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           children: [
                             Text(
                               booksAsync.hasError || groupsAsync.hasError
-                                  ? '서재를 새로 불러오지 못했습니다.'
-                                  : '읽기 기록을 불러오지 못했습니다. 다시 시도해 주세요.',
+                                  ? tr("서재를 새로 불러오지 못했습니다.")
+                                  : tr("읽기 기록을 불러오지 못했습니다. 다시 시도해 주세요."),
                             ),
                             TextButton(
                               onPressed: _refresh,
-                              child: const Text('다시 시도'),
+                              child: Text(tr("다시 시도")),
                             ),
                           ],
                         ),
@@ -384,8 +390,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               icon: const Icon(Icons.expand_more),
                               label: Text(
                                 recent.isNotEmpty
-                                    ? '읽던 책: ${recent.first.title}'
-                                    : '책 읽기',
+                                    ? tr("읽던 책: {0}", [recent.first.title])
+                                    : tr("책 읽기"),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -451,13 +457,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             : Icons.download_outlined,
         size: 18,
       ),
-      label: const Text('도서·글꼴 다운로드'),
+      label: Text(tr("도서·글꼴 다운로드")),
     );
     final add = OutlinedButton.icon(
       key: const ValueKey('add-books'),
       onPressed: _importing || _updatingCover ? null : _importBook,
       icon: const Icon(Icons.add, size: 18),
-      label: const Text('책 추가'),
+      label: Text(tr("책 추가")),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -509,15 +515,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Widget _welcome(BuildContext context, {required bool empty}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('나만의 작은 서재', style: Theme.of(context).textTheme.labelLarge),
+      Text(tr("나만의 작은 서재"), style: Theme.of(context).textTheme.labelLarge),
       const SizedBox(height: 10),
       Text(
-        empty ? '첫 번째 책을\n들여놓아 볼까요?' : '오늘은 어떤 이야기를\n읽어 볼까요?',
+        empty ? tr("첫 번째 책을\n들여놓아 볼까요?") : tr("오늘은 어떤 이야기를\n읽어 볼까요?"),
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(height: 1.4),
       ),
       const SizedBox(height: 12),
       Text(
-        empty ? '기기에 있는 EPUB · TXT 파일을 가져오세요.' : '책을 열면 다음부터 읽던 곳으로 이어집니다.',
+        empty
+            ? tr("기기에 있는 EPUB · TXT 파일을 가져오세요.")
+            : tr("책을 열면 다음부터 읽던 곳으로 이어집니다."),
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       if (empty) ...[
@@ -525,7 +533,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         FilledButton.icon(
           onPressed: _importing || _updatingCover ? null : _importBook,
           icon: const Icon(Icons.add),
-          label: Text(_importing ? _importProgress : '첫 책 가져오기'),
+          label: Text(_importing ? _importProgress : tr("첫 책 가져오기")),
         ),
       ],
     ],
@@ -598,7 +606,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 LinearProgressIndicator(
                   value: state.progression,
                   minHeight: 3,
-                  semanticsLabel: '${book.title} 읽은 비율',
+                  semanticsLabel: tr("{0} 읽은 비율", [book.title]),
                   semanticsValue: state.progressLabel,
                 ),
                 const SizedBox(height: 10),
@@ -622,7 +630,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               FilledButton(
                 onPressed: canOpen ? () => _openReader(book, state) : null,
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                child: const Text('이어 읽기'),
+                child: Text(tr("이어 읽기")),
               ),
             ],
           ),
@@ -632,15 +640,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 
   String _dateLabel(DateTime? date) {
-    if (date == null) return '저장된 독서 기록';
+    if (date == null) return tr("저장된 독서 기록");
     final now = DateTime.now();
     final days = DateTime(
       now.year,
       now.month,
       now.day,
     ).difference(DateTime(date.year, date.month, date.day)).inDays;
-    if (days <= 0) return '오늘 읽었어요';
-    if (days == 1) return '어제 읽었어요';
+    if (days <= 0) return tr("오늘 읽었어요");
+    if (days == 1) return tr("어제 읽었어요");
     return '${date.year}.${date.month}.${date.day}';
   }
 
@@ -668,13 +676,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    Text('나의 책', style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      tr("나의 책"),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     TextButton.icon(
                       onPressed: _importing || _updatingCover
                           ? null
                           : _batchCovers,
                       icon: const Icon(Icons.collections_outlined, size: 18),
-                      label: const Text('표지 일괄 등록'),
+                      label: Text(tr("표지 일괄 등록")),
                     ),
                   ],
                 ),
@@ -684,13 +695,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     controller: _search,
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
-                      hintText: '내 서재에서 책 검색',
+                      hintText: tr("내 서재에서 책 검색"),
                       prefixIcon: const Icon(Icons.search),
 
                       suffixIcon: _search.text.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: '검색어 지우기',
+                              tooltip: tr("검색어 지우기"),
                               icon: const Icon(Icons.clear),
                               onPressed: () => setState(_search.clear),
                             ),
@@ -703,10 +714,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   runSpacing: 4,
                   children: [
                     for (final entry in <LibraryBookStatus?, String>{
-                      null: '전체',
-                      LibraryBookStatus.reading: '읽는 중',
-                      LibraryBookStatus.unread: '읽을 책',
-                      LibraryBookStatus.finished: '완독',
+                      null: tr("전체"),
+                      LibraryBookStatus.reading: tr("읽는 중"),
+                      LibraryBookStatus.unread: tr("읽을 책"),
+                      LibraryBookStatus.finished: tr("완독"),
                     }.entries)
                       ChoiceChip(
                         label: Text(entry.value),
@@ -722,24 +733,31 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   children: [
                     Text(
                       books.any((b) => groups.containsKey(b.id))
-                          ? '${books.where((b) => !groups.containsKey(b.id)).length}권 · ${books.where((b) => groups.containsKey(b.id)).length}묶음'
-                          : '${books.length}권',
+                          ? tr("{0}권 · {1}묶음", [
+                              books
+                                  .where((b) => !groups.containsKey(b.id))
+                                  .length,
+                              books
+                                  .where((b) => groups.containsKey(b.id))
+                                  .length,
+                            ])
+                          : tr("{0}권", [books.length]),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     PopupMenuButton<bool>(
-                      tooltip: '책 정렬',
+                      tooltip: tr("책 정렬"),
                       initialValue: _titleSort,
                       onSelected: (value) => setState(() => _titleSort = value),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: false, child: Text('최근 읽은 순')),
-                        PopupMenuItem(value: true, child: Text('제목순')),
+                      itemBuilder: (_) => [
+                        PopupMenuItem(value: false, child: Text(tr("최근 읽은 순"))),
+                        PopupMenuItem(value: true, child: Text(tr("제목순"))),
                       ],
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(_titleSort ? '제목순' : '최근 읽은 순'),
+                            Text(_titleSort ? tr("제목순") : tr("최근 읽은 순")),
                             const Icon(Icons.expand_more, size: 18),
                           ],
                         ),
@@ -748,10 +766,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ],
                 ),
                 if (progressLoading)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: LinearProgressIndicator(
-                      semanticsLabel: '읽기 기록 불러오는 중',
+                      semanticsLabel: tr("읽기 기록 불러오는 중"),
                     ),
                   ),
                 if (books.isEmpty)
@@ -759,13 +777,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     padding: const EdgeInsets.symmetric(vertical: 36),
                     child: Column(
                       children: [
-                        const Text('조건에 맞는 책이 없어요.'),
+                        Text(tr("조건에 맞는 책이 없어요.")),
                         TextButton(
                           onPressed: () => setState(() {
                             _filter = null;
                             _search.clear();
                           }),
-                          child: const Text('전체 책 보기'),
+                          child: Text(tr("전체 책 보기")),
                         ),
                       ],
                     ),
@@ -837,7 +855,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       enableLongPress: false,
                       badge: group == null
                           ? null
-                          : '${group.bookIds.length}권 묶음',
+                          : tr("{0}권 묶음", [group.bookIds.length]),
                       onTap: group != null
                           ? () => _openGroup(group)
                           : canOpen
@@ -847,16 +865,27 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                           ? _groupMenu(group)
                           : _bookMenu(book, state, status(book)),
                       statusLabel: progressError
-                          ? '읽기 기록 확인 필요'
+                          ? tr("읽기 기록 확인 필요")
                           : progressLoading
-                          ? '기록 불러오는 중'
+                          ? tr("기록 불러오는 중")
                           : group != null
-                          ? '완독 ${group.bookIds.where((id) => ref.read(libraryCompletionProvider).valueOrNull?[id] == true).length}/${group.bookIds.length}권'
+                          ? tr("완독 {0}/{1}권", [
+                              group.bookIds
+                                  .where(
+                                    (id) =>
+                                        ref
+                                            .read(libraryCompletionProvider)
+                                            .valueOrNull?[id] ==
+                                        true,
+                                  )
+                                  .length,
+                              group.bookIds.length,
+                            ])
                           : switch (status(book)) {
-                              LibraryBookStatus.finished => '완독',
-                              LibraryBookStatus.unread => '아직 읽지 않음',
+                              LibraryBookStatus.finished => tr("완독"),
+                              LibraryBookStatus.unread => tr("아직 읽지 않음"),
                               LibraryBookStatus.reading =>
-                                state?.progressLabel ?? '읽는 중',
+                                state?.progressLabel ?? tr("읽는 중"),
                             },
                     ),
                   );
@@ -891,7 +920,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Future<void> _openReader(Book book, LibraryReadingState? state) async {
     if (_opening) return;
     if (!ref.read(nativeReaderAvailableProvider)) {
-      _snack('독서 화면은 Android와 iOS 앱에서 사용할 수 있습니다.');
+      _snack(tr("독서 화면은 Android와 iOS 앱에서 사용할 수 있습니다."));
       return;
     }
     setState(() => _opening = true);
@@ -931,26 +960,26 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               if (membership.isEmpty) ...[
                 ListTile(
                   leading: const Icon(Icons.create_new_folder_outlined),
-                  title: const Text('책 묶음 만들기'),
+                  title: Text(tr("책 묶음 만들기")),
                   onTap: () => Navigator.pop(context, 'createGroup'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.drive_file_move_outlined),
-                  title: const Text('묶음에 추가'),
+                  title: Text(tr("묶음에 추가")),
                   onTap: () => Navigator.pop(context, 'addToGroup'),
                 ),
               ] else
                 ListTile(
                   leading: const Icon(Icons.move_to_inbox_outlined),
-                  title: const Text('묶음에서 꺼내기'),
+                  title: Text(tr("묶음에서 꺼내기")),
                   onTap: () => Navigator.pop(context, 'takeOut'),
                 ),
               ListTile(
                 leading: const Icon(Icons.add_photo_alternate_outlined),
                 title: Text(
                   book.coverPath == null && book.coverAssetPath == null
-                      ? '표지 이미지 등록'
-                      : '표지 이미지 변경',
+                      ? tr("표지 이미지 등록")
+                      : tr("표지 이미지 변경"),
                 ),
                 enabled: !_updatingCover,
                 onTap: () => Navigator.pop(context, 'cover'),
@@ -958,11 +987,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               if (book.coverPath != null)
                 ListTile(
                   leading: const Icon(Icons.restore),
-                  title: const Text('표지 초기화'),
+                  title: Text(tr("표지 초기화")),
                   subtitle: Text(
                     book.coverAssetPath != null
-                        ? '처음 제공된 표지로 되돌립니다.'
-                        : '제목이 표시되는 기본 표지로 되돌립니다.',
+                        ? tr("처음 제공된 표지로 되돌립니다.")
+                        : tr("제목이 표시되는 기본 표지로 되돌립니다."),
                   ),
                   enabled: !_updatingCover,
                   onTap: () => Navigator.pop(context, 'resetCover'),
@@ -970,19 +999,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ListTile(
                 leading: const Icon(Icons.check_circle_outline),
                 title: Text(
-                  status == LibraryBookStatus.finished ? '완독 표시 해제' : '완독으로 표시',
+                  status == LibraryBookStatus.finished
+                      ? tr("완독 표시 해제")
+                      : tr("완독으로 표시"),
                 ),
                 onTap: () => Navigator.pop(context, 'completion'),
               ),
               ListTile(
                 leading: const Icon(Icons.history),
-                title: const Text('이전 버전의 독서 기록'),
-                subtitle: const Text('보존된 기록을 확인하고 읽던 곳을 찾습니다.'),
+                title: Text(tr("이전 버전의 독서 기록")),
+                subtitle: Text(tr("보존된 기록을 확인하고 읽던 곳을 찾습니다.")),
                 onTap: () => Navigator.pop(context, 'history'),
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
-                title: Text(book.isLocalFile ? '책 삭제' : '서재에서 숨기기'),
+                title: Text(book.isLocalFile ? tr("책 삭제") : tr("서재에서 숨기기")),
                 onTap: () => Navigator.pop(context, 'remove'),
               ),
               const SizedBox(height: 12),
@@ -1002,7 +1033,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           () => ref
               .read(bookGroupRepositoryProvider)
               .takeOut(membership.single.id, book.id),
-          '서재로 꺼냈습니다.',
+          tr("서재로 꺼냈습니다."),
         );
       case 'cover':
         await _updateCover(book);
@@ -1015,7 +1046,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               .setFinished(book.id, status != LibraryBookStatus.finished);
           if (mounted) ref.invalidate(libraryCompletionProvider);
         } catch (_) {
-          _snack('완독 표시를 저장하지 못했습니다. 다시 시도해 주세요.');
+          _snack(tr("완독 표시를 저장하지 못했습니다. 다시 시도해 주세요."));
         }
       case 'history':
         await Navigator.of(context).push(
@@ -1030,18 +1061,20 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 
   Future<void> _confirmRemoveBook(Book book) async {
-    final action = book.isLocalFile ? '삭제' : '숨김';
+    final action = book.isLocalFile ? tr("삭제") : tr("숨김");
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('책 $action'),
+        title: Text(tr("책 {0}", [action])),
         content: Text(
-          '“${book.title}”을 휴지통으로 옮길까요? 파일·표지·읽던 위치는 유지되며 설정의 휴지통에서 복원할 수 있습니다.',
+          tr("“{0}”을 휴지통으로 옮길까요? 파일·표지·읽던 위치는 유지되며 설정의 휴지통에서 복원할 수 있습니다.", [
+            book.title,
+          ]),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr("취소")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
@@ -1058,29 +1091,29 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       ref.invalidate(booksProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('휴지통으로 이동: ${book.title}'),
+          content: Text(tr("휴지통으로 이동: {0}", [book.title])),
           action: SnackBarAction(
-            label: '실행 취소',
+            label: tr("실행 취소"),
             onPressed: () async {
               try {
                 await trash.restoreBook(book.id);
                 if (mounted) ref.invalidate(booksProvider);
               } catch (_) {
-                _snack('복원하지 못했습니다. 설정의 휴지통에서 다시 시도해 주세요.');
+                _snack(tr("복원하지 못했습니다. 설정의 휴지통에서 다시 시도해 주세요."));
               }
             },
           ),
         ),
       );
     } catch (_) {
-      _snack('책을 제거하지 못했습니다. 다시 시도해 주세요.');
+      _snack(tr("책을 제거하지 못했습니다. 다시 시도해 주세요."));
     }
   }
 
   Future<void> _updateCover(Book book, {bool reset = false}) async {
     if (_updatingCover || _importing) return;
     if (kIsWeb) {
-      _snack('표지 이미지는 Android · iOS 앱에서 등록해 주세요.');
+      _snack(tr("표지 이미지는 Android · iOS 앱에서 등록해 주세요."));
       return;
     }
     setState(() => _updatingCover = true);
@@ -1092,23 +1125,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         final result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
           allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-          dialogTitle: '표지 이미지 선택',
+          dialogTitle: tr("표지 이미지 선택"),
         );
         if (!mounted || result == null || result.files.isEmpty) return;
         final path = result.files.single.path;
         if (path == null) {
-          _snack('이미지를 열 수 없습니다. 다른 이미지를 선택해 주세요.');
+          _snack(tr("이미지를 열 수 없습니다. 다른 이미지를 선택해 주세요."));
           return;
         }
         await repository.setBookCover(book.id, path);
       }
       if (!mounted) return;
       ref.invalidate(booksProvider);
-      _snack(reset ? '기본 표지로 되돌렸습니다.' : '표지 이미지를 적용했습니다.');
+      _snack(reset ? tr("기본 표지로 되돌렸습니다.") : tr("표지 이미지를 적용했습니다."));
     } on FormatException catch (error) {
-      _snack(error.message);
+      _snack(tr(error.message));
     } catch (_) {
-      _snack('표지를 저장하지 못했습니다. JPG · PNG · WebP 이미지로 다시 시도해 주세요.');
+      _snack(tr("표지를 저장하지 못했습니다. JPG · PNG · WebP 이미지로 다시 시도해 주세요."));
     } finally {
       if (mounted) setState(() => _updatingCover = false);
     }
@@ -1135,19 +1168,19 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Future<void> _importBook() async {
     if (_importing || _updatingCover) return;
     if (kIsWeb) {
-      _snack('파일 가져오기는 Android · iOS 앱에서 이용해 주세요.');
+      _snack(tr("파일 가져오기는 Android · iOS 앱에서 이용해 주세요."));
       return;
     }
     setState(() {
       _importing = true;
-      _importProgress = '파일 선택 중…';
+      _importProgress = tr("파일 선택 중…");
     });
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['txt', 'epub', ...coverImageExtensions],
         allowMultiple: true,
-        dialogTitle: '책과 같은 이름의 표지 이미지 함께 선택',
+        dialogTitle: tr("책과 같은 이름의 표지 이미지 함께 선택"),
       );
       if (!mounted || result == null || result.files.isEmpty) return;
       final selected = result.files
@@ -1163,7 +1196,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         await showBatchCovers(context, ref, images: images);
         return;
       }
-      setState(() => _importProgress = '가져오는 중 0/${bookFiles.length}');
+      setState(() => _importProgress = tr("가져오는 중 0/{0}", [bookFiles.length]));
       final imported = await importBooks(
         ref.read(bookRepositoryProvider),
         bookFiles,
@@ -1174,7 +1207,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         ),
         onProgress: (completed, total) {
           if (mounted) {
-            setState(() => _importProgress = '가져오는 중 $completed/$total');
+            setState(
+              () => _importProgress = tr("가져오는 중 {0}/{1}", [completed, total]),
+            );
           }
         },
       );
@@ -1184,28 +1219,32 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         _filter = null;
         _search.clear();
       });
-      final summary =
-          '가져오기 완료: ${imported.added}권 추가'
-          '${imported.existing > 0 ? ' · 이미 등록된 책 ${imported.existing}권' : ''}'
-          '${imported.skipped > 0 ? ' · 건너뛴 파일 ${imported.skipped}개' : ''}';
+      final summary = [
+        tr("가져오기 완료: {0}권 추가", [imported.added]),
+        if (imported.existing > 0) tr(' · 이미 등록된 책 {0}권', [imported.existing]),
+        if (imported.skipped > 0) tr(' · 건너뛴 파일 {0}개', [imported.skipped]),
+      ].join();
       if (imported.failedNames.isEmpty) {
         _snack(summary);
       } else {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('가져오기 결과'),
+            title: Text(tr("가져오기 결과")),
             content: SingleChildScrollView(
               child: Text(
-                '$summary\n\n다음 ${imported.failedNames.length}개 파일은 가져오지 못했습니다. '
-                '파일이 기기에 내려받아져 있는지, TXT·EPUB 형식인지 확인해 주세요.\n\n'
-                '${imported.failedNames.join('\n')}',
+                tr("{0}\n\n다음 {1}개 파일은 가져오지 못했습니다. ", [
+                      summary,
+                      imported.failedNames.length,
+                    ]) +
+                    tr("파일이 기기에 내려받아져 있는지, TXT·EPUB 형식인지 확인해 주세요.\n\n") +
+                    imported.failedNames.join('\n'),
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
+                child: Text(tr("확인")),
               ),
             ],
           ),
@@ -1223,7 +1262,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         await _organizeImportedBooks(imported.addedIds);
       }
     } catch (_) {
-      _snack('책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요.');
+      _snack(tr("책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요."));
     } finally {
       if (mounted) setState(() => _importing = false);
     }

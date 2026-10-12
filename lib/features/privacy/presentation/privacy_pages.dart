@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -17,7 +18,7 @@ Future<void> openReaderLink(BuildContext context, Uri uri) async {
   } catch (_) {}
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('연결할 앱을 열지 못했습니다. 표시된 주소를 복사해 이용해 주세요.')),
+    SnackBar(content: Text(tr("연결할 앱을 열지 못했습니다. 표시된 주소를 복사해 이용해 주세요."))),
   );
 }
 
@@ -83,31 +84,46 @@ class _AdvertisingChoicesPageState
     final current = ref.watch(privacyStateProvider).valueOrNull;
     final service = ref.read(privacyServiceProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.firstRun ? '쿠피리더 시작하기' : '광고 선택 변경')),
+      appBar: AppBar(
+        title: Text(widget.firstRun ? tr("쿠피리더 시작하기") : tr("광고 선택 변경")),
+      ),
       body: SafeArea(
         child: ListView(
           padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
           children: [
-            Text('개인정보와 광고', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            const Text(
-              '책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.',
+            Text(
+              tr("개인정보와 광고"),
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
-            const Text(
-              '광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.',
+            Text(
+              tr(
+                "책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.",
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              tr(
+                "광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.",
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               service.isIOS
-                  ? '추적을 허용하지 않아도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다.'
-                  : '어느 항목을 선택해도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다. 선택은 설정에서 변경할 수 있습니다.',
+                  ? tr(
+                      "추적을 허용하지 않아도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다.",
+                    )
+                  : tr(
+                      "어느 항목을 선택해도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다. 선택은 설정에서 변경할 수 있습니다.",
+                    ),
             ),
             if (service.isIOS)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text(
-                  '계속을 누르면 Apple의 추적 권한 요청으로 이동합니다. 허용 여부는 시스템 창에서 직접 선택합니다. 이미 결정했거나 기기에서 요청을 제한한 경우에는 기존 설정을 따릅니다.',
+                  tr(
+                    "계속을 누르면 Apple의 추적 권한 요청으로 이동합니다. 허용 여부는 시스템 창에서 직접 선택합니다. 이미 결정했거나 기기에서 요청을 제한한 경우에는 기존 설정을 따릅니다.",
+                  ),
                 ),
               ),
             TextButton(
@@ -118,7 +134,7 @@ class _AdvertisingChoicesPageState
                         builder: (_) => const ReaderPrivacyPolicyPage(),
                       ),
                     ),
-              child: const Text('개인정보처리방침 읽기'),
+              child: Text(tr("개인정보처리방침 읽기")),
             ),
             if (!service.isIOS)
               RadioGroup<AdvertisingChoice>(
@@ -127,14 +143,14 @@ class _AdvertisingChoicesPageState
                 child: Column(
                   children: [
                     RadioListTile<AdvertisingChoice>(
-                      title: const Text('비맞춤형 광고 이용'),
-                      subtitle: const Text('맞춤형 광고와 이를 위한 정보 공유에 동의하지 않습니다.'),
+                      title: Text(tr("비맞춤형 광고 이용")),
+                      subtitle: Text(tr("맞춤형 광고와 이를 위한 정보 공유에 동의하지 않습니다.")),
                       value: AdvertisingChoice.standard,
                       enabled: !_busy,
                     ),
                     RadioListTile<AdvertisingChoice>(
-                      title: const Text('맞춤형 광고 허용 (선택)'),
-                      subtitle: const Text('안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.'),
+                      title: Text(tr("맞춤형 광고 허용 (선택)")),
+                      subtitle: Text(tr("안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.")),
                       value: AdvertisingChoice.personalized,
                       enabled: !_busy,
                     ),
@@ -144,7 +160,7 @@ class _AdvertisingChoicesPageState
             if (current?.error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(current!.error!),
+                child: Text(tr(current!.error!)),
               ),
             const SizedBox(height: 16),
             FilledButton(
@@ -164,8 +180,8 @@ class _AdvertisingChoicesPageState
                       } catch (_) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('선택을 저장하지 못했습니다. 다시 시도해 주세요.'),
+                            SnackBar(
+                              content: Text(tr("선택을 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );
                         }
@@ -175,12 +191,12 @@ class _AdvertisingChoicesPageState
                     },
               child: Text(
                 _busy
-                    ? '적용 중…'
+                    ? tr("적용 중…")
                     : service.isIOS
-                    ? '계속'
+                    ? tr("계속")
                     : widget.firstRun
-                    ? '선택하고 시작하기'
-                    : '선택 저장',
+                    ? tr("선택하고 시작하기")
+                    : tr("선택 저장"),
               ),
             ),
           ],
@@ -198,19 +214,19 @@ class PrivacySettingsPage extends ConsumerWidget {
     final service = ref.read(privacyServiceProvider);
     final choice = state?.choice;
     return Scaffold(
-      appBar: AppBar(title: const Text('개인정보 및 광고')),
+      appBar: AppBar(title: Text(tr("개인정보 및 광고"))),
       body: ListView(
         padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
         children: [
           if (!service.isIOS)
             ListTile(
-              title: const Text('광고 선택'),
+              title: Text(tr("광고 선택")),
               subtitle: Text(
                 choice == null
-                    ? '선택 전'
+                    ? tr("선택 전")
                     : choice == AdvertisingChoice.standard
-                    ? '비맞춤형 광고'
-                    : '맞춤형 광고 허용',
+                    ? tr("비맞춤형 광고")
+                    : tr("맞춤형 광고 허용"),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
@@ -223,34 +239,39 @@ class PrivacySettingsPage extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                '최근 선택: ${state!.changedAt!.toLocal().toString().split('.').first}\n기록 버전: ${PrivacyService.policyVersion}',
+                tr("최근 선택: {0}\n기록 버전: {1}", [
+                  state!.changedAt!.toLocal().toString().split('.').first,
+                  PrivacyService.policyVersion,
+                ]),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
           if (state?.error != null)
             ListTile(
-              title: Text(state!.error!),
+              title: Text(tr(state!.error!)),
               trailing: IconButton(
-                tooltip: '다시 적용',
+                tooltip: tr("다시 적용"),
                 onPressed: () => service.retryConsent(),
                 icon: const Icon(Icons.refresh),
               ),
             ),
           if (service.isIOS) ...[
             ListTile(
-              title: const Text('현재 광고 제공 방식'),
+              title: Text(tr("현재 광고 제공 방식")),
               subtitle: Text(
                 state?.configured != true
-                    ? '광고 설정 확인 중'
+                    ? tr("광고 설정 확인 중")
                     : state!.effectivePersonalized
-                    ? '맞춤형 광고'
-                    : '비맞춤형 광고',
+                    ? tr("맞춤형 광고")
+                    : tr("비맞춤형 광고"),
               ),
             ),
             SwitchListTile(
-              title: const Text('비맞춤형 광고만 사용'),
-              subtitle: const Text(
-                '켜면 추적 허가와 관계없이 비맞춤형 광고를 사용합니다. 꺼도 Apple의 추적 허가를 변경하지 않습니다.',
+              title: Text(tr("비맞춤형 광고만 사용")),
+              subtitle: Text(
+                tr(
+                  "켜면 추적 허가와 관계없이 비맞춤형 광고를 사용합니다. 꺼도 Apple의 추적 허가를 변경하지 않습니다.",
+                ),
               ),
               value: choice == AdvertisingChoice.standard,
               onChanged: choice == null
@@ -265,8 +286,8 @@ class PrivacySettingsPage extends ConsumerWidget {
                       } catch (_) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('설정을 저장하지 못했습니다. 다시 시도해 주세요.'),
+                            SnackBar(
+                              content: Text(tr("설정을 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );
                         }
@@ -274,28 +295,30 @@ class PrivacySettingsPage extends ConsumerWidget {
                     },
             ),
             ListTile(
-              title: const Text('iOS 추적 허가'),
+              title: Text(tr("iOS 추적 허가")),
               subtitle: Text(switch (state?.att) {
-                'authorized' => '허용됨',
-                'denied' => '허용 안 함',
-                'restricted' => '기기에서 제한됨',
-                _ => '아직 결정하지 않음',
+                'authorized' => tr("허용됨"),
+                'denied' => tr("허용 안 함"),
+                'restricted' => tr("기기에서 제한됨"),
+                _ => tr("아직 결정하지 않음"),
               }),
               trailing: const Icon(Icons.open_in_new),
               onTap: () => openReaderLink(context, Uri.parse('app-settings:')),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                '추적 허가를 거부하면 비맞춤형 광고가 적용됩니다. 기기 설정에서 권한을 변경한 후 돌아오면 다시 확인합니다.',
+                tr(
+                  "추적 허가를 거부하면 비맞춤형 광고가 적용됩니다. 기기 설정에서 권한을 변경한 후 돌아오면 다시 확인합니다.",
+                ),
               ),
             ),
           ],
           if (state?.privacyOptionsRequired == true)
             ListTile(
               leading: const Icon(Icons.tune),
-              title: const Text('광고 개인정보 선택 관리'),
-              subtitle: const Text('광고 제공자의 동의 화면에서 선택을 확인하거나 변경합니다.'),
+              title: Text(tr("광고 개인정보 선택 관리")),
+              subtitle: Text(tr("광고 제공자의 동의 화면에서 선택을 확인하거나 변경합니다.")),
               onTap: () async {
                 await service.showConsentOptions();
               },
@@ -303,8 +326,8 @@ class PrivacySettingsPage extends ConsumerWidget {
           const Divider(height: 32),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('개인정보처리방침'),
-            subtitle: const Text('인터넷 없이도 확인할 수 있습니다.'),
+            title: Text(tr("개인정보처리방침")),
+            subtitle: Text(tr("인터넷 없이도 확인할 수 있습니다.")),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const ReaderPrivacyPolicyPage(),
@@ -313,7 +336,7 @@ class PrivacySettingsPage extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.mail_outline),
-            title: const Text('문의하기'),
+            title: Text(tr("문의하기")),
             subtitle: const Text(readerSupportEmail),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -323,7 +346,7 @@ class PrivacySettingsPage extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.flag_outlined),
-            title: const Text('부적절한 광고 신고'),
+            title: Text(tr("부적절한 광고 신고")),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const ReaderSupportPage(reportAd: true),
@@ -332,7 +355,7 @@ class PrivacySettingsPage extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('오픈소스 라이선스'),
+            title: Text(tr("오픈소스 라이선스")),
             onTap: () => showLicensePage(
               context: context,
               applicationName: 'Koofy Reader',
@@ -357,14 +380,17 @@ class _ReaderPrivacyPolicyPageState extends State<ReaderPrivacyPolicyPage> {
       .then((v) => jsonDecode(v) as Map<String, dynamic>);
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('개인정보처리방침')),
+    appBar: AppBar(title: Text(tr("개인정보처리방침"))),
     body: FutureBuilder<Map<String, dynamic>>(
       future: _document,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(
+          return Center(
             child: SelectableText(
-              '방침을 불러오지 못했습니다.\n$readerPolicyUrl\n$readerSupportEmail',
+              tr("방침을 불러오지 못했습니다.\n{0}\n{1}", [
+                readerPolicyUrl,
+                readerSupportEmail,
+              ]),
             ),
           );
         }
@@ -372,7 +398,9 @@ class _ReaderPrivacyPolicyPageState extends State<ReaderPrivacyPolicyPage> {
           return const Center(child: CircularProgressIndicator());
         }
         final data = snapshot.data!;
-        final document = data['translations']['ko'];
+        final document =
+            data['translations'][AppLanguage.instance.code] ??
+            data['translations']['en'];
         return ListView(
           padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
           children: [
@@ -380,7 +408,7 @@ class _ReaderPrivacyPolicyPageState extends State<ReaderPrivacyPolicyPage> {
               document['title'],
               style: Theme.of(context).textTheme.headlineSmall,
             ),
-            Text('최종 업데이트: ${data['updatedAt']}'),
+            Text(tr("최종 업데이트: {0}", [data['updatedAt']])),
             const SizedBox(height: 16),
             Text(document['intro']),
             for (final section in document['sections']) ...[
@@ -406,7 +434,7 @@ class _ReaderPrivacyPolicyPageState extends State<ReaderPrivacyPolicyPage> {
             TextButton(
               onPressed: () =>
                   openReaderLink(context, Uri.parse(readerPolicyUrl)),
-              child: const Text('웹에서 최신 방침 보기'),
+              child: Text(tr("웹에서 최신 방침 보기")),
             ),
           ],
         );
@@ -420,21 +448,25 @@ class ReaderSupportPage extends StatelessWidget {
   final bool reportAd;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(reportAd ? '부적절한 광고 신고' : '문의하기')),
+    appBar: AppBar(title: Text(reportAd ? tr("부적절한 광고 신고") : tr("문의하기"))),
     body: ListView(
       padding: AdOverlayInsets.padding(context, const EdgeInsets.all(20)),
       children: [
         Text(
           reportAd
-              ? '광고가 나온 시각, 서재·독서 화면 등 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.'
-              : '기기 종류, OS 버전, 발생한 문제와 재현 방법을 알려 주세요. 개인정보 관련 요청도 같은 메일로 접수합니다.',
+              ? tr(
+                  "광고가 나온 시각, 서재·독서 화면 등 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.",
+                )
+              : tr(
+                  "기기 종류, OS 버전, 발생한 문제와 재현 방법을 알려 주세요. 개인정보 관련 요청도 같은 메일로 접수합니다.",
+                ),
         ),
         const SizedBox(height: 16),
-        const Text('Koofy Lab 대표 메일'),
+        Text(tr("Koofy Lab 대표 메일")),
         const SelectableText(readerSupportEmail),
         TextButton.icon(
           icon: const Icon(Icons.copy),
-          label: const Text('메일 주소 복사'),
+          label: Text(tr("메일 주소 복사")),
           onPressed: () async {
             await Clipboard.setData(
               const ClipboardData(text: readerSupportEmail),
@@ -442,33 +474,35 @@ class ReaderSupportPage extends StatelessWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(const SnackBar(content: Text('메일 주소를 복사했습니다.')));
+              ).showSnackBar(SnackBar(content: Text(tr("메일 주소를 복사했습니다."))));
             }
           },
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
           icon: const Icon(Icons.mail_outline),
-          label: const Text('메일 작성하기'),
+          label: Text(tr("메일 작성하기")),
           onPressed: () => openReaderLink(
             context,
             Uri(
               scheme: 'mailto',
               path: readerSupportEmail,
               query:
-                  'subject=${Uri.encodeComponent(reportAd ? '[쿠피리더] 광고 신고' : '[쿠피리더] 문의')}&body=${Uri.encodeComponent(reportAd ? '발생 시각:\n광고 위치:\n광고 내용:\n기기 및 OS:\n' : '기기 및 OS:\n문의 내용:\n')}',
+                  'subject=${Uri.encodeComponent(reportAd ? tr('[쿠피리더] 광고 신고') : tr('[쿠피리더] 문의'))}&body=${Uri.encodeComponent(reportAd ? tr('발생 시각:\n광고 위치:\n광고 내용:\n기기 및 OS:\n') : tr('기기 및 OS:\n문의 내용:\n'))}',
             ),
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          '메일 앱이 없으면 주소를 복사해 사용 중인 메일 서비스에서 보내 주세요. 본문·독서 기록은 자동 첨부하지 않습니다.',
+        Text(
+          tr(
+            "메일 앱이 없으면 주소를 복사해 사용 중인 메일 서비스에서 보내 주세요. 본문·독서 기록은 자동 첨부하지 않습니다.",
+          ),
         ),
         const SizedBox(height: 20),
         const SelectableText(readerSupportUrl),
         TextButton(
           onPressed: () => openReaderLink(context, Uri.parse(readerSupportUrl)),
-          child: const Text('웹 지원 페이지 열기'),
+          child: Text(tr("웹 지원 페이지 열기")),
         ),
       ],
     ),

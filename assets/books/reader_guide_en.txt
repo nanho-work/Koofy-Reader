@@ -1,0 +1,508 @@
+[장] Getting started with Koofy Reader
+
+1. Add a book
+Tap “Add books” in your library and choose a TXT or EPUB file.
+
+2. Open your book
+Tap its cover in the library.
+
+3. Make reading comfortable
+Open “Reading settings” to change the text size and background.
+
+Need help with another feature?
+Open the table of contents to jump to a topic.
+The detailed help at the end explains limits and exceptions.
+
+[장] App language and this guide
+
+Use the globe button at the top right of the library to choose 한국어, English or 日本語.
+Initially, the app follows your device language. Unsupported languages fall back to English.
+A language you select remains selected after restarting the app.
+Choose “Device language” to return to automatic selection.
+
+This guide’s title, cover, contents and text follow the selected language.
+Ordinary book titles and text are not translated or changed.
+The app language does not change the listening voice or the English → Korean translation direction.
+
+Each language has different text, so reading positions are stored separately.
+The first time you open another language version, a content-change notice may appear.
+Returning to the original language restores that version’s saved position.
+
+[장] Add books from your files
+
+1. Tap “Add books” in the library.
+
+2. Choose TXT or EPUB files in your device’s file picker.
+You can select several files together.
+
+3. When importing finishes, tap a book’s cover to read it.
+
+You can organize multiple books into a collection.
+Choose to keep them separately if you prefer individual books.
+
+If Korean characters look garbled, check the text preview.
+See “Help · Importing files” for details.
+
+[장] Download available books
+
+1. Open “Books & fonts” in the library.
+
+2. Under “Books”, search by title or author.
+You can also narrow the list by category.
+
+3. Tap the download icon for a standalone book.
+A check mark appears when it is added to your library.
+
+Tap a title to see its description, source and terms of use.
+Downloading requires internet access.
+Once downloaded, books are available offline.
+
+[장] Read a series and its next episode
+
+1. Select a series in the book download list.
+
+2. Find an episode inside the series.
+Use the episode number or title search to find it.
+
+3. Download the episode, then open it in your library.
+
+New episodes appear after they are published.
+To organize downloaded episodes together, create a book collection.
+
+[장] Find books in your library
+
+To keep reading
+Tap “Continue reading” in the library.
+Each book resumes from its own saved position.
+
+To find another book
+Enter its title or author in the search field.
+Use filters and sorting to narrow the list.
+
+If a book is missing
+Clear the search and filters, then pull down to refresh the library.
+
+[장] Use the reading screen
+
+Turn a page
+Tap a screen edge or the previous and next buttons.
+
+Hide or show reading controls
+Tap the center of the text.
+
+Go to another chapter
+Choose its title in the table of contents.
+
+With the page-turn effect enabled
+You can also press an edge and drag to turn the page.
+
+[장] Change text and background
+
+1. Open a book and tap “Reading settings”.
+
+2. Under “Display”, choose the text size and background.
+You can also change the reading mode and page layout.
+
+3. Expand the font and paragraph settings to adjust spacing.
+Change line spacing, paragraph spacing, margins and font.
+
+Appearance settings apply across books.
+Reading positions are saved separately for each book.
+
+[장] Download and apply fonts
+
+1. Open “Books & fonts” in the library.
+
+2. Under “Fonts”, download a font you like.
+
+3. Open a book, then choose “Display” in “Reading settings”.
+Select the downloaded font in the font and paragraph settings.
+
+If a new font is missing, return to the library and reopen the book.
+For your own font files, see “Help · Add personal fonts”.
+
+[장] Change a book cover
+
+1. Tap “…” at the top right of a book card.
+
+2. Choose the option to add or change its cover image.
+
+3. Select a JPG, PNG or WebP image.
+
+Changing the cover keeps the text and reading position intact.
+Resetting the cover restores its default appearance.
+Bundled books return to their included cover.
+
+[장] Add several covers at once
+
+1. Match the book and cover filenames.
+Example: novel_001.txt / novel_001.jpg
+
+2. Select books and images together when adding books.
+For books already in the library, use the batch cover option.
+
+3. Check the matches and apply them.
+Enable replacement of existing covers if you want to overwrite them.
+
+Collections also have a batch cover option for their books.
+Matching uses original filenames, not the displayed book titles.
+
+[장] Organize books into collections
+
+1. Open a book’s “…” menu and choose to create a collection.
+
+2. Select books, then check the collection title and order.
+
+3. Open the saved collection and choose a book to read.
+
+You can also hold a book and drag it onto another book.
+To use an existing collection, choose the option to add to a collection.
+
+A collection gathers books in one place.
+Each book keeps its own text and reading records.
+
+[장] Collection order and the next book
+
+Change the order
+Open the collection and move its reorder handles.
+You can also sort by title and episode number.
+
+Read the next book
+Check the title under “Next book” on the reading screen, then tap “Open”.
+You can also continue from the last page.
+
+The next book follows the collection’s order.
+It does not open automatically. Previously read books resume from their saved position.
+
+[장] Delete or empty a collection
+
+Remove a collection and its books
+Open the collection’s “…” menu and choose to delete it.
+The collection and its books move to the trash together.
+
+Keep an empty collection
+Open the collection, then choose to empty it in the “…” menu.
+Only its books move to the trash.
+
+Keep the books but remove the grouping
+Ungroup the collection. Its books return to the library.
+To remove just one book from a collection, use its remove-from-collection option.
+
+[장] Delete and restore books
+
+1. Choose delete in a book’s “…” menu.
+The book moves to the trash instead of being erased immediately.
+
+2. To read it again, open “Settings” in the library.
+
+3. Open “Trash” and tap “Restore” for the item.
+
+Files, covers and reading records remain stored while an item is in the trash.
+Books in the trash are excluded from library backups.
+
+[장] Empty the trash to free space
+
+1. Open “Trash” from the library’s “Settings”.
+
+2. Permanently delete an individual item, or empty the trash to delete all items.
+
+3. Check the items before confirming.
+
+Important: permanently deleted items cannot be restored.
+Restore or back up books you need first.
+
+Originals stored outside the app and files shared with other books are kept.
+Built-in source files for bundled books are not removed.
+
+[장] Search text and use bookmarks
+
+Find text
+Tap the search control or magnifying glass at the top of the reading screen.
+Enter a word or phrase in the text search and select a result.
+
+Mark a place
+Add a bookmark at your current position and give it a name.
+Use the bookmark list to return to saved places.
+
+Return to where you were
+Tap the back-to-position arrow at the bottom.
+It is available after jumping through the contents, search results or bookmarks.
+
+[장] Listen to a book
+
+1. Choose “Listen” in “Reading settings”.
+
+2. Start or resume listening.
+The device voice reads from the visible position.
+
+3. Tap Ⅱ to pause.
+Ending listening hides the playback controls.
+
+Change the voice, speed and sleep timer in listening settings.
+
+Listening pauses when you leave the app or lock the screen.
+It does not resume automatically when you return.
+The current listening feature uses local Korean voices; changing the app language does not change the voice language.
+
+[장] Translate English passages
+
+1. Enable translation mode under “Translate” in “Reading settings”.
+
+2. First, prepare translation over Wi-Fi to download the language data.
+
+3. Hold the text and adjust the handles to select a word or passage.
+The translation panel shows the English original and Korean translation.
+
+Turn translation off from the panel when finished.
+After the language data is ready, translation works offline.
+
+See “Help · Translation” for limits and data handling.
+Changing the app language does not change the English-to-Korean translation direction.
+
+[장] Back up your library
+
+1. Open library backup and restore from the library’s “Settings”.
+
+2. Choose to save a backup file.
+
+3. Pick a location outside the app in the file picker.
+The backup is saved as one .koofy.zip file.
+
+It includes books, covers, personal fonts, collections, reading records and settings.
+Restore books from the trash before backing up if you want to include them.
+
+Before deleting the app, check that the backup is safely stored.
+This is not automatic synchronization between devices.
+
+[장] Restore a backup
+
+1. Transfer the backup file to the device where you want to use it.
+
+2. Open library backup and restore in “Settings”.
+
+3. Select the backup file and restore it.
+
+Books and records that are missing on the current device are added.
+Existing records for the same book and existing collection order are kept.
+
+On a new device, download catalog fonts and device voices again.
+The detailed help explains what is included and the size limits.
+
+[장] Temporarily hide ads
+
+1. Open “Settings” at the top of the library.
+
+2. Choose to watch an ad for two hours of reading without ads.
+
+3. Finish watching and check that the reward was applied.
+Banners in the library, settings and reading screen are hidden for two hours.
+
+Closing the ad early may prevent the reward.
+The time continues to pass while the app is closed.
+Check the remaining time in settings.
+
+[장] If something goes wrong
+
+1. Open diagnostic information for reporting a problem in the library’s settings.
+
+2. Copy the diagnostics.
+They do not include book text, titles or file paths.
+
+3. Tell us the steps that led to the problem and the error message.
+The file format and whether the screen was folded are also helpful.
+
+Contact: koofylab@gmail.com
+Diagnostics and book text are not sent automatically.
+
+[장] Detailed help
+
+The following topics provide details when you need them.
+You do not need to read them all to get started.
+
+Cannot import a file → Importing files
+Unexpected cover behavior → Covers and collections
+Changes in screen layout → Reading screen and records
+Voice or translation problems → Listening / Translation
+
+Choose a topic beginning with “Help ·” in the table of contents.
+
+[장] Help · Importing files
+
+Supported: TXT and ordinary text-focused EPUB without DRM.
+PDF, comic-specific formats, DRM-protected ebooks and fixed-layout EPUB are not supported.
+
+TXT supports UTF-8 and UTF-16 with a BOM.
+Korean CP949/EUC-KR text can be imported after checking the preview.
+Only the app’s copy is converted; the original is unchanged.
+
+Books with identical content are not added twice, even if filenames differ.
+If the content changes under the same filename, the old book is kept and a new one is added.
+
+If some files fail, importing continues for the others.
+Check the failed filenames after importing finishes.
+How to select several files depends on your device’s file picker.
+
+[장] Help · Covers and collections
+
+Batch covers match original filenames without their extensions.
+English letter case and spaces at either end are ignored.
+Choose the correct match if filenames overlap.
+For older backups without original filenames, add covers individually.
+
+Enable the cover option in settings to show a registered cover as the first page.
+A collection’s representative image is not used as each book’s first page.
+An EPUB’s existing cover is not added twice.
+
+Resuming starts in the text without showing the cover again.
+You can return to the cover through the contents; listening skips it.
+
+Use the collection’s cover display option to show its books’ covers.
+Finished counts follow the marks you set yourself.
+Reaching the last page does not automatically mark a book finished.
+
+[장] Help · Create a TXT table of contents
+
+Write a chapter title line as “[장] Title”.
+Put [장] at the very start of the line, followed by a space or tab and the title.
+The marker remains [장] in every app language.
+
+Example: write “[장] Episode 1” on a title line and the text on the next line.
+Use “[장] Episode 2” for the next episode’s title line.
+
+The reading screen hides the marker and adds the title to the contents.
+In paged reading, each chapter begins on a new page.
+Long chapters can continue across several pages.
+
+Markers without a title or preceded by spaces are not recognized.
+Blank lines alone do not create chapters.
+Continuous scrolling displays the chapters in sequence.
+
+The same rules apply to imported and downloaded TXT files.
+EPUB uses the table of contents included in the file.
+
+[장] Help · Reading screen and records
+
+Two-page layout is available when the text area is wide enough.
+Folding the screen switches to one page; widening it restores your selection.
+A new chapter does not always start on the left page.
+
+Default line and paragraph spacing follows the book’s own styles.
+Changing paragraph spacing does not remove blank lines in the source.
+Page layout and transition effects cannot be adjusted in continuous scrolling.
+
+Page numbers can change with text size, font or screen layout.
+Your position is restored using the text you were reading.
+
+When the text itself changes, the old position is not applied directly.
+Previous records are preserved. Use the new contents to find your place.
+This can also happen when this guide is revised or you open another language version.
+Each language version has its own reading position; returning to it restores that version’s saved position.
+
+Books and records are stored on the device.
+Back up before deleting the app or clearing its data. Automatic sync is not supported.
+
+[장] Help · Search and bookmarks
+
+Text search works within the current book and does not need internet access.
+Up to 500 results are shown at a time. Narrow your query if there are too many.
+Library search finds book titles and authors.
+
+You can save up to 100 bookmarks per book; they are included in library backups.
+On iOS, swipe an item in the list to delete it.
+On Android, tap an item and choose delete.
+
+The return history keeps the latest 20 jumps.
+It resets when you close the book.
+Old bookmarks are not automatically applied when the text changes.
+
+[장] Help · Add personal fonts
+
+Open the font and paragraph controls under Reading settings → Display.
+Choose the personal font management option and select TTF or OTF files.
+
+Each file must be no larger than 10MB; you can keep up to 50 fonts.
+The same file is not added twice.
+After adding a font, return to reading to reopen the book at its saved position.
+
+Fonts installed in device settings are not all imported automatically.
+Choose font files you have saved yourself.
+
+The app keeps a copy, so moving the original does not remove the font.
+Personal fonts are included in backups. Deleting the active font restores the default font.
+
+[장] Help · Listening
+
+Listening uses local Korean voices installed on your device.
+Book text is not sent to a server for speech synthesis.
+Available voices and their quality vary by device.
+
+On Android, use the device voice download option if no voice is available.
+On iPhone, install voices through Accessibility in device settings.
+Reopen the reading screen after installation.
+
+Hold the play button to change the voice, speed and timer.
+You can also keep the listening button visible and follow the voice with page turns.
+
+Leaving the app, locking the screen, calls, unplugging headphones and tapping an ad pause listening.
+A banner simply being visible does not pause it.
+Jumping to another page manually pauses playback; the next playback starts at the new position.
+
+The listening position is saved separately from the reading position.
+Use the saved listening position option to continue listening.
+Playback stops at the end of the book and does not automatically open the next book in a collection.
+
+[장] Help · Translation
+
+Translation is English → Korean, with up to 2,000 selected characters at a time.
+Scroll inside the translation panel for long results.
+Vocabulary lists and grammar explanations are not currently provided.
+
+Listen to the selected original or translation using the respective controls.
+A device voice for that language is required; playback does not start automatically.
+Your existing reading and listening positions are unchanged.
+
+The app uses Google Translate’s on-device translation.
+Selected text and translations are not sent to a translation server.
+The SDK may communicate with Google to download language models and report performance and usage statistics.
+
+Translations are for learning reference and may not accurately reflect context or idioms.
+Google provides no express or implied warranties, including accuracy, reliability, merchantability, fitness for a particular purpose or non-infringement.
+
+Service information
+https://developers.google.com/ml-kit/language/translation
+https://cloud.google.com/translate
+
+[장] Help · Backup scope and limits
+
+Backups include original book files, covers, personal fonts, collections and their order.
+Reading positions, bookmarks, finished marks, appearance and cover display settings are included.
+Voice settings and listening positions are included, but device voice files and sleep timers are not.
+
+When restoring, current records and settings on the device take priority.
+A new device receives the backup’s appearance settings.
+Choose a voice again when moving between Android and iPhone.
+
+Download catalog fonts again on the new device.
+Ad-free time and ad consent preferences are not backed up.
+
+Up to 100MB of original files, covers and related data can be backed up at once.
+You will see a message if an original is missing or a backup is damaged.
+If restoring fails, you can try the same file again.
+
+Backups contain book text. Store them somewhere you control.
+
+[장] Help · Privacy and ads
+
+Change your ad preference in Settings → Privacy and ads in the library.
+You can also read the privacy policy offline.
+Reading is available regardless of your ad choice.
+
+Personalized ads are subject to separate consent and applicable iOS tracking permission.
+You can report inappropriate ads from the same menu.
+Book text and reading records are not attached automatically.
+
+Rewarded ad time is applied when completion is confirmed.
+The confirmation may arrive late.
+You cannot accumulate time in advance; you can watch again after it expires.
+
+If no ad appears, check your internet connection and try again later. Ad availability varies.

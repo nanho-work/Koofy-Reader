@@ -48,6 +48,7 @@ class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
             require(file.path.startsWith(root.path + File.separator) && file.isFile && file.canRead()) {
                 "The reader requires an app-owned, readable EPUB file"
             }
+            ReaderStrings.language = request.uiLanguage ?: "ko"
             val session = ReaderSession(request)
             ReaderRuntime.session = session
             try {

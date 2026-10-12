@@ -37,7 +37,7 @@ func speechStart(publication: Publication, target: Locator) async throws -> Spee
         }
         skip += ranges.count
     }
-    throw NSError(domain: "KoofySpeech", code: 2, userInfo: [NSLocalizedDescriptionKey: "읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요."])
+    throw NSError(domain: "KoofySpeech", code: 2, userInfo: [NSLocalizedDescriptionKey: L("읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요.")])
 }
 private func compactSpeech(_ value: String) -> String { String(value.filter { !$0.isWhitespace }) }
 private func speechQuoteOffset(text: String, before: String?, highlight: String?, after: String?) -> Int? {

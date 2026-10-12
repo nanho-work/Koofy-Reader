@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -158,7 +159,7 @@ class LegacyBookRecord {
   String excerpt(int? offset) {
     final text = cachedText;
     if (text == null || offset == null || offset >= text.length) {
-      return '원문 위치를 직접 확인해 주세요.';
+      return tr('원문 위치를 직접 확인해 주세요.');
     }
     return text.substring(offset, (offset + 120).clamp(0, text.length)).trim();
   }

@@ -86,37 +86,37 @@ internal class ReaderSettingsDialog(
         }
         fun update(next: ReaderPreferences) { change(next); render() }
         val heading = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
-        heading.addView(label("독서 설정", 20f), LinearLayout.LayoutParams(0, -2, 1f))
-        heading.addView(button("완료") { dialog.dismiss() }, LinearLayout.LayoutParams(dp(64), dp(48)))
+        heading.addView(label(L("독서 설정"), 20f), LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(button(L("완료")) { dialog.dismiss() }, LinearLayout.LayoutParams(dp(64), dp(48)))
         column.addView(heading)
         val tabs = LinearLayout(context)
-        listOf("보기", "듣기", "번역").forEachIndexed { i, name ->
+        listOf(L("보기"), L("듣기"), L("번역")).forEachIndexed { i, name ->
             tabs.addView(button(name, tab == i) { tab = i; render() }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
         }
         column.addView(tabs)
         if (tab == 1) {
-            column.addView(button("▶  듣기 시작 / 재개") { dialog.dismiss(); speechStart?.invoke() })
-            column.addView(button("목소리·속도·타이머  ›") { dialog.dismiss(); speechSettings?.invoke() })
-            column.addView(button("듣기 종료") { speechEnd?.invoke(); dialog.dismiss() })
+            column.addView(button(L("▶  듣기 시작 / 재개")) { dialog.dismiss(); speechStart?.invoke() })
+            column.addView(button(L("목소리·속도·타이머  ›")) { dialog.dismiss(); speechSettings?.invoke() })
+            column.addView(button(L("듣기 종료")) { speechEnd?.invoke(); dialog.dismiss() })
             val prefs = context.getSharedPreferences("reader_speech", Context.MODE_PRIVATE)
             column.addView(SwitchCompat(context).apply {
-                text = "듣기 버튼 항상 표시"; setTextColor(colors.foreground); minHeight = dp(48)
+                text = L("듣기 버튼 항상 표시"); setTextColor(colors.foreground); minHeight = dp(48)
                 isChecked = prefs.getBoolean("alwaysShow", false)
                 setOnCheckedChangeListener { _, value -> prefs.edit().putBoolean("alwaysShow", value).apply(); speechVisibility() }
             })
-            column.addView(label("듣기를 시작하면 조작 버튼이 표시됩니다. 일시정지 후에도 유지되며, 듣기 종료를 누르면 숨겨집니다.", 13f))
+            column.addView(label(L("듣기를 시작하면 조작 버튼이 표시됩니다. 일시정지 후에도 유지되며, 듣기 종료를 누르면 숨겨집니다."), 13f))
             return
         }
         if (tab == 2) {
             column.addView(SwitchCompat(context).apply {
-                text = "번역 모드"; setTextColor(colors.foreground); minHeight = dp(48)
+                text = L("번역 모드"); setTextColor(colors.foreground); minHeight = dp(48)
                 isChecked = translationEnabled
                 setOnCheckedChangeListener { _, _ -> dialog.dismiss(); translationSettings?.invoke() }
             })
-            column.addView(label("모드를 켠 뒤 본문을 길게 눌러 단어나 문장을 선택하세요. 번역은 하단에 표시됩니다.", 14f))
+            column.addView(label(L("모드를 켠 뒤 본문을 길게 눌러 단어나 문장을 선택하세요. 번역은 하단에 표시됩니다."), 14f))
             return
         }
-        column.addView(label("글자 크기"))
+        column.addView(label(L("글자 크기")))
         val font = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
         font.addView(button("A−") { update(current().copy(fontScale = (current().fontScale - .1).coerceAtLeast(.5))) }, LinearLayout.LayoutParams(0, -2, 1f))
         font.addView(label("${(p.fontScale * 100).toInt()}%", 16f).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -130,52 +130,52 @@ internal class ReaderSettingsDialog(
             }
             column.addView(row)
         }
-        choices("배경", listOf("밝게", "종이색", "어둡게"), listOf("light", "sepia", "dark").indexOf(p.theme)) {
+        choices(L("배경"), listOf(L("밝게"), L("종이색"), L("어둡게")), listOf("light", "sepia", "dark").indexOf(p.theme)) {
             update(current().copy(theme = listOf("light", "sepia", "dark")[it]))
         }
-        column.addView(label("읽기 방식", 17f))
-        choices("넘김 방식", listOf("페이지 넘김", "연속 스크롤"), if (p.scroll) 1 else 0) {
+        column.addView(label(L("읽기 방식"), 17f))
+        choices(L("넘김 방식"), listOf(L("페이지 넘김"), L("연속 스크롤")), if (p.scroll) 1 else 0) {
             update(current().copy(scroll = it == 1))
         }
-        choices("페이지 배치", if (canShowSpread()) listOf("자동", "한 페이지", "두 페이지") else listOf("자동", "한 페이지"), if (!canShowSpread() && p.columnCount == 2L) -1 else p.columnCount.toInt(), enabled = !p.scroll) {
+        choices(L("페이지 배치"), if (canShowSpread()) listOf(L("자동"), L("한 페이지"), L("두 페이지")) else listOf(L("자동"), L("한 페이지")), if (!canShowSpread() && p.columnCount == 2L) -1 else p.columnCount.toInt(), enabled = !p.scroll) {
             update(current().copy(columnCount = it.toLong()))
         }
         if (!p.scroll) {
-            choices("페이지 전환 효과", listOf("바로 넘기기", "책장 넘기기"), if (p.pageTurnStyle == "curl") 1 else 0) {
+            choices(L("페이지 전환 효과"), listOf(L("바로 넘기기"), L("책장 넘기기")), if (p.pageTurnStyle == "curl") 1 else 0) {
                 update(current().copy(pageTurnStyle = if (it == 1) "curl" else "instant"))
             }
         } else {
-            column.addView(label("연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다.", 12f)
+            column.addView(label(L("연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다."), 12f)
                 .apply { setTextColor(colors.secondary) })
         }
-        column.addView(label(if (!canShowSpread() && p.columnCount == 2L) "현재 한 페이지로 표시 중 · 화면을 넓히면 두 페이지로 돌아갑니다." else "두 페이지 선택은 넓은 화면에서 표시됩니다.", 12f).apply { setTextColor(colors.secondary) })
-        column.addView(button(if (detailsExpanded) "글꼴·문단 설정  ▴" else "글꼴·문단 설정  ▾") { detailsExpanded = !detailsExpanded; render() })
+        column.addView(label(if (!canShowSpread() && p.columnCount == 2L) L("현재 한 페이지로 표시 중 · 화면을 넓히면 두 페이지로 돌아갑니다.") else L("두 페이지 선택은 넓은 화면에서 표시됩니다."), 12f).apply { setTextColor(colors.secondary) })
+        column.addView(button(if (detailsExpanded) L("글꼴·문단 설정  ▴") else L("글꼴·문단 설정  ▾")) { detailsExpanded = !detailsExpanded; render() })
         if (!detailsExpanded) return
-        column.addView(label("본문 간격", 17f))
+        column.addView(label(L("본문 간격"), 17f))
         val lines = listOf(null, 1.2, 1.5, 1.8)
-        choices("줄간격", listOf("기본", "촘촘", "보통", "넉넉"), lines.indexOf(p.lineHeight)) {
+        choices(L("줄간격"), listOf(L("기본"), L("촘촘"), L("보통"), L("넉넉")), lines.indexOf(p.lineHeight)) {
             update(current().copy(lineHeight = lines[it]))
         }
         val paragraphs = listOf(null, 0.0, 0.5, 1.0)
-        choices("문단 간격", listOf("기본", "없음", "보통", "넓게"), paragraphs.indexOf(p.paragraphSpacing)) {
+        choices(L("문단 간격"), listOf(L("기본"), L("없음"), L("보통"), L("넓게")), paragraphs.indexOf(p.paragraphSpacing)) {
             update(current().copy(paragraphSpacing = paragraphs[it]))
         }
         val margins = listOf(null, 0.5, 1.0, 1.5)
-        choices("페이지 여백", listOf("기본", "좁게", "보통", "넓게"), margins.indexOf(p.pageMargins)) {
+        choices(L("페이지 여백"), listOf(L("기본"), L("좁게"), L("보통"), L("넓게")), margins.indexOf(p.pageMargins)) {
             update(current().copy(pageMargins = margins[it]))
         }
-        column.addView(label("기본은 책의 원래 설정입니다. 줄·문단 간격을 지정하면 출판사 문단 스타일 일부가 바뀔 수 있습니다. 두 페이지에서는 좌우 여백과 중앙 간격이 함께 조절됩니다.", 12f).apply { setTextColor(colors.secondary) })
-        column.addView(label("글꼴"))
+        column.addView(label(L("기본은 책의 원래 설정입니다. 줄·문단 간격을 지정하면 출판사 문단 스타일 일부가 바뀔 수 있습니다. 두 페이지에서는 좌우 여백과 중앙 간격이 함께 조절됩니다."), 12f).apply { setTextColor(colors.secondary) })
+        column.addView(label(L("글꼴")))
         val selectedFont = (p.fontId ?: "default").takeIf { it in fontIds } ?: "default"
         var lastGroup = ""
         fontIds.forEachIndexed { index, id ->
-            val group = if (id.startsWith("personal_")) "내 글꼴" else if (id.startsWith("remote_")) "다운로드 글꼴" else "기본 글꼴"
+            val group = if (id.startsWith("personal_")) L("내 글꼴") else if (id.startsWith("remote_")) L("다운로드 글꼴") else L("기본 글꼴")
             if (group != lastGroup) { column.addView(label(group)); lastGroup = group }
             val selected = id == selectedFont
             column.addView(button(if (selected) "✓ ${fontLabels[index]}" else fontLabels[index], selected) {
                 update(current().copy(fontId = id))
             }.apply { previewFont(id)?.let { typeface = it } }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
         }
-        column.addView(button("＋ 내 글꼴 추가·관리  ›") { dialog.dismiss(); manageFonts?.invoke() })
+        column.addView(button(L("＋ 내 글꼴 추가·관리  ›")) { dialog.dismiss(); manageFonts?.invoke() })
     }
 }

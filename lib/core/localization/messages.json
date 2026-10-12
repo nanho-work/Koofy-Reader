@@ -1,0 +1,3306 @@
+{
+  "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.": {
+    "en": "Could not start the app. Your books and records are preserved. Check available storage and try again.",
+    "ja": "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。"
+  },
+  "다시 시도": {
+    "en": "Try again",
+    "ja": "再試行"
+  },
+  "기록을 안전하게 준비하는 중": {
+    "en": "Preparing your records safely",
+    "ja": "記録を安全に準備しています"
+  },
+  "광고 불러오는 중…": {
+    "en": "Loading ad…",
+    "ja": "広告を読み込み中…"
+  },
+  "지금은 광고를 표시할 수 없습니다.": {
+    "en": "Ads are unavailable right now.",
+    "ja": "現在、広告を表示できません。"
+  },
+  "오프라인에서도 독서를 계속할 수 있습니다.": {
+    "en": "You can keep reading offline.",
+    "ja": "オフラインでも読書を続けられます。"
+  },
+  "{0}분 남음": {
+    "en": "{0} min remaining",
+    "ja": "残り{0}分"
+  },
+  "{0}시간{1} 남음": {
+    "en": "{0} hr{1} remaining",
+    "ja": "残り{0}時間{1}"
+  },
+  "설정": {
+    "en": "Settings",
+    "ja": "設定"
+  },
+  "앱 버전": {
+    "en": "App version",
+    "ja": "アプリのバージョン"
+  },
+  "{0} (빌드 {1})": {
+    "en": "{0} (build {1})",
+    "ja": "{0}（ビルド {1}）"
+  },
+  "확인 중…": {
+    "en": "Checking…",
+    "ja": "確認中…"
+  },
+  "버전 정보를 확인할 수 없습니다.": {
+    "en": "Version information is unavailable.",
+    "ja": "バージョン情報を確認できません。"
+  },
+  "서재 백업·복원": {
+    "en": "Library backup & restore",
+    "ja": "本棚のバックアップ・復元"
+  },
+  "책·표지·묶음·읽던 위치를 파일로 보관": {
+    "en": "Save books, covers, collections and reading positions",
+    "ja": "本・表紙・コレクション・読書位置をファイルに保存"
+  },
+  "휴지통": {
+    "en": "Trash",
+    "ja": "ゴミ箱"
+  },
+  "삭제한 책과 해제한 묶음 복원": {
+    "en": "Restore deleted books and dissolved collections",
+    "ja": "削除した本や解除したコレクションを復元"
+  },
+  "개인정보 및 광고": {
+    "en": "Privacy & ads",
+    "ja": "プライバシーと広告"
+  },
+  "광고 선택 · 개인정보처리방침 · 문의 · 광고 신고": {
+    "en": "Ad choices · Privacy policy · Support · Report an ad",
+    "ja": "広告の選択・プライバシーポリシー・お問い合わせ・広告の報告"
+  },
+  "독서 화면에 표지 표시": {
+    "en": "Show covers in the reader",
+    "ja": "読書画面に表紙を表示"
+  },
+  "각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.": {
+    "en": "Show the assigned cover as the first page. Resume starts at your saved position. Existing EPUB covers are preserved.",
+    "ja": "登録した表紙を最初のページに表示します。続きから読む場合は保存した位置から始まり、EPUBの既存の表紙は保持されます。"
+  },
+  "표지 설정을 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save cover settings. Please try again.",
+    "ja": "表紙の設定を保存できませんでした。もう一度お試しください。"
+  },
+  "표지 설정을 불러오는 중…": {
+    "en": "Loading cover settings…",
+    "ja": "表紙の設定を読み込み中…"
+  },
+  "표지 설정 다시 불러오기": {
+    "en": "Reload cover settings",
+    "ja": "表紙の設定を再読み込み"
+  },
+  "문제 신고용 진단 정보": {
+    "en": "Diagnostics for support",
+    "ja": "不具合報告用の診断情報"
+  },
+  "앱 버전과 독서 설정 확인·복사": {
+    "en": "View and copy app version and reader settings",
+    "ja": "アプリのバージョンと読書設定を確認・コピー"
+  },
+  "광고 없이 읽기": {
+    "en": "Read without ads",
+    "ja": "広告なしで読む"
+  },
+  "리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.": {
+    "en": "Watch a rewarded ad to the end to hide banners in the library, settings and reader for 2 hours.",
+    "ja": "リワード広告を最後まで視聴すると、本棚・設定・読書画面のバナーを2時間非表示にできます。"
+  },
+  "LevelPlay 광고 연동 테스트": {
+    "en": "Test LevelPlay ad integration",
+    "ja": "LevelPlay広告連携テスト"
+  },
+  "광고 상태를 불러오는 중입니다.": {
+    "en": "Loading ad status.",
+    "ja": "広告の状態を読み込んでいます。"
+  },
+  "광고 상태를 불러오지 못했습니다. 다시 시도": {
+    "en": "Could not load ad status. Try again",
+    "ja": "広告の状態を読み込めませんでした。再試行"
+  },
+  "광고 숨김 · {0}": {
+    "en": "Ads hidden · {0}",
+    "ja": "広告非表示・{0}"
+  },
+  "광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다.": {
+    "en": "Watch an ad to hide banners for 2 hours.",
+    "ja": "広告を視聴すると、バナーを2時間非表示にできます。"
+  },
+  "처리 중…": {
+    "en": "Processing…",
+    "ja": "処理中…"
+  },
+  "광고 숨김 적용 중": {
+    "en": "Ads are currently hidden",
+    "ja": "広告を非表示にしています"
+  },
+  "광고 보고 2시간 광고 없이 읽기": {
+    "en": "Watch an ad for 2 hours without banners",
+    "ja": "広告を見て2時間バナーを非表示"
+  },
+  "숨김 시간이 끝나면 다시 시청할 수 있습니다.": {
+    "en": "You can watch again when the ad-free period ends.",
+    "ja": "非表示期間が終了すると、再び視聴できます。"
+  },
+  "2시간 동안 배너 광고를 숨깁니다.": {
+    "en": "Banner ads will be hidden for 2 hours.",
+    "ja": "バナー広告を2時間非表示にします。"
+  },
+  "광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.": {
+    "en": "The ad closed. Your reward will apply automatically once confirmed.",
+    "ja": "広告を閉じました。視聴報酬が確認でき次第、自動で適用します。"
+  },
+  "지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다.": {
+    "en": "An ad cannot play right now. Try again later. You can keep reading.",
+    "ja": "現在、広告を再生できません。しばらくしてからお試しください。読書は続けられます。"
+  },
+  "광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.": {
+    "en": "Could not process the ad reward. Please try again later.",
+    "ja": "広告の報酬を処理できませんでした。しばらくしてからお試しください。"
+  },
+  "연결할 앱을 열지 못했습니다. 표시된 주소를 복사해 이용해 주세요.": {
+    "en": "Could not open the app. Please copy and use the displayed address.",
+    "ja": "アプリを開けませんでした。表示されたアドレスをコピーしてご利用ください。"
+  },
+  "쿠피리더 시작하기": {
+    "en": "Getting started with Koofy Reader",
+    "ja": "クーピーリーダーの使い方"
+  },
+  "광고 선택 변경": {
+    "en": "Change ad choices",
+    "ja": "広告の選択を変更"
+  },
+  "개인정보와 광고": {
+    "en": "Privacy and advertising",
+    "ja": "プライバシーと広告"
+  },
+  "책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.": {
+    "en": "Books and reading positions stay on your device. Library and reader banners and optional rewarded ads are served by Unity Ads, ironSource Ads and Google AdMob through Unity LevelPlay.",
+    "ja": "本と読書位置は端末に保存します。本棚・読書画面のバナーと任意のリワード広告は、Unity LevelPlayを通じてUnity Ads・ironSource Ads・Google AdMobが提供します。"
+  },
+  "광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.": {
+    "en": "IP address, device and app information, and ad interaction data may be processed to serve and measure ads and prevent fraud. If you allow personalized ads, permitted identifiers and information about activity in other apps and websites may be used for personalization.",
+    "ja": "広告の配信・測定・不正防止のため、IPアドレス、端末・アプリ情報、広告の利用情報が処理される場合があります。パーソナライズ広告を許可すると、許可された識別子や他のアプリ・ウェブの利用に関する情報がパーソナライズに使われる場合があります。"
+  },
+  "추적을 허용하지 않아도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다.": {
+    "en": "Reading is available without tracking permission. Non-personalized ads still process information needed for delivery and security.",
+    "ja": "トラッキングを許可しなくても読書できます。非パーソナライズ広告でも配信とセキュリティに必要な情報は処理されます。"
+  },
+  "어느 항목을 선택해도 독서는 이용할 수 있습니다. 비맞춤형 광고도 제공·보안에 필요한 정보는 처리합니다. 선택은 설정에서 변경할 수 있습니다.": {
+    "en": "You can read with either choice. Non-personalized ads still process information needed for delivery and security. You can change your choice in Settings.",
+    "ja": "どちらを選んでも読書できます。非パーソナライズ広告でも配信とセキュリティに必要な情報は処理されます。選択は設定で変更できます。"
+  },
+  "계속을 누르면 Apple의 추적 권한 요청으로 이동합니다. 허용 여부는 시스템 창에서 직접 선택합니다. 이미 결정했거나 기기에서 요청을 제한한 경우에는 기존 설정을 따릅니다.": {
+    "en": "Continue opens Apple's tracking permission request. Choose directly in the system dialog. If you have already decided or requests are restricted, your existing setting applies.",
+    "ja": "「続ける」を押すとAppleのトラッキング許可画面に進みます。システム画面で選択してください。選択済みの場合や端末で制限されている場合は、既存の設定に従います。"
+  },
+  "개인정보처리방침 읽기": {
+    "en": "Read privacy policy",
+    "ja": "プライバシーポリシーを読む"
+  },
+  "비맞춤형 광고 이용": {
+    "en": "Use non-personalized ads",
+    "ja": "非パーソナライズ広告を利用"
+  },
+  "맞춤형 광고와 이를 위한 정보 공유에 동의하지 않습니다.": {
+    "en": "I do not consent to personalized ads or information sharing for them.",
+    "ja": "パーソナライズ広告およびそのための情報共有に同意しません。"
+  },
+  "맞춤형 광고 허용 (선택)": {
+    "en": "Allow personalized ads (optional)",
+    "ja": "パーソナライズ広告を許可（任意）"
+  },
+  "안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.": {
+    "en": "I consent to the described ad personalization and related information processing and sharing.",
+    "ja": "説明された広告のパーソナライズと関連情報の処理・共有に同意します。"
+  },
+  "선택을 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save your choice. Please try again.",
+    "ja": "選択を保存できませんでした。もう一度お試しください。"
+  },
+  "적용 중…": {
+    "en": "Applying…",
+    "ja": "適用中…"
+  },
+  "계속": {
+    "en": "Continue",
+    "ja": "続ける"
+  },
+  "선택하고 시작하기": {
+    "en": "Choose and start",
+    "ja": "選択して始める"
+  },
+  "선택 저장": {
+    "en": "Save choice",
+    "ja": "選択を保存"
+  },
+  "광고 선택": {
+    "en": "Ad choices",
+    "ja": "広告の選択"
+  },
+  "선택 전": {
+    "en": "Not selected",
+    "ja": "未選択"
+  },
+  "비맞춤형 광고": {
+    "en": "Non-personalized ads",
+    "ja": "非パーソナライズ広告"
+  },
+  "맞춤형 광고 허용": {
+    "en": "Allow personalized ads",
+    "ja": "パーソナライズ広告を許可"
+  },
+  "최근 선택: {0}\n기록 버전: {1}": {
+    "en": "Last choice: {0}\nRecord version: {1}",
+    "ja": "最終選択：{0}\n記録バージョン：{1}"
+  },
+  "다시 적용": {
+    "en": "Apply again",
+    "ja": "再適用"
+  },
+  "현재 광고 제공 방식": {
+    "en": "Current ad mode",
+    "ja": "現在の広告配信方式"
+  },
+  "광고 설정 확인 중": {
+    "en": "Checking ad settings",
+    "ja": "広告設定を確認中"
+  },
+  "맞춤형 광고": {
+    "en": "Personalized ads",
+    "ja": "パーソナライズ広告"
+  },
+  "비맞춤형 광고만 사용": {
+    "en": "Use only non-personalized ads",
+    "ja": "非パーソナライズ広告のみ利用"
+  },
+  "켜면 추적 허가와 관계없이 비맞춤형 광고를 사용합니다. 꺼도 Apple의 추적 허가를 변경하지 않습니다.": {
+    "en": "When enabled, only non-personalized ads are used regardless of tracking permission. Turning this off does not change Apple's tracking permission.",
+    "ja": "有効にするとトラッキング許可に関係なく非パーソナライズ広告を使用します。無効にしてもAppleのトラッキング許可は変わりません。"
+  },
+  "설정을 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save settings. Please try again.",
+    "ja": "設定を保存できませんでした。もう一度お試しください。"
+  },
+  "iOS 추적 허가": {
+    "en": "iOS tracking permission",
+    "ja": "iOSトラッキング許可"
+  },
+  "허용됨": {
+    "en": "Allowed",
+    "ja": "許可済み"
+  },
+  "허용 안 함": {
+    "en": "Not allowed",
+    "ja": "許可しない"
+  },
+  "기기에서 제한됨": {
+    "en": "Restricted by device",
+    "ja": "端末による制限"
+  },
+  "아직 결정하지 않음": {
+    "en": "Not yet decided",
+    "ja": "未選択"
+  },
+  "추적 허가를 거부하면 비맞춤형 광고가 적용됩니다. 기기 설정에서 권한을 변경한 후 돌아오면 다시 확인합니다.": {
+    "en": "Denying tracking enables non-personalized ads. We check again when you return after changing permission in device settings.",
+    "ja": "トラッキングを拒否すると非パーソナライズ広告を適用します。端末の設定で権限を変更して戻ると、再確認します。"
+  },
+  "광고 개인정보 선택 관리": {
+    "en": "Manage ad privacy choices",
+    "ja": "広告のプライバシー設定"
+  },
+  "광고 제공자의 동의 화면에서 선택을 확인하거나 변경합니다.": {
+    "en": "Review or change choices in the ad provider's consent screen.",
+    "ja": "広告提供者の同意画面で選択を確認・変更します。"
+  },
+  "개인정보처리방침": {
+    "en": "Privacy policy",
+    "ja": "プライバシーポリシー"
+  },
+  "인터넷 없이도 확인할 수 있습니다.": {
+    "en": "Available offline.",
+    "ja": "オフラインでも確認できます。"
+  },
+  "문의하기": {
+    "en": "Contact support",
+    "ja": "お問い合わせ"
+  },
+  "부적절한 광고 신고": {
+    "en": "Report an inappropriate ad",
+    "ja": "不適切な広告を報告"
+  },
+  "오픈소스 라이선스": {
+    "en": "Open-source licenses",
+    "ja": "オープンソースライセンス"
+  },
+  "방침을 불러오지 못했습니다.\n{0}\n{1}": {
+    "en": "Could not load the policy.\n{0}\n{1}",
+    "ja": "ポリシーを読み込めませんでした。\n{0}\n{1}"
+  },
+  "최종 업데이트: {0}": {
+    "en": "Last updated: {0}",
+    "ja": "最終更新：{0}"
+  },
+  "웹에서 최신 방침 보기": {
+    "en": "View the latest policy online",
+    "ja": "最新のポリシーをウェブで確認"
+  },
+  "광고가 나온 시각, 서재·독서 화면 등 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.": {
+    "en": "Tell us when the ad appeared, where it appeared (library or reader), and what it showed. If needed, attach a screenshot after hiding personal information and book text.",
+    "ja": "広告の表示時刻、表示場所（本棚・読書画面など）、内容をお知らせください。必要に応じて、個人情報と本文を隠したスクリーンショットを添付してください。"
+  },
+  "기기 종류, OS 버전, 발생한 문제와 재현 방법을 알려 주세요. 개인정보 관련 요청도 같은 메일로 접수합니다.": {
+    "en": "Tell us your device, OS version, the issue and how to reproduce it. Privacy requests are accepted at the same email address.",
+    "ja": "端末の種類、OSバージョン、問題と再現手順をお知らせください。個人情報に関するご依頼も同じメールで受け付けます。"
+  },
+  "Koofy Lab 대표 메일": {
+    "en": "Koofy Lab contact email",
+    "ja": "Koofy Lab連絡先メール"
+  },
+  "메일 주소 복사": {
+    "en": "Copy email address",
+    "ja": "メールアドレスをコピー"
+  },
+  "메일 주소를 복사했습니다.": {
+    "en": "Email address copied.",
+    "ja": "メールアドレスをコピーしました。"
+  },
+  "메일 작성하기": {
+    "en": "Write an email",
+    "ja": "メールを作成"
+  },
+  "subject={0}&body={1}": {
+    "en": "subject={0}&body={1}",
+    "ja": "subject={0}&body={1}"
+  },
+  "메일 앱이 없으면 주소를 복사해 사용 중인 메일 서비스에서 보내 주세요. 본문·독서 기록은 자동 첨부하지 않습니다.": {
+    "en": "If you have no mail app, copy the address and use your email service. Book text and reading records are not attached automatically.",
+    "ja": "メールアプリがない場合は、アドレスをコピーしてご利用のメールサービスから送信してください。本文や読書記録は自動添付されません。"
+  },
+  "웹 지원 페이지 열기": {
+    "en": "Open support website",
+    "ja": "サポートサイトを開く"
+  },
+  "책을 준비하고 있습니다…": {
+    "en": "Preparing your book…",
+    "ja": "本を準備しています…"
+  },
+  "읽기 기록 저장을 확인하지 못했습니다. 다시 열면 복구를 시도합니다.\n{0}": {
+    "en": "Could not confirm that reading records were saved. Recovery will be attempted when you reopen.\n{0}",
+    "ja": "読書記録の保存を確認できませんでした。再度開くと復旧を試みます。\n{0}"
+  },
+  "읽던 위치를 불러오고 있습니다…": {
+    "en": "Loading your reading position…",
+    "ja": "読書位置を読み込んでいます…"
+  },
+  "책을 열지 못했습니다.\n{0}": {
+    "en": "Could not open the book.\n{0}",
+    "ja": "本を開けませんでした。\n{0}"
+  },
+  "책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요.": {
+    "en": "The book's content has changed. Please review the previous records.",
+    "ja": "本の内容が変更されています。以前の記録を確認してください。"
+  },
+  "책의 내용이 변경되었습니다": {
+    "en": "The book's content has changed",
+    "ja": "本の内容が変更されています"
+  },
+  "이전 버전의 읽기 기록은 보존했습니다. 변경된 본문에는 같은 위치를 적용할 수 없습니다. 처음 열고 목차에서 읽던 곳을 찾아 주세요.": {
+    "en": "Previous reading records are preserved. They cannot be applied to the changed text. Open from the beginning and use the contents to find your place.",
+    "ja": "以前の読書記録は保持されています。変更後の本文に同じ位置を適用できません。最初から開いて目次から読んでいた場所を探してください。"
+  },
+  "서재로": {
+    "en": "Library",
+    "ja": "本棚へ"
+  },
+  "변경된 책 열기": {
+    "en": "Open updated book",
+    "ja": "変更された本を開く"
+  },
+  "이전 읽기 위치 확인": {
+    "en": "Review previous position",
+    "ja": "以前の読書位置を確認"
+  },
+  "이전 기록은 보존했습니다. 현재 본문에서 같은 위치임을 확인할 수 없어 자동으로 이동하지 않습니다.": {
+    "en": "Previous records are preserved. We could not verify the same position in the current text, so we will not jump automatically.",
+    "ja": "以前の記録は保持されています。現在の本文で同じ位置と確認できないため、自動では移動しません。"
+  },
+  "\n\n{0}": {
+    "en": "\n\n{0}",
+    "ja": "\n\n{0}"
+  },
+  "{0}": {
+    "en": "{0}",
+    "ja": "{0}"
+  },
+  "처음 열고 목차에서 찾기": {
+    "en": "Open from the beginning and use contents",
+    "ja": "最初から開いて目次で探す"
+  },
+  "후보 위치 확인": {
+    "en": "Review suggested position",
+    "ja": "候補の位置を確認"
+  },
+  "책을 읽고 있습니다.": {
+    "en": "Reading your book.",
+    "ja": "読書中です。"
+  },
+  "독서 화면에서 오류가 발생했습니다.": {
+    "en": "An error occurred in the reader.",
+    "ja": "読書画面でエラーが発生しました。"
+  },
+  "다음 권을 준비하고 있습니다…": {
+    "en": "Preparing the next book…",
+    "ja": "次の本を準備しています…"
+  },
+  "글꼴 저장소를 찾지 못했습니다.": {
+    "en": "Could not find the font storage.",
+    "ja": "フォントの保存先が見つかりません。"
+  },
+  "글꼴 관리 화면을 열지 못했습니다.\n{0}": {
+    "en": "Could not open font management.\n{0}",
+    "ja": "フォント管理画面を開けませんでした。\n{0}"
+  },
+  "책 열기를 취소하고 있습니다…": {
+    "en": "Cancelling book opening…",
+    "ja": "本を開く処理をキャンセルしています…"
+  },
+  "독서 화면을 닫지 못했습니다.\n{0}": {
+    "en": "Could not close the reader.\n{0}",
+    "ja": "読書画面を閉じられませんでした。\n{0}"
+  },
+  "서재로 돌아가기": {
+    "en": "Back to library",
+    "ja": "本棚に戻る"
+  },
+  "이전 기록과 북마크": {
+    "en": "Previous records & bookmarks",
+    "ja": "以前の記録とブックマーク"
+  },
+  "기록을 읽지 못했습니다.\n{0}": {
+    "en": "Could not read records.\n{0}",
+    "ja": "記録を読み込めませんでした。\n{0}"
+  },
+  "이 책에는 이전 기록이 없습니다.": {
+    "en": "This book has no previous records.",
+    "ja": "この本には以前の記録がありません。"
+  },
+  "이전 기록 원본은 그대로 보존되어 있습니다. 확인된 본문 위치는 눌러서 열 수 있습니다. 위치를 변환할 수 없는 기록은 아래 문장과 원본 기록을 참고해 목차에서 찾아 주세요.": {
+    "en": "Original records are preserved. Tap a verified position to open it. For records that cannot be converted, use the excerpts and original records below to find your place in the contents.",
+    "ja": "元の記録は保持されています。確認済みの位置をタップすると開けます。変換できない記録は、下の文章と元の記録を参考に目次から探してください。"
+  },
+  "이전에 읽던 위치": {
+    "en": "Previous reading position",
+    "ja": "以前の読書位置"
+  },
+  "북마크 {0}": {
+    "en": "Bookmark {0}",
+    "ja": "ブックマーク {0}"
+  },
+  "저장된 이전 북마크가 없습니다.": {
+    "en": "No previous bookmarks saved.",
+    "ja": "以前のブックマークはありません。"
+  },
+  "보존된 원본 기록 보기": {
+    "en": "View preserved original records",
+    "ja": "保持された元の記録を見る"
+  },
+  "읽기 위치\n{0}\n\n북마크\n{1}": {
+    "en": "Reading position\n{0}\n\nBookmarks\n{1}",
+    "ja": "読書位置\n{0}\n\nブックマーク\n{1}"
+  },
+  "책 열기": {
+    "en": "Open book",
+    "ja": "本を開く"
+  },
+  "{0} · {1}화 공개": {
+    "en": "{0} · {1} episodes available",
+    "ja": "{0}・{1}話公開"
+  },
+  "{0}화를 내 서재에 추가했습니다.": {
+    "en": "Added episode {0} to your library.",
+    "ja": "第{0}話を本棚に追加しました。"
+  },
+  "다운로드하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Download failed. Please try again.",
+    "ja": "ダウンロードできませんでした。もう一度お試しください。"
+  },
+  "다운로드가 끝날 때까지 잠시 기다려 주세요.": {
+    "en": "Please wait for the download to finish.",
+    "ja": "ダウンロードが完了するまでお待ちください。"
+  },
+  "회차 목록 새로고침": {
+    "en": "Refresh episodes",
+    "ja": "話数一覧を更新"
+  },
+  "출처·이용 조건": {
+    "en": "Source & terms of use",
+    "ja": "出典・利用条件"
+  },
+  "회차 번호·제목 검색": {
+    "en": "Search episode number or title",
+    "ja": "話数・タイトルで検索"
+  },
+  "처음부터": {
+    "en": "Oldest first",
+    "ja": "最初から"
+  },
+  "최신순": {
+    "en": "Newest first",
+    "ja": "新しい順"
+  },
+  "회차 목록이나 다운로드 상태를 확인하지 못했습니다.": {
+    "en": "Could not check episodes or download status.",
+    "ja": "話数一覧またはダウンロード状況を確認できませんでした。"
+  },
+  "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.": {
+    "en": "No episodes published yet.\nDownload new episodes here when available.",
+    "ja": "公開された話はまだありません。\n次の話が公開されると、ここからダウンロードできます。"
+  },
+  "검색 조건에 맞는 회차가 없습니다.": {
+    "en": "No episodes match your search.",
+    "ja": "検索条件に一致する話はありません。"
+  },
+  "시": {
+    "en": "Poetry",
+    "ja": "詩"
+  },
+  "소설": {
+    "en": "Fiction",
+    "ja": "小説"
+  },
+  "에세이": {
+    "en": "Essays",
+    "ja": "エッセイ"
+  },
+  "기타": {
+    "en": "Other",
+    "ja": "その他"
+  },
+  "도서·글꼴 다운로드": {
+    "en": "Books & fonts",
+    "ja": "本・フォントのダウンロード"
+  },
+  "도서": {
+    "en": "Books",
+    "ja": "本"
+  },
+  "글꼴": {
+    "en": "Fonts",
+    "ja": "フォント"
+  },
+  "다운로드 목록 새로고침": {
+    "en": "Refresh downloads",
+    "ja": "ダウンロード一覧を更新"
+  },
+  "목록을 처리하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not process the list. Please try again.",
+    "ja": "一覧を処理できませんでした。もう一度お試しください。"
+  },
+  "내 서재에 책을 추가했습니다.": {
+    "en": "Added the book to your library.",
+    "ja": "本棚に本を追加しました。"
+  },
+  "글꼴을 내려받았습니다. 책의 독서 설정에서 선택해 주세요.": {
+    "en": "Font downloaded. Select it in the book's reading settings.",
+    "ja": "フォントをダウンロードしました。読書設定から選択してください。"
+  },
+  "제목·작가로 검색": {
+    "en": "Search title or author",
+    "ja": "タイトル・著者で検索"
+  },
+  "글꼴 이름으로 검색": {
+    "en": "Search font name",
+    "ja": "フォント名で検索"
+  },
+  "검색어 지우기": {
+    "en": "Clear search",
+    "ja": "検索をクリア"
+  },
+  "전체": {
+    "en": "All",
+    "ja": "すべて"
+  },
+  "전체 목록 불러오는 중…": {
+    "en": "Loading full list…",
+    "ja": "一覧を読み込み中…"
+  },
+  "{0}개 · 가나다순": {
+    "en": "{0} items · Title order",
+    "ja": "{0}件・タイトル順"
+  },
+  "다운로드 상태를 확인하지 못했습니다.": {
+    "en": "Could not check download status.",
+    "ja": "ダウンロード状況を確認できませんでした。"
+  },
+  "검색 조건에 맞는 {0} 없습니다.": {
+    "en": "No matching {0} found.",
+    "ja": "条件に一致する{0}はありません。"
+  },
+  "아직 공개된 {0} 없습니다.": {
+    "en": "No {0} published yet.",
+    "ja": "公開された{0}はまだありません。"
+  },
+  "닫기": {
+    "en": "Close",
+    "ja": "閉じる"
+  },
+  "{0} 다운로드 중": {
+    "en": "Downloading {0}",
+    "ja": "{0}をダウンロード中"
+  },
+  "{0} {1}": {
+    "en": "{0} {1}",
+    "ja": "{0} {1}"
+  },
+  "내려받은 글꼴은 책의 독서 설정에서 선택할 수 있어요.": {
+    "en": "Select downloaded fonts in the book's reading settings.",
+    "ja": "ダウンロードしたフォントは読書設定で選択できます。"
+  },
+  "{0}, 글꼴 정보": {
+    "en": "{0}, font information",
+    "ja": "{0}、フォント情報"
+  },
+  "{0} 다운로드 완료": {
+    "en": "{0} downloaded",
+    "ja": "{0}のダウンロード完了"
+  },
+  "{0} 다운로드": {
+    "en": "Download {0}",
+    "ja": "{0}をダウンロード"
+  },
+  "이전 읽기 기록 확인": {
+    "en": "Review previous reading records",
+    "ja": "以前の読書記録を確認"
+  },
+  "읽던 위치 저장됨": {
+    "en": "Reading position saved",
+    "ja": "読書位置を保存済み"
+  },
+  "{0}% 읽음": {
+    "en": "{0}% read",
+    "ja": "{0}% 読了"
+  },
+  "가져오는 중…": {
+    "en": "Importing…",
+    "ja": "読み込み中…"
+  },
+  "책 묶음 만들기": {
+    "en": "Create collection",
+    "ja": "コレクションを作成"
+  },
+  "서재를 불러오지 못했습니다.": {
+    "en": "Could not load your library.",
+    "ja": "本棚を読み込めませんでした。"
+  },
+  "서재 불러오는 중": {
+    "en": "Loading library",
+    "ja": "本棚を読み込み中"
+  },
+  "서재를 새로 불러오지 못했습니다.": {
+    "en": "Could not refresh your library.",
+    "ja": "本棚を更新できませんでした。"
+  },
+  "읽기 기록을 불러오지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not load reading records. Please try again.",
+    "ja": "読書記録を読み込めませんでした。もう一度お試しください。"
+  },
+  "읽던 책: {0}": {
+    "en": "Currently reading: {0}",
+    "ja": "読書中：{0}"
+  },
+  "책 읽기": {
+    "en": "Read book",
+    "ja": "本を読む"
+  },
+  "책 추가": {
+    "en": "Add books",
+    "ja": "本を追加"
+  },
+  "나만의 작은 서재": {
+    "en": "Your own little library",
+    "ja": "自分だけの小さな本棚"
+  },
+  "첫 번째 책을\n들여놓아 볼까요?": {
+    "en": "Add your\nfirst book?",
+    "ja": "最初の一冊を\n追加しませんか？"
+  },
+  "오늘은 어떤 이야기를\n읽어 볼까요?": {
+    "en": "What will you\nread today?",
+    "ja": "今日はどんな物語を\n読みますか？"
+  },
+  "기기에 있는 EPUB · TXT 파일을 가져오세요.": {
+    "en": "Import EPUB or TXT files from your device.",
+    "ja": "端末のEPUB・TXTファイルを追加してください。"
+  },
+  "책을 열면 다음부터 읽던 곳으로 이어집니다.": {
+    "en": "Open a book to resume where you left off next time.",
+    "ja": "本を開くと、次回から読んでいた場所を再開できます。"
+  },
+  "첫 책 가져오기": {
+    "en": "Import your first book",
+    "ja": "最初の本を追加"
+  },
+  "{0} 읽은 비율": {
+    "en": "{0} reading progress",
+    "ja": "{0}の読書進捗"
+  },
+  "이어 읽기": {
+    "en": "Continue reading",
+    "ja": "続きから読む"
+  },
+  "저장된 독서 기록": {
+    "en": "Saved reading record",
+    "ja": "保存された読書記録"
+  },
+  "오늘 읽었어요": {
+    "en": "Read today",
+    "ja": "今日読みました"
+  },
+  "어제 읽었어요": {
+    "en": "Read yesterday",
+    "ja": "昨日読みました"
+  },
+  "나의 책": {
+    "en": "My books",
+    "ja": "自分の本"
+  },
+  "표지 일괄 등록": {
+    "en": "Assign covers in bulk",
+    "ja": "表紙を一括登録"
+  },
+  "내 서재에서 책 검색": {
+    "en": "Search your library",
+    "ja": "本棚の本を検索"
+  },
+  "읽는 중": {
+    "en": "Reading",
+    "ja": "読書中"
+  },
+  "읽을 책": {
+    "en": "To read",
+    "ja": "未読"
+  },
+  "완독": {
+    "en": "Finished",
+    "ja": "読了"
+  },
+  "{0}권 · {1}묶음": {
+    "en": "{0} books · {1} collections",
+    "ja": "{0}冊・{1}コレクション"
+  },
+  "{0}권": {
+    "en": "{0} books",
+    "ja": "{0}冊"
+  },
+  "책 정렬": {
+    "en": "Sort books",
+    "ja": "本の並び順"
+  },
+  "최근 읽은 순": {
+    "en": "Recently read",
+    "ja": "最近読んだ順"
+  },
+  "제목순": {
+    "en": "Title",
+    "ja": "タイトル順"
+  },
+  "읽기 기록 불러오는 중": {
+    "en": "Loading reading records",
+    "ja": "読書記録を読み込み中"
+  },
+  "조건에 맞는 책이 없어요.": {
+    "en": "No books match your filters.",
+    "ja": "条件に一致する本はありません。"
+  },
+  "전체 책 보기": {
+    "en": "Show all books",
+    "ja": "すべての本を表示"
+  },
+  "{0}권 묶음": {
+    "en": "Collection of {0} books",
+    "ja": "{0}冊のコレクション"
+  },
+  "읽기 기록 확인 필요": {
+    "en": "Reading records need review",
+    "ja": "読書記録の確認が必要"
+  },
+  "기록 불러오는 중": {
+    "en": "Loading records",
+    "ja": "記録を読み込み中"
+  },
+  "완독 {0}/{1}권": {
+    "en": "Finished {0}/{1} books",
+    "ja": "{0}/{1}冊読了"
+  },
+  "아직 읽지 않음": {
+    "en": "Not started",
+    "ja": "未読"
+  },
+  "독서 화면은 Android와 iOS 앱에서 사용할 수 있습니다.": {
+    "en": "The reader is available in the Android and iOS apps.",
+    "ja": "読書画面はAndroid・iOSアプリで利用できます。"
+  },
+  "묶음에 추가": {
+    "en": "Add to collection",
+    "ja": "コレクションに追加"
+  },
+  "묶음에서 꺼내기": {
+    "en": "Remove from collection",
+    "ja": "コレクションから取り出す"
+  },
+  "표지 이미지 등록": {
+    "en": "Add cover image",
+    "ja": "表紙画像を登録"
+  },
+  "표지 이미지 변경": {
+    "en": "Change cover image",
+    "ja": "表紙画像を変更"
+  },
+  "표지 초기화": {
+    "en": "Reset cover",
+    "ja": "表紙をリセット"
+  },
+  "처음 제공된 표지로 되돌립니다.": {
+    "en": "Restore the original cover.",
+    "ja": "最初の表紙に戻します。"
+  },
+  "제목이 표시되는 기본 표지로 되돌립니다.": {
+    "en": "Restore the default cover showing the title.",
+    "ja": "タイトルが表示される標準の表紙に戻します。"
+  },
+  "완독 표시 해제": {
+    "en": "Mark as unfinished",
+    "ja": "読了を解除"
+  },
+  "완독으로 표시": {
+    "en": "Mark as finished",
+    "ja": "読了にする"
+  },
+  "이전 버전의 독서 기록": {
+    "en": "Reading records from previous versions",
+    "ja": "以前のバージョンの読書記録"
+  },
+  "보존된 기록을 확인하고 읽던 곳을 찾습니다.": {
+    "en": "Review preserved records and find your place.",
+    "ja": "保持された記録を確認して読んでいた場所を探します。"
+  },
+  "책 삭제": {
+    "en": "Delete book",
+    "ja": "本を削除"
+  },
+  "서재에서 숨기기": {
+    "en": "Hide from library",
+    "ja": "本棚で非表示"
+  },
+  "서재로 꺼냈습니다.": {
+    "en": "Moved back to the library.",
+    "ja": "本棚に戻しました。"
+  },
+  "완독 표시를 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save finished status. Please try again.",
+    "ja": "読了状態を保存できませんでした。もう一度お試しください。"
+  },
+  "삭제": {
+    "en": "Delete",
+    "ja": "削除"
+  },
+  "숨김": {
+    "en": "Hide",
+    "ja": "非表示"
+  },
+  "책 {0}": {
+    "en": "{0} book",
+    "ja": "本を{0}"
+  },
+  "“{0}”을 휴지통으로 옮길까요? 파일·표지·읽던 위치는 유지되며 설정의 휴지통에서 복원할 수 있습니다.": {
+    "en": "Move “{0}” to Trash? Files, covers and reading positions are preserved. Restore them from Trash in Settings.",
+    "ja": "「{0}」をゴミ箱に移動しますか？ファイル・表紙・読書位置は保持され、設定のゴミ箱から復元できます。"
+  },
+  "취소": {
+    "en": "Cancel",
+    "ja": "キャンセル"
+  },
+  "휴지통으로 이동: {0}": {
+    "en": "Moved to Trash: {0}",
+    "ja": "ゴミ箱に移動：{0}"
+  },
+  "실행 취소": {
+    "en": "Undo",
+    "ja": "元に戻す"
+  },
+  "복원하지 못했습니다. 설정의 휴지통에서 다시 시도해 주세요.": {
+    "en": "Could not restore. Please try again from Trash in Settings.",
+    "ja": "復元できませんでした。設定のゴミ箱からもう一度お試しください。"
+  },
+  "책을 제거하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not remove the book. Please try again.",
+    "ja": "本を削除できませんでした。もう一度お試しください。"
+  },
+  "표지 이미지는 Android · iOS 앱에서 등록해 주세요.": {
+    "en": "Add cover images in the Android or iOS app.",
+    "ja": "表紙画像はAndroid・iOSアプリで登録してください。"
+  },
+  "표지 이미지 선택": {
+    "en": "Choose cover image",
+    "ja": "表紙画像を選択"
+  },
+  "이미지를 열 수 없습니다. 다른 이미지를 선택해 주세요.": {
+    "en": "Could not open the image. Choose another image.",
+    "ja": "画像を開けませんでした。別の画像を選んでください。"
+  },
+  "기본 표지로 되돌렸습니다.": {
+    "en": "Restored the default cover.",
+    "ja": "標準の表紙に戻しました。"
+  },
+  "표지 이미지를 적용했습니다.": {
+    "en": "Cover image applied.",
+    "ja": "表紙画像を適用しました。"
+  },
+  "표지를 저장하지 못했습니다. JPG · PNG · WebP 이미지로 다시 시도해 주세요.": {
+    "en": "Could not save the cover. Try a JPG, PNG or WebP image.",
+    "ja": "表紙を保存できませんでした。JPG・PNG・WebP画像でお試しください。"
+  },
+  "파일 가져오기는 Android · iOS 앱에서 이용해 주세요.": {
+    "en": "Import files in the Android or iOS app.",
+    "ja": "ファイルの読み込みはAndroid・iOSアプリをご利用ください。"
+  },
+  "파일 선택 중…": {
+    "en": "Choosing files…",
+    "ja": "ファイルを選択中…"
+  },
+  "책과 같은 이름의 표지 이미지 함께 선택": {
+    "en": "Also select cover images with matching file names",
+    "ja": "本と同名の表紙画像も選択"
+  },
+  "가져오는 중 0/{0}": {
+    "en": "Importing 0/{0}",
+    "ja": "読み込み中 0/{0}"
+  },
+  "가져오는 중 {0}/{1}": {
+    "en": "Importing {0}/{1}",
+    "ja": "読み込み中 {0}/{1}"
+  },
+  "가져오기 완료: {0}권 추가": {
+    "en": "Import complete: {0} books added",
+    "ja": "読み込み完了：{0}冊追加"
+  },
+  "가져오기 결과": {
+    "en": "Import results",
+    "ja": "読み込み結果"
+  },
+  "{0}\n\n다음 {1}개 파일은 가져오지 못했습니다. ": {
+    "en": "{0}\n\nCould not import the following {1} files. ",
+    "ja": "{0}\n\n次の{1}個のファイルを読み込めませんでした。"
+  },
+  "파일이 기기에 내려받아져 있는지, TXT·EPUB 형식인지 확인해 주세요.\n\n": {
+    "en": "Check that the files are downloaded to your device and are TXT or EPUB files.\n\n",
+    "ja": "ファイルが端末に保存されているか、TXT・EPUB形式かを確認してください。\n\n"
+  },
+  "확인": {
+    "en": "OK",
+    "ja": "確認"
+  },
+  "책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요.": {
+    "en": "Could not import books. Check the files and try again.",
+    "ja": "本を読み込めませんでした。ファイルを確認してもう一度お試しください。"
+  },
+  "{0}권을 가져왔어요": {
+    "en": "Imported {0} books",
+    "ja": "{0}冊を追加しました"
+  },
+  "묶음에 넣을 책과 순서를 다음 화면에서 확인하세요.": {
+    "en": "Review books and their order on the next screen.",
+    "ja": "次の画面でコレクションに入れる本と順番を確認してください。"
+  },
+  "새 묶음 만들기": {
+    "en": "New collection",
+    "ja": "新しいコレクション"
+  },
+  "이 묶음에 추가": {
+    "en": "Add to this collection",
+    "ja": "このコレクションに追加"
+  },
+  "각각 보관": {
+    "en": "Keep separate",
+    "ja": "個別に保存"
+  },
+  "책은 가져왔지만 묶음 목록을 불러오지 못했습니다. 서재에서 묶음으로 정리해 주세요.": {
+    "en": "Books imported, but collections could not load. Organize them from the library.",
+    "ja": "本は追加しましたが、コレクションを読み込めませんでした。本棚から整理してください。"
+  },
+  "묶음 목록을 먼저 불러와 주세요.": {
+    "en": "Please load collections first.",
+    "ja": "先にコレクション一覧を読み込んでください。"
+  },
+  "묶이지 않은 책이 두 권 이상 있어야 합니다.": {
+    "en": "At least two ungrouped books are required.",
+    "ja": "コレクションに入っていない本が2冊以上必要です。"
+  },
+  "책 묶음을 만들었습니다.": {
+    "en": "Collection created.",
+    "ja": "コレクションを作成しました。"
+  },
+  "묶음을 만들지 못했습니다. 목록을 새로고침해 주세요.": {
+    "en": "Could not create the collection. Refresh the list.",
+    "ja": "コレクションを作成できませんでした。一覧を更新してください。"
+  },
+  "추가할 수 있는 책이 없습니다. 다른 묶음의 책은 먼저 꺼내 주세요.": {
+    "en": "No books available to add. Remove books from other collections first.",
+    "ja": "追加できる本がありません。他のコレクションから先に取り出してください。"
+  },
+  "묶음에 추가했습니다.": {
+    "en": "Added to collection.",
+    "ja": "コレクションに追加しました。"
+  },
+  "책을 추가하지 못했습니다. 목록을 새로고침해 주세요.": {
+    "en": "Could not add books. Refresh the list.",
+    "ja": "本を追加できませんでした。一覧を更新してください。"
+  },
+  "추가할 묶음 선택": {
+    "en": "Choose collection",
+    "ja": "追加先を選択"
+  },
+  "{0}권의 책 묶음": {
+    "en": "Collection of {0} books",
+    "ja": "{0}冊のコレクション"
+  },
+  "묶음에 책 추가": {
+    "en": "Add books to collection",
+    "ja": "コレクションに本を追加"
+  },
+  "묶음 이름 변경": {
+    "en": "Rename collection",
+    "ja": "コレクション名を変更"
+  },
+  "묶음책 삭제": {
+    "en": "Delete collection and books",
+    "ja": "コレクションと本を削除"
+  },
+  "묶음과 안의 책을 함께 휴지통으로 옮깁니다.": {
+    "en": "Move the collection and its books to Trash.",
+    "ja": "コレクションと中の本をゴミ箱に移動します。"
+  },
+  "묶음책장 비우기": {
+    "en": "Empty collection",
+    "ja": "コレクションを空にする"
+  },
+  "책만 휴지통으로 옮기고 빈 묶음은 남깁니다.": {
+    "en": "Move only the books to Trash and keep the empty collection.",
+    "ja": "本だけをゴミ箱に移動し、空のコレクションを残します。"
+  },
+  "묶음 해제": {
+    "en": "Ungroup books",
+    "ja": "コレクションを解除"
+  },
+  "책은 모두 서재로 돌아갑니다.": {
+    "en": "All books return to your library.",
+    "ja": "すべての本が本棚に戻ります。"
+  },
+  "“{0}”의 책 {1}권을 휴지통으로 옮길까요?\n{2} 설정의 휴지통에서 한 번에 복원할 수 있습니다.": {
+    "en": "Move {1} books in “{0}” to Trash?\n{2} You can restore them together from Trash in Settings.",
+    "ja": "「{0}」の{1}冊をゴミ箱に移動しますか？\n{2} 設定のゴミ箱からまとめて復元できます。"
+  },
+  "휴지통으로 이동": {
+    "en": "Move to Trash",
+    "ja": "ゴミ箱に移動"
+  },
+  "휴지통으로 옮겼습니다. 설정에서 복원할 수 있습니다.": {
+    "en": "Moved to Trash. Restore from Settings.",
+    "ja": "ゴミ箱に移動しました。設定から復元できます。"
+  },
+  "작업을 완료하지 못했습니다. 휴지통과 목록을 확인해 주세요.": {
+    "en": "Could not finish. Check Trash and the list.",
+    "ja": "処理を完了できませんでした。ゴミ箱と一覧を確認してください。"
+  },
+  "묶음 이름을 변경했습니다.": {
+    "en": "Collection renamed.",
+    "ja": "コレクション名を変更しました。"
+  },
+  "“{0}”의 책 {1}권을 서재로 꺼낼까요? 책과 읽던 위치는 유지됩니다.": {
+    "en": "Move {1} books in “{0}” back to the library? Books and reading positions are preserved.",
+    "ja": "「{0}」の{1}冊を本棚に戻しますか？本と読書位置は保持されます。"
+  },
+  "묶음을 해제했습니다. 책은 서재에 있습니다.": {
+    "en": "Collection dissolved. Books are in your library.",
+    "ja": "コレクションを解除しました。本は本棚にあります。"
+  },
+  "묶음 이름": {
+    "en": "Collection name",
+    "ja": "コレクション名"
+  },
+  "저장": {
+    "en": "Save",
+    "ja": "保存"
+  },
+  "이미지를 열 수 없습니다.": {
+    "en": "Could not open the image.",
+    "ja": "画像を開けませんでした。"
+  },
+  "묶음 표지를 적용했습니다.": {
+    "en": "Collection cover applied.",
+    "ja": "コレクションの表紙を適用しました。"
+  },
+  "표지를 저장하지 못했습니다. 다른 이미지로 다시 시도해 주세요.": {
+    "en": "Could not save the cover. Try another image.",
+    "ja": "表紙を保存できませんでした。別の画像でお試しください。"
+  },
+  "이후에 묶음을 변경해서 되돌릴 수 없습니다.": {
+    "en": "Cannot undo because the collection was changed later.",
+    "ja": "その後コレクションが変更されたため、元に戻せません。"
+  },
+  "실행 취소를 저장하지 못했습니다. 다시 확인해 주세요.": {
+    "en": "Could not save undo. Please check again.",
+    "ja": "元に戻す操作を保存できませんでした。もう一度確認してください。"
+  },
+  "묶음 변경을 저장하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.": {
+    "en": "Could not save collection changes. Refresh and try again.",
+    "ja": "コレクションの変更を保存できませんでした。更新してもう一度お試しください。"
+  },
+  "“{0}”을 “{1}”에 추가할까요?": {
+    "en": "Add “{0}” to “{1}”?",
+    "ja": "「{0}」を「{1}」に追加しますか？"
+  },
+  "추가": {
+    "en": "Add",
+    "ja": "追加"
+  },
+  "한글 텍스트 확인": {
+    "en": "Check Korean text",
+    "ja": "韓国語テキストを確認"
+  },
+  "CP949/EUC-KR 방식으로 읽었습니다. 아래 한글이 정상인지 확인해 주세요. 가져오면 앱 안의 사본만 UTF-8로 저장하며 원본 파일은 바꾸지 않습니다.": {
+    "en": "Read using CP949/EUC-KR. Check that the Korean text below displays correctly. Import saves only the in-app copy as UTF-8; the original file is unchanged.",
+    "ja": "CP949/EUC-KRで読み込みました。下の韓国語が正しく表示されるか確認してください。追加するとアプリ内のコピーのみUTF-8で保存し、元のファイルは変更しません。"
+  },
+  "이 파일 건너뛰기": {
+    "en": "Skip this file",
+    "ja": "このファイルをスキップ"
+  },
+  "확인 후 가져오기": {
+    "en": "Confirm and import",
+    "ja": "確認して追加"
+  },
+  "삭제 중인 항목입니다.": {
+    "en": "This item is being deleted.",
+    "ja": "この項目は削除中です。"
+  },
+  "복원했습니다. 다른 묶음에 배치한 책의 현재 소속은 유지합니다.": {
+    "en": "Restored. Books already in other collections keep their current membership.",
+    "ja": "復元しました。他のコレクションに入っている本の所属は維持します。"
+  },
+  "복원하지 못했습니다. 기록은 보존했습니다. 다시 시도해 주세요.": {
+    "en": "Could not restore. Records are preserved. Please try again.",
+    "ja": "復元できませんでした。記録は保持されています。もう一度お試しください。"
+  },
+  "휴지통 비우기": {
+    "en": "Empty Trash",
+    "ja": "ゴミ箱を空にする"
+  },
+  "영구 삭제": {
+    "en": "Delete permanently",
+    "ja": "完全に削除"
+  },
+  "{0}개 항목의 앱 내 파일·표지·독서 기록을 영구 삭제할까요?\n복원할 수 없습니다. 다른 책과 공유하는 파일과 앱 밖에 보관한 원본은 유지됩니다.": {
+    "en": "Permanently delete in-app files, covers and reading records for {0} items?\nThis cannot be undone. Files shared with other books and originals outside the app are preserved.",
+    "ja": "{0}項目のアプリ内ファイル・表紙・読書記録を完全に削除しますか？\n復元できません。他の本と共有しているファイルやアプリ外の原本は保持されます。"
+  },
+  "영구 삭제했습니다.": {
+    "en": "Permanently deleted.",
+    "ja": "完全に削除しました。"
+  },
+  "일부 항목의 삭제를 완료하지 못했습니다. 남은 항목에서 다시 시도해 주세요.": {
+    "en": "Some items could not be deleted. Try again for the remaining items.",
+    "ja": "一部の項目を削除できませんでした。残った項目でもう一度お試しください。"
+  },
+  "휴지통 다시 불러오기": {
+    "en": "Reload Trash",
+    "ja": "ゴミ箱を再読み込み"
+  },
+  "복원하거나 영구 삭제할 수 있습니다. 휴지통을 비우면 앱에 보관한 파일 용량을 확보합니다. 기본 제공 책의 앱 내장 원본은 삭제되지 않습니다. 휴지통의 책은 서재 백업에서 제외됩니다.": {
+    "en": "Restore items or delete them permanently. Empty Trash to free storage used by in-app files. Bundled originals cannot be removed. Books in Trash are excluded from library backups.",
+    "ja": "復元または完全削除できます。ゴミ箱を空にするとアプリ内のファイル容量を確保できます。アプリに内蔵された本の原本は削除されません。ゴミ箱の本はバックアップ対象外です。"
+  },
+  "삭제로 확보 가능한 파일 용량: {0} MB": {
+    "en": "Storage that can be freed: {0} MB",
+    "ja": "削除で空けられる容量：{0} MB"
+  },
+  "파일 용량을 확인하지 못했습니다.": {
+    "en": "Could not check file sizes.",
+    "ja": "ファイル容量を確認できませんでした。"
+  },
+  "파일 용량 확인 중…": {
+    "en": "Checking file sizes…",
+    "ja": "ファイル容量を確認中…"
+  },
+  "휴지통이 비어 있습니다.": {
+    "en": "Trash is empty.",
+    "ja": "ゴミ箱は空です。"
+  },
+  "삭제 미완료 · 다시 시도해 주세요.": {
+    "en": "Deletion incomplete · Please try again.",
+    "ja": "削除未完了・もう一度お試しください。"
+  },
+  "{0}권 · {1}": {
+    "en": "{0} books · {1}",
+    "ja": "{0}冊・{1}"
+  },
+  "해제한 묶음": {
+    "en": "Dissolved collection",
+    "ja": "解除したコレクション"
+  },
+  "서재에서 삭제한 책": {
+    "en": "Books removed from library",
+    "ja": "本棚から削除した本"
+  },
+  "복원": {
+    "en": "Restore",
+    "ja": "復元"
+  },
+  "삭제 재시도": {
+    "en": "Retry deletion",
+    "ja": "削除を再試行"
+  },
+  "묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save collection settings. Please try again.",
+    "ja": "コレクションの設定を保存できませんでした。もう一度お試しください。"
+  },
+  "책 묶음": {
+    "en": "Book collection",
+    "ja": "コレクション"
+  },
+  "묶음 관리": {
+    "en": "Manage collection",
+    "ja": "コレクションを管理"
+  },
+  "묶음을 불러오지 못했습니다.": {
+    "en": "Could not load the collection.",
+    "ja": "コレクションを読み込めませんでした。"
+  },
+  "묶음이 해제되었습니다.": {
+    "en": "The collection was dissolved.",
+    "ja": "コレクションは解除されました。"
+  },
+  "총 {0}권 · 완독 {1}권\n{2}": {
+    "en": "{0} books · {1} finished\n{2}",
+    "ja": "全{0}冊・{1}冊読了\n{2}"
+  },
+  "총 {0}권 중 {1}권 완독": {
+    "en": "{1} of {0} books finished",
+    "ja": "全{0}冊中{1}冊読了"
+  },
+  "순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.": {
+    "en": "Drag the handles to change the reading order.",
+    "ja": "ハンドルをドラッグして読む順番を変更できます。"
+  },
+  "묶음 안의 책 표지 표시": {
+    "en": "Show covers inside collections",
+    "ja": "コレクション内の表紙を表示"
+  },
+  "묶음 안의 표지 일괄 등록": {
+    "en": "Assign covers in this collection",
+    "ja": "コレクション内の表紙を一括登録"
+  },
+  "제목·회차 순으로 정렬": {
+    "en": "Sort by title / episode",
+    "ja": "タイトル・話数順に並べ替え"
+  },
+  "{0} · 이어 읽기": {
+    "en": "{0} · Continue reading",
+    "ja": "{0}・続きから読む"
+  },
+  "{0} · 읽기 시작": {
+    "en": "{0} · Start reading",
+    "ja": "{0}・読み始める"
+  },
+  "읽기 기록 다시 불러오기": {
+    "en": "Reload reading records",
+    "ja": "読書記録を再読み込み"
+  },
+  "비어 있는 묶음입니다. 책을 추가하거나 묶음을 해제할 수 있어요.": {
+    "en": "This collection is empty. Add books or dissolve it.",
+    "ja": "空のコレクションです。本を追加するか解除できます。"
+  },
+  "순서를 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save the order. Please try again.",
+    "ja": "順番を保存できませんでした。もう一度お試しください。"
+  },
+  "읽는 중 · {0}": {
+    "en": "Reading · {0}",
+    "ja": "読書中・{0}"
+  },
+  "{0} 더보기": {
+    "en": "More options for {0}",
+    "ja": "{0}のその他の操作"
+  },
+  "{0} 순서 변경": {
+    "en": "Reorder {0}",
+    "ja": "{0}の順番を変更"
+  },
+  "책 검색": {
+    "en": "Search books",
+    "ja": "本を検索"
+  },
+  "함께 묶을 책을 두 권 이상 선택해 주세요.": {
+    "en": "Select at least two books to group together.",
+    "ja": "まとめる本を2冊以上選択してください。"
+  },
+  "추가할 책을 선택해 주세요.": {
+    "en": "Select books to add.",
+    "ja": "追加する本を選択してください。"
+  },
+  "추가할 수 있는 책이 없습니다.": {
+    "en": "No books available to add.",
+    "ja": "追加できる本はありません。"
+  },
+  "{0}권 {1}": {
+    "en": "{0} books · {1}",
+    "ja": "{0}冊・{1}"
+  },
+  "책 파일과 이름이 같은 표지 이미지 선택": {
+    "en": "Choose cover images with matching book file names",
+    "ja": "本と同じファイル名の表紙画像を選択"
+  },
+  "표지 파일을 불러오지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not load cover files. Please try again.",
+    "ja": "表紙ファイルを読み込めませんでした。もう一度お試しください。"
+  },
+  "표지 등록 결과": {
+    "en": "Cover assignment results",
+    "ja": "表紙の登録結果"
+  },
+  "{0}권 적용 · {1}권 유지\n": {
+    "en": "Applied to {0} books · Kept {1} books\n",
+    "ja": "{0}冊に適用・{1}冊を維持\n"
+  },
+  "확장자를 제외한 원래 파일명이 같은 책에 연결합니다. 제목은 비교하지 않습니다.\n중복된 이름은 연결할 항목을 직접 선택해 주세요.": {
+    "en": "Matches original file names without extensions, not book titles.\nFor duplicate names, choose the match yourself.",
+    "ja": "拡張子を除いた元のファイル名で照合します。タイトルは比較しません。\n同名の場合は、登録先を選択してください。"
+  },
+  "{0}권 일치 · 이미지 {1}개 미일치": {
+    "en": "{0} books matched · {1} images unmatched",
+    "ja": "{0}冊一致・画像{1}個不一致"
+  },
+  "기존 표지도 교체": {
+    "en": "Replace existing covers too",
+    "ja": "既存の表紙も置き換える"
+  },
+  "끄면 이미 표지가 있는 책은 유지합니다.": {
+    "en": "When off, books with covers are kept unchanged.",
+    "ja": "無効にすると、表紙のある本は変更しません。"
+  },
+  "이름이 일치하는 책이 없습니다.\n예: 소설_001.txt ↔ 소설_001.jpg\n원래 파일명 정보가 없는 이전 백업의 책은 개별 표지 등록을 이용해 주세요.": {
+    "en": "No matching file names.\nExample: novel_001.txt ↔ novel_001.jpg\nFor older backups without original file names, assign covers individually.",
+    "ja": "一致するファイル名がありません。\n例：novel_001.txt ↔ novel_001.jpg\n元のファイル名がない以前のバックアップでは、個別に登録してください。"
+  },
+  "이미지 미리보기를 불러올 수 없습니다.": {
+    "en": "Could not load image preview.",
+    "ja": "画像のプレビューを読み込めませんでした。"
+  },
+  "중복 이름 · 연결할 이미지를 직접 선택해 주세요.": {
+    "en": "Duplicate names · Choose an image to link.",
+    "ja": "同名のファイル・登録する画像を選択してください。"
+  },
+  "기존 표지 유지": {
+    "en": "Keep existing cover",
+    "ja": "既存の表紙を維持"
+  },
+  "연결하지 않음": {
+    "en": "Do not link",
+    "ja": "登録しない"
+  },
+  "연결할 책이 없는 이미지": {
+    "en": "Images without matching books",
+    "ja": "対応する本がない画像"
+  },
+  "표지 저장 중 {0}": {
+    "en": "Saving covers {0}",
+    "ja": "表紙を保存中 {0}"
+  },
+  "{0}권에 표지 적용": {
+    "en": "Apply covers to {0} books",
+    "ja": "{0}冊に表紙を適用"
+  },
+  "업데이트 확인 중…": {
+    "en": "Checking for updates…",
+    "ja": "更新を確認中…"
+  },
+  "업데이트가 필요합니다": {
+    "en": "Update required",
+    "ja": "更新が必要です"
+  },
+  "새 버전 {0}": {
+    "en": "New version {0}",
+    "ja": "新しいバージョン {0}"
+  },
+  "스토어 여는 중…": {
+    "en": "Opening store…",
+    "ja": "ストアを開いています…"
+  },
+  "업데이트": {
+    "en": "Update",
+    "ja": "更新"
+  },
+  "나중에": {
+    "en": "Later",
+    "ja": "後で"
+  },
+  "스토어를 열지 못했습니다. 다시 누르거나 아래 주소를 복사해 이용해 주세요.": {
+    "en": "Could not open the store. Try again or copy the address below.",
+    "ja": "ストアを開けませんでした。もう一度押すか、下のアドレスをコピーしてください。"
+  },
+  "쿠피리더 진단 정보": {
+    "en": "Koofy Reader diagnostics",
+    "ja": "クーピーリーダー診断情報"
+  },
+  "운영체제: {0}": {
+    "en": "Operating system: {0}",
+    "ja": "OS：{0}"
+  },
+  "OS 버전: {0}": {
+    "en": "OS version: {0}",
+    "ja": "OSバージョン：{0}"
+  },
+  "화면: {0} × {1} (논리 픽셀)": {
+    "en": "Display: {0} × {1} (logical pixels)",
+    "ja": "画面：{0} × {1}（論理ピクセル）"
+  },
+  "시스템 글자 배율: {0}": {
+    "en": "System text scale: {0}",
+    "ja": "システム文字倍率：{0}"
+  },
+  "앱: {0} ({1})": {
+    "en": "App: {0} ({1})",
+    "ja": "アプリ：{0}（{1}）"
+  },
+  "앱 버전: 확인 실패": {
+    "en": "App version: unavailable",
+    "ja": "アプリのバージョン：確認失敗"
+  },
+  "독서 설정: 확인 실패": {
+    "en": "Reader settings: unavailable",
+    "ja": "読書設定：確認失敗"
+  },
+  "\n발생한 문제와 재현 순서를 함께 적어 문의해 주세요.": {
+    "en": "\nPlease include the issue and steps to reproduce when contacting support.",
+    "ja": "\n問題と再現手順を添えてお問い合わせください。"
+  },
+  "아래 정보를 확인한 뒤 복사해 문의에 첨부할 수 있습니다. 책 본문·파일명·독서 위치·광고 식별자는 포함하지 않으며 자동 전송하지 않습니다.": {
+    "en": "Review and copy this information to include in your support request. It contains no book text, file names, reading positions or ad identifiers and is not sent automatically.",
+    "ja": "確認後にコピーしてお問い合わせに添付できます。本文・ファイル名・読書位置・広告識別子は含まず、自動送信もしません。"
+  },
+  "진단 정보를 복사했습니다.": {
+    "en": "Diagnostics copied.",
+    "ja": "診断情報をコピーしました。"
+  },
+  "진단 정보 복사": {
+    "en": "Copy diagnostics",
+    "ja": "診断情報をコピー"
+  },
+  "준비 중…": {
+    "en": "Preparing…",
+    "ja": "準備中…"
+  },
+  "읽고 있는 책을 닫은 뒤 이용해 주세요.": {
+    "en": "Close the current book first.",
+    "ja": "読書中の本を閉じてからご利用ください。"
+  },
+  "쿠피리더 백업 선택": {
+    "en": "Select Koofy Reader backup",
+    "ja": "クーピーリーダーのバックアップを選択"
+  },
+  "백업 파일을 기기에 내려받은 뒤 선택해 주세요.": {
+    "en": "Download the backup file to your device first.",
+    "ja": "バックアップファイルを端末に保存してから選択してください。"
+  },
+  "백업 파일 확인 중…": {
+    "en": "Checking backup…",
+    "ja": "バックアップを確認中…"
+  },
+  "백업 복원": {
+    "en": "Restore backup",
+    "ja": "バックアップを復元"
+  },
+  "{0}권이 포함된 백업입니다.\n\n현재 서재에 없는 책·묶음·독서 기록을 추가합니다. ": {
+    "en": "This backup contains {0} books.\n\nBooks, collections and reading records missing from your library will be added. ",
+    "ja": "{0}冊を含むバックアップです。\n\n現在の本棚にない本・コレクション・読書記録を追加します。"
+  },
+  "같은 책의 현재 기록과 설정은 유지합니다. 처음 사용하는 기기에는 백업의 보기 설정을 적용합니다.": {
+    "en": "Existing records and settings for the same books are preserved. On a new device, backup display settings are applied.",
+    "ja": "同じ本の現在の記録と設定は保持します。初めて使う端末にはバックアップの表示設定を適用します。"
+  },
+  "책과 독서 기록 복원 중…": {
+    "en": "Restoring books and reading records…",
+    "ja": "本と読書記録を復元中…"
+  },
+  "복원 완료 · {0}권 추가\n기존 책과 독서 기록은 유지했습니다.": {
+    "en": "Restored · {0} books added\nExisting books and reading records are preserved.",
+    "ja": "復元完了・{0}冊追加\n既存の本と読書記録は保持されています。"
+  },
+  "저장할 위치를 선택해 주세요.": {
+    "en": "Choose where to save.",
+    "ja": "保存先を選択してください。"
+  },
+  "서재 백업 저장": {
+    "en": "Save library backup",
+    "ja": "本棚のバックアップを保存"
+  },
+  "백업 파일은 저장했지만 마지막 백업 날짜를 기록하지 못했습니다.": {
+    "en": "Backup saved, but could not record the backup date.",
+    "ja": "バックアップは保存しましたが、日時を記録できませんでした。"
+  },
+  "백업 저장을 취소했습니다.": {
+    "en": "Backup save cancelled.",
+    "ja": "バックアップの保存をキャンセルしました。"
+  },
+  "백업 파일을 저장했습니다.": {
+    "en": "Backup saved.",
+    "ja": "バックアップを保存しました。"
+  },
+  "작업을 완료하지 못했습니다. 파일과 저장 공간을 확인해 주세요.\n{0}": {
+    "en": "Could not complete the operation. Check the file and storage space.\n{0}",
+    "ja": "処理を完了できませんでした。ファイルと空き容量を確認してください。\n{0}"
+  },
+  "마지막 백업 날짜를 확인하지 못했습니다.": {
+    "en": "Could not check the last backup date.",
+    "ja": "最終バックアップ日時を確認できませんでした。"
+  },
+  "{0}{1}": {
+    "en": "{0}{1}",
+    "ja": "{0}{1}"
+  },
+  "책 파일, 표지, 묶음과 순서, 읽던 위치, 책갈피, 완독 표시, 보기·듣기 설정과 듣던 위치를 파일 하나로 저장합니다.": {
+    "en": "Save book files, covers, collections and order, reading positions, bookmarks, finished status, display and listening settings, and listening positions in one file.",
+    "ja": "本・表紙・コレクションと順番・読書位置・ブックマーク・読了状態・表示と読み上げの設定・再生位置を一つのファイルに保存します。"
+  },
+  "파일 앱에서 다른 기기로 옮겨 복원할 수 있습니다. 자동 동기화는 하지 않습니다. ": {
+    "en": "Transfer the file to another device using a file app to restore it. There is no automatic sync. ",
+    "ja": "ファイルアプリで別の端末に移して復元できます。自動同期は行いません。"
+  },
+  "다운로드한 글꼴과 음성은 새 기기에서 다시 설치해 주세요. 다른 운영체제에서는 목소리를 다시 선택합니다. 휴지통의 책, 광고 숨김 시간과 광고 동의는 백업하지 않습니다.": {
+    "en": "Reinstall downloaded fonts and voices on the new device. Choose voices again on a different OS. Trash, ad-free time and ad consent are not backed up.",
+    "ja": "新しい端末ではフォントと音声を再インストールしてください。OSが異なる場合は音声を選び直します。ゴミ箱・広告非表示時間・広告への同意はバックアップしません。"
+  },
+  "한 번에 원본 기준 100MB까지 지원합니다. 백업에는 책 본문이 포함되므로 본인이 관리하는 위치에 보관해 주세요.": {
+    "en": "Supports up to 100 MB of original files per backup. Backups include book text, so keep them in a location you control.",
+    "ja": "元のファイルで一度に100MBまで対応します。バックアップには本文を含むため、ご自身で管理する場所に保存してください。"
+  },
+  "백업 파일 저장": {
+    "en": "Save backup file",
+    "ja": "バックアップを保存"
+  },
+  "백업 파일 불러오기": {
+    "en": "Load backup file",
+    "ja": "バックアップを読み込む"
+  },
+  "글꼴 파일을 읽거나 저장하지 못했습니다. 파일과 저장 공간을 확인해 주세요.": {
+    "en": "Could not read or save the font. Check the file and storage space.",
+    "ja": "フォントの読み込み・保存ができませんでした。ファイルと空き容量を確認してください。"
+  },
+  "글꼴을 불러오지 못했습니다. 다른 TTF·OTF 파일로 다시 시도해 주세요.": {
+    "en": "Could not load the font. Try another TTF or OTF file.",
+    "ja": "フォントを読み込めませんでした。別のTTF・OTFファイルをお試しください。"
+  },
+  "10MB 이하의 글꼴 파일을 선택해 주세요.": {
+    "en": "Choose a font file no larger than 10 MB.",
+    "ja": "10MB以下のフォントファイルを選択してください。"
+  },
+  "글꼴 파일이 너무 큽니다.": {
+    "en": "The font file is too large.",
+    "ja": "フォントファイルが大きすぎます。"
+  },
+  "내 글꼴 삭제": {
+    "en": "Delete custom font",
+    "ja": "追加したフォントを削除"
+  },
+  "“{0}”을 삭제할까요? 사용 중인 글꼴이면 기본 글꼴로 돌아갑니다.": {
+    "en": "Delete “{0}”? If it is in use, the default font will be restored.",
+    "ja": "「{0}」を削除しますか？使用中の場合は標準フォントに戻ります。"
+  },
+  "내 글꼴": {
+    "en": "My fonts",
+    "ja": "自分のフォント"
+  },
+  "독서로 돌아가기": {
+    "en": "Back to reading",
+    "ja": "読書に戻る"
+  },
+  "기기에 있는 TTF·OTF 파일을 가져와 사용할 수 있습니다. 추가한 글꼴은 앱 안에 보관되며 모든 책에 적용됩니다.": {
+    "en": "Import TTF or OTF files from your device. Added fonts are stored in the app and available for all books.",
+    "ja": "端末のTTF・OTFファイルを追加できます。追加したフォントはアプリ内に保存され、すべての本で使えます。"
+  },
+  "내 글꼴 추가": {
+    "en": "Add a font",
+    "ja": "フォントを追加"
+  },
+  "아직 추가한 글꼴이 없습니다.": {
+    "en": "No custom fonts yet.",
+    "ja": "追加したフォントはまだありません。"
+  },
+  "글꼴 삭제": {
+    "en": "Delete font",
+    "ja": "フォントを削除"
+  },
+  "언어": {
+    "en": "Language",
+    "ja": "言語"
+  },
+  "기기 설정 따르기": {
+    "en": "Device language",
+    "ja": "端末の設定に従う"
+  },
+  "언어를 저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save language. Please try again.",
+    "ja": "言語を保存できませんでした。もう一度お試しください。"
+  },
+  "읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요.": {
+    "en": "Could not find the saved sentence. Move to a text page and try again.",
+    "ja": "保存した文章が見つかりません。本文の位置を移動してから再生してください。"
+  },
+  "지원하지 않는 독서 설정입니다.": {
+    "en": "Unsupported reader settings.",
+    "ja": "対応していない読書設定です。"
+  },
+  "서재": {
+    "en": "Library",
+    "ja": "本棚"
+  },
+  "책을 여는 중": {
+    "en": "Opening book",
+    "ja": "本を開いています"
+  },
+  "이동 전 위치로": {
+    "en": "Return to previous position",
+    "ja": "移動前の位置へ"
+  },
+  "이전": {
+    "en": "Previous",
+    "ja": "前へ"
+  },
+  "다음": {
+    "en": "Next",
+    "ja": "次へ"
+  },
+  "책 파일 주소가 올바르지 않습니다.": {
+    "en": "Invalid book file URL.",
+    "ja": "本のファイルアドレスが正しくありません。"
+  },
+  "현재는 DRM 없는 리플로우 EPUB을 지원합니다.": {
+    "en": "Currently supports DRM-free reflowable EPUB only.",
+    "ja": "現在はDRMなしのリフロー型EPUBに対応しています。"
+  },
+  "책을 여는 중입니다.": {
+    "en": "The book is opening.",
+    "ja": "本を開いています。"
+  },
+  "본문 표시가 완료되지 않았습니다. 책을 닫고 다시 열어 주세요.": {
+    "en": "The text did not finish loading. Close and reopen the book.",
+    "ja": "本文の表示が完了しませんでした。本を閉じて開き直してください。"
+  },
+  "본문 표시가 완료된 뒤 변경해 주세요.": {
+    "en": "Wait for the text to load before changing settings.",
+    "ja": "本文の表示が完了してから変更してください。"
+  },
+  "새 설정으로 대체되었습니다.": {
+    "en": "Replaced by new settings.",
+    "ja": "新しい設定に置き換えられました。"
+  },
+  "본문 표시가 완료된 뒤 이동해 주세요.": {
+    "en": "Wait for the text to load before navigating.",
+    "ja": "本文の表示が完了してから移動してください。"
+  },
+  "본문 이동을 완료하지 못했습니다.": {
+    "en": "Could not complete navigation.",
+    "ja": "本文の移動を完了できませんでした。"
+  },
+  "본문 이동이 취소되었습니다.": {
+    "en": "Navigation cancelled.",
+    "ja": "本文の移動をキャンセルしました。"
+  },
+  "요청한 본문 위치로 이동할 수 없습니다.": {
+    "en": "Could not move to the requested position.",
+    "ja": "指定した位置に移動できませんでした。"
+  },
+  "이 책에 없는 본문 위치입니다.": {
+    "en": "This position is not in the book.",
+    "ja": "この本に存在しない位置です。"
+  },
+  "읽기 위치 계산 파일을 찾지 못했습니다.": {
+    "en": "Could not find the reading position script.",
+    "ja": "読書位置の計算ファイルが見つかりません。"
+  },
+  "본문 위치를 확인하지 못했습니다.": {
+    "en": "Could not determine the text position.",
+    "ja": "本文の位置を確認できませんでした。"
+  },
+  "이어서 읽기": {
+    "en": "Continue reading",
+    "ja": "続きから読む"
+  },
+  "다음 페이지": {
+    "en": "Next page",
+    "ja": "次のページ"
+  },
+  "마지막 페이지": {
+    "en": "Last page",
+    "ja": "最終ページ"
+  },
+  "표지": {
+    "en": "Cover",
+    "ja": "表紙"
+  },
+  "독서 화면을 닫는 중입니다.": {
+    "en": "Closing the reader.",
+    "ja": "読書画面を閉じています。"
+  },
+  "독서 화면이 종료되었습니다.": {
+    "en": "The reader has closed.",
+    "ja": "読書画面を閉じました。"
+  },
+  "책을 열지 못함": {
+    "en": "Could not open book",
+    "ja": "本を開けませんでした"
+  },
+  "읽기 기록 저장 실패": {
+    "en": "Could not save reading records",
+    "ja": "読書記録の保存に失敗"
+  },
+  "독서 화면": {
+    "en": "Reader",
+    "ja": "読書画面"
+  },
+  "외부 링크": {
+    "en": "External link",
+    "ja": "外部リンク"
+  },
+  "책 밖의 링크는 이 독서 화면에서 열지 않습니다.": {
+    "en": "Links outside this book do not open in the reader.",
+    "ja": "本の外部リンクは読書画面では開きません。"
+  },
+  "듣기 설정": {
+    "en": "Listening settings",
+    "ja": "読み上げ設定"
+  },
+  "이전 문장": {
+    "en": "Previous sentence",
+    "ja": "前の文章"
+  },
+  "다음 문장": {
+    "en": "Next sentence",
+    "ja": "次の文章"
+  },
+  "책 읽어주기 일시정지": {
+    "en": "Pause read aloud",
+    "ja": "読み上げを一時停止"
+  },
+  "책 읽어주기 재생": {
+    "en": "Play read aloud",
+    "ja": "読み上げを再生"
+  },
+  "타이머 꺼짐": {
+    "en": "Timer off",
+    "ja": "タイマーなし"
+  },
+  "책 읽어주기": {
+    "en": "Read aloud",
+    "ja": "読み上げ"
+  },
+  "독서 설정": {
+    "en": "Reading settings",
+    "ja": "読書設定"
+  },
+  "목차": {
+    "en": "Contents",
+    "ja": "目次"
+  },
+  "본문 검색 · 책갈피": {
+    "en": "Search text · Bookmarks",
+    "ja": "本文検索・ブックマーク"
+  },
+  "다음 권": {
+    "en": "Next book",
+    "ja": "次の本"
+  },
+  "다음 권 읽기": {
+    "en": "Read next book",
+    "ja": "次の本を読む"
+  },
+  "열기": {
+    "en": "Open",
+    "ja": "開く"
+  },
+  "찾기 · 책갈피": {
+    "en": "Search · Bookmarks",
+    "ja": "検索・ブックマーク"
+  },
+  "본문 검색": {
+    "en": "Search text",
+    "ja": "本文検索"
+  },
+  "현재 위치에 책갈피 추가": {
+    "en": "Bookmark this position",
+    "ja": "現在の位置にブックマーク"
+  },
+  "책갈피 목록": {
+    "en": "Bookmarks",
+    "ja": "ブックマーク一覧"
+  },
+  "책갈피는 본문에서 추가해 주세요.": {
+    "en": "Add bookmarks from a text page.",
+    "ja": "ブックマークは本文で追加してください。"
+  },
+  "책갈피는 책마다 100개까지 저장할 수 있습니다.": {
+    "en": "You can save up to 100 bookmarks per book.",
+    "ja": "ブックマークは本ごとに100個まで保存できます。"
+  },
+  "이미 저장한 위치입니다.": {
+    "en": "This position is already saved.",
+    "ja": "保存済みの位置です。"
+  },
+  "책갈피 이름": {
+    "en": "Bookmark name",
+    "ja": "ブックマーク名"
+  },
+  "책갈피": {
+    "en": "Bookmark",
+    "ja": "ブックマーク"
+  },
+  "선택한 로컬 음성을 사용할 수 없습니다.": {
+    "en": "The selected local voice is unavailable.",
+    "ja": "選択した端末内の音声を利用できません。"
+  },
+  "로컬 한국어 음성이 없습니다. iPhone 설정의 손쉬운 사용에서 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어 음성을 다운로드한 뒤 다시 열어 주세요.": {
+    "en": "No local Korean voice. In iPhone Accessibility settings, open Read & Speak (or Spoken Content) → Voices, download a Korean voice, then reopen the reader.",
+    "ja": "端末内に韓国語の音声がありません。iPhoneの設定のアクセシビリティから「読み上げとスピーチ」（または読み上げコンテンツ）→音声で韓国語の音声をダウンロードし、開き直してください。"
+  },
+  "다른 소리 재생이 끝난 뒤 다시 눌러 주세요.": {
+    "en": "Try again after other audio finishes.",
+    "ja": "他の音声が終わってからもう一度押してください。"
+  },
+  "이 책의 읽을 본문을 준비하지 못했습니다.": {
+    "en": "Could not prepare the book's text for speech.",
+    "ja": "読み上げる本文を準備できませんでした。"
+  },
+  "설정한 시간이 되어 듣기를 멈췄습니다.": {
+    "en": "Listening stopped because the timer ended.",
+    "ja": "設定した時間になったため、読み上げを停止しました。"
+  },
+  "설치된 로컬 음성을 먼저 선택해 주세요.": {
+    "en": "Select an installed local voice first.",
+    "ja": "インストール済みの端末内の音声を選択してください。"
+  },
+  "음성 재생을 시작하지 못했습니다.": {
+    "en": "Could not start speech playback.",
+    "ja": "音声の再生を開始できませんでした。"
+  },
+  "안녕하세요. 쿠피리더에서 편안하게 책을 들어 보세요.": {
+    "en": "Hello. Enjoy listening to your books with Koofy Reader.",
+    "ja": "こんにちは。クーピーリーダーで本の読み上げをお楽しみください。"
+  },
+  "읽기가 끝났습니다.": {
+    "en": "Reading finished.",
+    "ja": "読み上げが終了しました。"
+  },
+  "음성을 재생하지 못했습니다. 기기의 한국어 음성 설치 상태를 확인해 주세요.": {
+    "en": "Could not play speech. Check installed Korean voices on your device.",
+    "ja": "音声を再生できませんでした。端末の韓国語音声を確認してください。"
+  },
+  "독서 화면을 닫고 다시 시도해 주세요.": {
+    "en": "Close the reader and try again.",
+    "ja": "読書画面を閉じてもう一度お試しください。"
+  },
+  "이미 책을 읽고 있습니다.": {
+    "en": "A book is already open.",
+    "ja": "すでに本を開いています。"
+  },
+  "독서 세션 정보가 올바르지 않습니다.": {
+    "en": "Invalid reading session.",
+    "ja": "読書セッション情報が正しくありません。"
+  },
+  "앱에 가져온 EPUB 파일을 찾을 수 없습니다.": {
+    "en": "Could not find the imported EPUB file.",
+    "ja": "追加したEPUBファイルが見つかりません。"
+  },
+  "서재 화면이 준비된 뒤 다시 열어 주세요.": {
+    "en": "Wait for the library to load, then reopen.",
+    "ja": "本棚の準備ができてから開き直してください。"
+  },
+  "이미 종료된 독서 세션입니다.": {
+    "en": "This reading session has ended.",
+    "ja": "この読書セッションは終了しています。"
+  },
+  "완료": {
+    "en": "Done",
+    "ja": "完了"
+  },
+  "목소리": {
+    "en": "Voice",
+    "ja": "音声"
+  },
+  "읽기 속도": {
+    "en": "Reading speed",
+    "ja": "読み上げ速度"
+  },
+  "취침 타이머": {
+    "en": "Sleep timer",
+    "ja": "スリープタイマー"
+  },
+  "본문 표시": {
+    "en": "Text display",
+    "ja": "本文の表示"
+  },
+  "이어 듣기": {
+    "en": "Resume listening",
+    "ja": "続きから聴く"
+  },
+  "로컬 음성을 선택해 주세요": {
+    "en": "Select a local voice",
+    "ja": "端末内の音声を選択"
+  },
+  "설치된 한국어 음성이 없습니다.": {
+    "en": "No Korean voices installed.",
+    "ja": "韓国語の音声がインストールされていません。"
+  },
+  "한국어 · 기기 음성": {
+    "en": "Korean · Device voice",
+    "ja": "韓国語・端末の音声"
+  },
+  "선택한 음성 미리 듣기": {
+    "en": "Preview selected voice",
+    "ja": "選択した音声を試聴"
+  },
+  "0.75배": {
+    "en": "0.75×",
+    "ja": "0.75倍"
+  },
+  "1배": {
+    "en": "1×",
+    "ja": "1倍"
+  },
+  "1.25배": {
+    "en": "1.25×",
+    "ja": "1.25倍"
+  },
+  "1.5배": {
+    "en": "1.5×",
+    "ja": "1.5倍"
+  },
+  "2배": {
+    "en": "2×",
+    "ja": "2倍"
+  },
+  "꺼짐": {
+    "en": "Off",
+    "ja": "オフ"
+  },
+  "15분": {
+    "en": "15 min",
+    "ja": "15分"
+  },
+  "30분": {
+    "en": "30 min",
+    "ja": "30分"
+  },
+  "60분": {
+    "en": "60 min",
+    "ja": "60分"
+  },
+  "음성을 따라 페이지 이동": {
+    "en": "Follow speech with page turns",
+    "ja": "音声に合わせてページを移動"
+  },
+  "켜짐": {
+    "en": "On",
+    "ja": "オン"
+  },
+  "저장된 듣던 위치부터 재생": {
+    "en": "Play from saved listening position",
+    "ja": "保存した再生位置から聴く"
+  },
+  "선택됨": {
+    "en": "Selected",
+    "ja": "選択済み"
+  },
+  "한국어 목소리 선택": {
+    "en": "Choose Korean voice",
+    "ja": "韓国語の音声を選択"
+  },
+  "보기": {
+    "en": "Display",
+    "ja": "表示"
+  },
+  "듣기": {
+    "en": "Listen",
+    "ja": "読み上げ"
+  },
+  "번역": {
+    "en": "Translate",
+    "ja": "翻訳"
+  },
+  "읽던 위치에 적용 중…": {
+    "en": "Applying at your reading position…",
+    "ja": "読書位置に適用中…"
+  },
+  "글자 크기": {
+    "en": "Text size",
+    "ja": "文字サイズ"
+  },
+  "배경": {
+    "en": "Background",
+    "ja": "背景"
+  },
+  "읽기 방식": {
+    "en": "Reading mode",
+    "ja": "読み方"
+  },
+  "본문 간격": {
+    "en": "Text spacing",
+    "ja": "本文の間隔"
+  },
+  "듣기를 시작하면 조작 버튼이 표시됩니다. 일시정지 후에도 유지되며, 듣기 종료를 누르면 숨겨집니다.": {
+    "en": "Controls appear when listening starts and stay visible while paused. Stop listening hides them.",
+    "ja": "読み上げを開始すると操作ボタンが表示されます。一時停止中も表示され、終了すると非表示になります。"
+  },
+  "모드를 켠 뒤 본문을 길게 눌러 단어나 문장을 선택하세요. 번역은 하단에 표시됩니다.": {
+    "en": "Enable this mode, then long-press to select a word or sentence. Translation appears below.",
+    "ja": "モードをオンにして本文を長押しし、単語や文章を選択してください。翻訳は下部に表示されます。"
+  },
+  "기본은 책의 원래 설정입니다. 간격과 여백 변경은 모든 책에 적용됩니다.": {
+    "en": "Default uses the book's original settings. Spacing and margin changes apply to all books.",
+    "ja": "標準は本の元の設定です。間隔と余白の変更はすべての本に適用されます。"
+  },
+  "연속 스크롤에서는 페이지 배치와 전환 효과를 사용하지 않습니다. 선택한 설정은 유지됩니다.": {
+    "en": "Page layout and turn effects are unavailable while scrolling. Your selected settings are preserved.",
+    "ja": "連続スクロール中はページ配置と切り替え効果を使用しません。選択した設定は保持されます。"
+  },
+  "현재 한 페이지로 표시 중 · 화면을 넓히면 두 페이지로 돌아갑니다.": {
+    "en": "Showing one page · Widen the screen to restore two pages.",
+    "ja": "現在は1ページ表示・画面を広げると2ページに戻ります。"
+  },
+  "두 페이지 선택은 넓은 화면에서 표시됩니다.": {
+    "en": "Two-page mode is used on wide screens.",
+    "ja": "2ページ表示は広い画面で使用します。"
+  },
+  "▶ 듣기 시작 / 재개": {
+    "en": "▶ Start / resume listening",
+    "ja": "▶ 読み上げを開始・再開"
+  },
+  "목소리·속도·타이머": {
+    "en": "Voice · Speed · Timer",
+    "ja": "音声・速度・タイマー"
+  },
+  "듣기 종료": {
+    "en": "Stop listening",
+    "ja": "読み上げを終了"
+  },
+  "듣기 버튼 항상 표시": {
+    "en": "Always show listening controls",
+    "ja": "読み上げボタンを常に表示"
+  },
+  "번역 모드": {
+    "en": "Translation mode",
+    "ja": "翻訳モード"
+  },
+  "글꼴·문단 설정  ▴": {
+    "en": "Font & paragraph settings  ▴",
+    "ja": "フォント・段落設定  ▴"
+  },
+  "글꼴·문단 설정  ▾": {
+    "en": "Font & paragraph settings  ▾",
+    "ja": "フォント・段落設定  ▾"
+  },
+  "＋ 내 글꼴 추가·관리": {
+    "en": "＋ Add / manage fonts",
+    "ja": "＋ フォントの追加・管理"
+  },
+  " · 내 글꼴": {
+    "en": " · My font",
+    "ja": "・追加フォント"
+  },
+  " · 다운로드": {
+    "en": " · Downloaded",
+    "ja": "・ダウンロード"
+  },
+  "글자 작게": {
+    "en": "Smaller text",
+    "ja": "文字を小さく"
+  },
+  "글자 크게": {
+    "en": "Larger text",
+    "ja": "文字を大きく"
+  },
+  "기본": {
+    "en": "Default",
+    "ja": "標準"
+  },
+  "촘촘": {
+    "en": "Tight",
+    "ja": "狭い"
+  },
+  "보통": {
+    "en": "Normal",
+    "ja": "通常"
+  },
+  "넉넉": {
+    "en": "Spacious",
+    "ja": "広い"
+  },
+  "없음": {
+    "en": "None",
+    "ja": "なし"
+  },
+  "넓게": {
+    "en": "Wide",
+    "ja": "広い"
+  },
+  "좁게": {
+    "en": "Narrow",
+    "ja": "狭い"
+  },
+  "줄간격": {
+    "en": "Line spacing",
+    "ja": "行間"
+  },
+  "문단 간격": {
+    "en": "Paragraph spacing",
+    "ja": "段落間隔"
+  },
+  "페이지 여백": {
+    "en": "Page margins",
+    "ja": "ページ余白"
+  },
+  "밝게": {
+    "en": "Light",
+    "ja": "ライト"
+  },
+  "종이색": {
+    "en": "Paper",
+    "ja": "紙色"
+  },
+  "어둡게": {
+    "en": "Dark",
+    "ja": "ダーク"
+  },
+  "페이지 넘김": {
+    "en": "Pages",
+    "ja": "ページ送り"
+  },
+  "연속 스크롤": {
+    "en": "Continuous scroll",
+    "ja": "連続スクロール"
+  },
+  "자동": {
+    "en": "Auto",
+    "ja": "自動"
+  },
+  "한 페이지": {
+    "en": "One page",
+    "ja": "1ページ"
+  },
+  "두 페이지": {
+    "en": "Two pages",
+    "ja": "2ページ"
+  },
+  "바로 넘기기": {
+    "en": "Instant",
+    "ja": "すぐに切り替え"
+  },
+  "책장 넘기기": {
+    "en": "Page curl",
+    "ja": "ページめくり"
+  },
+  "페이지 배치": {
+    "en": "Page layout",
+    "ja": "ページ配置"
+  },
+  "페이지 전환 효과": {
+    "en": "Page turn effect",
+    "ja": "ページ切り替え効果"
+  },
+  "넘김 방식": {
+    "en": "Page turn style",
+    "ja": "ページのめくり方"
+  },
+  "듣기 기록을 백업·복원하지 못했습니다.": {
+    "en": "Could not back up or restore listening records.",
+    "ja": "読み上げ記録をバックアップ・復元できませんでした。"
+  },
+  "저장한 본문 위치": {
+    "en": "Saved text position",
+    "ja": "保存した本文の位置"
+  },
+  "저장한 책갈피가 없습니다.": {
+    "en": "No bookmarks saved.",
+    "ja": "保存したブックマークはありません。"
+  },
+  "눌러서 이동 · 밀어서 삭제": {
+    "en": "Tap to open · Swipe to delete",
+    "ja": "タップで移動・スワイプで削除"
+  },
+  "책갈피를 삭제하지 못했습니다": {
+    "en": "Could not delete bookmark",
+    "ja": "ブックマークを削除できませんでした"
+  },
+  "저장 공간을 확인하고 다시 시도해 주세요.": {
+    "en": "Check storage space and try again.",
+    "ja": "空き容量を確認してもう一度お試しください。"
+  },
+  "단어 또는 문장 검색": {
+    "en": "Search a word or sentence",
+    "ja": "単語や文章を検索"
+  },
+  "검색어를 입력해 주세요": {
+    "en": "Enter search text",
+    "ja": "検索語を入力してください"
+  },
+  "검색어를 1~200자로 입력해 주세요": {
+    "en": "Enter 1–200 characters",
+    "ja": "1〜200文字で入力してください"
+  },
+  "검색 중…": {
+    "en": "Searching…",
+    "ja": "検索中…"
+  },
+  "500개 표시 · 검색어를 더 구체적으로 입력해 주세요": {
+    "en": "Showing 500 results · Refine your search",
+    "ja": "500件表示・検索語を具体的にしてください"
+  },
+  "검색 결과가 없습니다": {
+    "en": "No results",
+    "ja": "検索結果がありません"
+  },
+  "검색 실패 · 다시 검색해 주세요": {
+    "en": "Search failed · Please try again",
+    "ja": "検索失敗・もう一度検索してください"
+  },
+  "영어 → 한국어 · 번역": {
+    "en": "English → Korean · Translation",
+    "ja": "英語 → 韓国語・翻訳"
+  },
+  "끄기": {
+    "en": "Turn off",
+    "ja": "オフにする"
+  },
+  "원문 듣기": {
+    "en": "Listen to original",
+    "ja": "原文を聴く"
+  },
+  "번역 듣기": {
+    "en": "Listen to translation",
+    "ja": "訳文を聴く"
+  },
+  "단어를 길게 누르고 선택 범위를 조절하세요. 처음에는 Wi-Fi에서 번역 데이터를 준비합니다.": {
+    "en": "Long-press a word and adjust the selection. Translation data is initially downloaded over Wi-Fi.",
+    "ja": "単語を長押しして選択範囲を調整してください。初回はWi-Fiで翻訳データを準備します。"
+  },
+  "다시 번역": {
+    "en": "Translate again",
+    "ja": "再翻訳"
+  },
+  "번역 준비 · Wi-Fi": {
+    "en": "Prepare translation · Wi-Fi",
+    "ja": "翻訳を準備・Wi-Fi"
+  },
+  "Wi-Fi에서 번역 데이터를 준비하고 있습니다. 끄기를 눌러 독서를 계속할 수 있습니다.": {
+    "en": "Preparing translation data over Wi-Fi. You can turn this off and keep reading.",
+    "ja": "Wi-Fiで翻訳データを準備しています。オフにすると読書を続けられます。"
+  },
+  "번역 준비가 지연되고 있습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.": {
+    "en": "Translation setup is taking longer than expected. Check Wi-Fi and try again.",
+    "ja": "翻訳の準備に時間がかかっています。Wi-Fi接続を確認して再試行してください。"
+  },
+  "준비됐습니다. 단어나 문장을 길게 눌러 선택하세요.": {
+    "en": "Ready. Long-press a word or sentence to select it.",
+    "ja": "準備できました。単語や文章を長押しして選択してください。"
+  },
+  "번역 데이터를 준비하지 못했습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.": {
+    "en": "Could not prepare translation data. Check Wi-Fi and try again.",
+    "ja": "翻訳データを準備できませんでした。Wi-Fi接続を確認して再試行してください。"
+  },
+  "단어나 문장을 길게 눌러 선택하세요.": {
+    "en": "Long-press a word or sentence to select it.",
+    "ja": "単語や文章を長押しして選択してください。"
+  },
+  "한 번에 2,000자까지 선택해 주세요.": {
+    "en": "Select up to 2,000 characters at a time.",
+    "ja": "一度に2,000文字まで選択してください。"
+  },
+  "번역하지 못했습니다. 다시 번역을 눌러 주세요.": {
+    "en": "Translation failed. Tap Translate again.",
+    "ja": "翻訳できませんでした。「再翻訳」を押してください。"
+  },
+  "읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다.": {
+    "en": "Reading recovery records are damaged. Originals are preserved.",
+    "ja": "読書の復旧記録が破損しています。元の記録は保持されています。"
+  },
+  "읽기 복구 기록의 버전 또는 순서가 잘못되었습니다.": {
+    "en": "Invalid recovery record version or order.",
+    "ja": "復旧記録のバージョンまたは順序が正しくありません。"
+  },
+  "책을 표시하는 데 시간이 너무 오래 걸립니다.": {
+    "en": "The book is taking too long to display.",
+    "ja": "本の表示に時間がかかりすぎています。"
+  },
+  "찾기": {
+    "en": "Search",
+    "ja": "検索"
+  },
+  "책을 여는 중…": {
+    "en": "Opening book…",
+    "ja": "本を開いています…"
+  },
+  "보호되지 않은 EPUB 파일만 지원합니다.": {
+    "en": "Only unprotected EPUB files are supported.",
+    "ja": "保護されていないEPUBにのみ対応しています。"
+  },
+  "고정 레이아웃 EPUB은 아직 지원하지 않습니다.": {
+    "en": "Fixed-layout EPUBs are not yet supported.",
+    "ja": "固定レイアウトのEPUBにはまだ対応していません。"
+  },
+  "책에 읽을 본문이 없습니다.": {
+    "en": "The book has no readable text.",
+    "ja": "この本には読める本文がありません。"
+  },
+  "저장한 본문 위치를 찾을 수 없습니다.": {
+    "en": "Could not find the saved position.",
+    "ja": "保存した位置が見つかりません。"
+  },
+  "책을 열 수 없습니다.": {
+    "en": "Could not open the book.",
+    "ja": "本を開けませんでした。"
+  },
+  "저장한 챕터로 이동하지 못했습니다. 기존 읽기 기록은 보존됩니다.": {
+    "en": "Could not open the saved chapter. Existing records are preserved.",
+    "ja": "保存した章に移動できませんでした。既存の記録は保持されています。"
+  },
+  "읽던 위치를 복원하지 못했습니다.": {
+    "en": "Could not restore the reading position.",
+    "ja": "読書位置を復元できませんでした。"
+  },
+  " · 한쪽 화면": {
+    "en": " · Single screen",
+    "ja": "・片側画面"
+  },
+  "본문 위치를 확인하지 못했습니다. 저장된 기록은 보존됩니다. 책을 다시 열어 주세요.": {
+    "en": "Could not verify the text position. Saved records are preserved. Reopen the book.",
+    "ja": "本文の位置を確認できませんでした。保存済みの記録は保持されています。本を開き直してください。"
+  },
+  "외부 링크는 독서 화면에서 열지 않습니다.": {
+    "en": "External links do not open in the reader.",
+    "ja": "外部リンクは読書画面では開きません。"
+  },
+  "책의 일부 내용을 불러오지 못했습니다.": {
+    "en": "Could not load part of the book.",
+    "ja": "本の一部を読み込めませんでした。"
+  },
+  "읽던 위치 복원이 완료되지 않았습니다. 책을 다시 열어 주세요.": {
+    "en": "Reading position restoration did not finish. Reopen the book.",
+    "ja": "読書位置の復元が完了しませんでした。本を開き直してください。"
+  },
+  "본문 위치 확인 후 다시 눌러 주세요.": {
+    "en": "Wait for the reading position to be verified, then try again.",
+    "ja": "本文の位置を確認してから、もう一度押してください。"
+  },
+  "해당 위치로 이동하지 못했습니다.": {
+    "en": "Could not move to that position.",
+    "ja": "その位置に移動できませんでした。"
+  },
+  "이전 위치로 돌아가지 못했습니다.": {
+    "en": "Could not return to the previous position.",
+    "ja": "前の位置に戻れませんでした。"
+  },
+  "기기 저장 공간을 확인한 뒤 다시 시도해 주세요.": {
+    "en": "Check device storage and try again.",
+    "ja": "端末の空き容量を確認して再試行してください。"
+  },
+  "다시 저장": {
+    "en": "Save again",
+    "ja": "再保存"
+  },
+  "계속 읽기": {
+    "en": "Keep reading",
+    "ja": "読み続ける"
+  },
+  "읽기 기록 저장 실패 · 저장 공간을 확인해 주세요": {
+    "en": "Save failed · Check storage space",
+    "ja": "読書記録の保存失敗・空き容量を確認してください"
+  },
+  "책을 표시할 수 없습니다": {
+    "en": "Could not display book",
+    "ja": "本を表示できません"
+  },
+  "기기의 음성 엔진을 시작하지 못했습니다. 잠시 후 다시 시도하거나 기기 음성 설정을 확인해 주세요.": {
+    "en": "Could not start the speech engine. Try again later or check device speech settings.",
+    "ja": "音声エンジンを起動できませんでした。しばらくしてから再試行するか、端末の音声設定を確認してください。"
+  },
+  "책의 본문 읽기 기능을 준비하지 못했습니다. 앱 업데이트를 확인해 주세요.": {
+    "en": "Could not prepare read aloud. Check for an app update.",
+    "ja": "読み上げ機能を準備できませんでした。アプリの更新を確認してください。"
+  },
+  "현재 위치에서 읽을 본문을 준비하지 못했습니다. 본문 페이지로 이동한 뒤 다시 시도해 주세요.": {
+    "en": "Could not prepare text at this position. Move to a text page and try again.",
+    "ja": "この位置の本文を準備できませんでした。本文のページに移動して再試行してください。"
+  },
+  "로컬 한국어 음성을 선택해 주세요. 듣기 설정에서 음성을 확인할 수 있습니다.": {
+    "en": "Select a local Korean voice in listening settings.",
+    "ja": "読み上げ設定で端末内の韓国語音声を選択してください。"
+  },
+  "음성 준비 시간이 초과되었습니다. 다시 시도해 주세요.": {
+    "en": "Voice setup timed out. Please try again.",
+    "ja": "音声の準備がタイムアウトしました。もう一度お試しください。"
+  },
+  "책 읽어주기를 준비하지 못했습니다. 독서 화면을 다시 열어 시도해 주세요.": {
+    "en": "Could not prepare read aloud. Reopen the reader and try again.",
+    "ja": "読み上げを準備できませんでした。読書画面を開き直して再試行してください。"
+  },
+  "책 읽기가 끝났습니다.": {
+    "en": "Finished reading the book.",
+    "ja": "本の読み上げが終了しました。"
+  },
+  "음성을 재생하지 못했습니다. 오프라인 음성 설치 상태를 확인해 주세요.": {
+    "en": "Could not play speech. Check installed offline voices.",
+    "ja": "音声を再生できませんでした。オフライン音声のインストール状況を確認してください。"
+  },
+  "▶  듣기 시작 / 재개": {
+    "en": "▶  Start / resume listening",
+    "ja": "▶  読み上げを開始・再開"
+  },
+  "목소리·속도·타이머  ›": {
+    "en": "Voice · Speed · Timer  ›",
+    "ja": "音声・速度・タイマー  ›"
+  },
+  "기본은 책의 원래 설정입니다. 줄·문단 간격을 지정하면 출판사 문단 스타일 일부가 바뀔 수 있습니다. 두 페이지에서는 좌우 여백과 중앙 간격이 함께 조절됩니다.": {
+    "en": "Default uses the book's original settings. Custom line and paragraph spacing may override publisher styles. In two-page mode, side and center margins change together.",
+    "ja": "標準は本の元の設定です。行間・段落間隔を指定すると出版者のスタイルが一部変わる場合があります。2ページ表示では左右の余白と中央の間隔が同時に変わります。"
+  },
+  "다운로드 글꼴": {
+    "en": "Downloaded fonts",
+    "ja": "ダウンロードしたフォント"
+  },
+  "기본 글꼴": {
+    "en": "Default font",
+    "ja": "標準フォント"
+  },
+  "＋ 내 글꼴 추가·관리  ›": {
+    "en": "＋ Add / manage fonts  ›",
+    "ja": "＋ フォントの追加・管理  ›"
+  },
+  "듣기 기록을 백업·복원하지 못했습니다. 독서 화면을 닫고 다시 시도해 주세요.": {
+    "en": "Could not back up or restore listening records. Close the reader and try again.",
+    "ja": "読み上げ記録をバックアップ・復元できませんでした。読書画面を閉じて再試行してください。"
+  },
+  "Google Translate 자동 번역": {
+    "en": "Google Translate automatic translation",
+    "ja": "Google Translateによる自動翻訳"
+  },
+  "선택한 본문은 기기 안에서 번역합니다. 번역은 학습 참고용이며 정확성·신뢰성·특정 목적 적합성을 보장하지 않습니다. Google은 번역에 관한 명시적·묵시적 보증을 제공하지 않습니다. 처음에는 Wi-Fi로 언어 데이터를 내려받아야 합니다. SDK는 성능·사용 통계를 Google에 전송할 수 있습니다.": {
+    "en": "Selected text is translated on your device. Translation is for learning reference; accuracy, reliability and suitability for a particular purpose are not guaranteed. Google provides no express or implied warranties for translation. Language data must initially be downloaded over Wi-Fi. The SDK may send performance and usage statistics to Google.",
+    "ja": "選択した本文は端末内で翻訳します。翻訳は学習の参考用で、正確性・信頼性・特定の目的への適合性を保証しません。Googleは翻訳について明示・黙示の保証を提供しません。初回はWi-Fiで言語データをダウンロードする必要があります。SDKは性能・利用統計をGoogleに送信する場合があります。"
+  },
+  "단어를 길게 누르고 선택 범위를 조절하세요. 번역 준비는 Wi-Fi에서 진행합니다.": {
+    "en": "Long-press a word and adjust the selection. Translation setup requires Wi-Fi.",
+    "ja": "単語を長押しして選択範囲を調整してください。翻訳の準備はWi-Fiで行います。"
+  },
+  "음성이 준비됐습니다. 듣기를 다시 눌러 주세요.": {
+    "en": "Voice ready. Tap Listen again.",
+    "ja": "音声の準備ができました。もう一度読み上げを押してください。"
+  },
+  "기기 음성 엔진을 사용할 수 없습니다.": {
+    "en": "The device speech engine is unavailable.",
+    "ja": "端末の音声エンジンを利用できません。"
+  },
+  "기기에 설치된 한국어 음성으로 책을 읽습니다.": {
+    "en": "Reads books using Korean voices installed on your device.",
+    "ja": "端末にインストールされた韓国語音声で本を読み上げます。"
+  },
+  "▷  선택한 음성 미리 듣기": {
+    "en": "▷  Preview selected voice",
+    "ja": "▷  選択した音声を試聴"
+  },
+  "기기 음성 다운로드  ›": {
+    "en": "Download device voices  ›",
+    "ja": "端末の音声をダウンロード  ›"
+  },
+  "설치된 로컬 한국어 음성이 없습니다. 음성을 다운로드한 뒤 독서 화면을 다시 열어 주세요.": {
+    "en": "No local Korean voices installed. Download a voice and reopen the reader.",
+    "ja": "端末内に韓国語音声がありません。音声をダウンロードして読書画面を開き直してください。"
+  },
+  "저장된 듣던 위치부터 재생  ›": {
+    "en": "Play from saved listening position  ›",
+    "ja": "保存した再生位置から聴く  ›"
+  },
+  "앱·독서 화면을 벗어나면 멈춥니다. 돌아와도 자동으로 재생하지 않습니다.": {
+    "en": "Stops when leaving the app or reader. Does not resume automatically on return.",
+    "ja": "アプリや読書画面を離れると停止します。戻っても自動再生しません。"
+  },
+  "책갈피가 가득 찼습니다.": {
+    "en": "Bookmark limit reached.",
+    "ja": "ブックマークが上限に達しています。"
+  },
+  "책갈피를 저장했습니다.": {
+    "en": "Bookmark saved.",
+    "ja": "ブックマークを保存しました。"
+  },
+  "저장하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not save. Please try again.",
+    "ja": "保存できませんでした。もう一度お試しください。"
+  },
+  "이동": {
+    "en": "Go to",
+    "ja": "移動"
+  },
+  "책갈피를 삭제했습니다.": {
+    "en": "Bookmark deleted.",
+    "ja": "ブックマークを削除しました。"
+  },
+  "삭제하지 못했습니다.": {
+    "en": "Could not delete.",
+    "ja": "削除できませんでした。"
+  },
+  "검색": {
+    "en": "Search",
+    "ja": "検索"
+  },
+  "더 보기": {
+    "en": "Show more",
+    "ja": "もっと見る"
+  },
+  "검색어를 1~200자로 입력해 주세요.": {
+    "en": "Enter 1–200 characters.",
+    "ja": "1〜200文字で入力してください。"
+  },
+  "이 책은 본문 검색을 지원하지 않습니다.": {
+    "en": "This book does not support text search.",
+    "ja": "この本は本文検索に対応していません。"
+  },
+  "500개까지 표시합니다. 검색어를 더 구체적으로 입력해 주세요.": {
+    "en": "Showing up to 500 results. Refine your search.",
+    "ja": "500件まで表示します。検索語を具体的にしてください。"
+  },
+  "검색 결과가 없습니다.": {
+    "en": "No search results.",
+    "ja": "検索結果がありません。"
+  },
+  " · 더 보기로 계속 검색": {
+    "en": " · Tap Show more to continue",
+    "ja": "・「もっと見る」で検索を続行"
+  },
+  "검색하지 못했습니다. 다시 검색해 주세요.": {
+    "en": "Search failed. Please try again.",
+    "ja": "検索できませんでした。もう一度お試しください。"
+  },
+  "도서가": {
+    "en": "books",
+    "ja": "本"
+  },
+  "글꼴이": {
+    "en": "fonts",
+    "ja": "フォント"
+  },
+  "묶기": {
+    "en": "Group",
+    "ja": "まとめる"
+  },
+  "위치 저장됨": {
+    "en": "Position saved",
+    "ja": "位置を保存済み"
+  },
+  "빈 묶음은 유지됩니다.": {
+    "en": "The empty collection is kept.",
+    "ja": "空のコレクションは残ります。"
+  },
+  "묶음도 함께 이동합니다.": {
+    "en": "The collection is moved too.",
+    "ja": "コレクションも移動します。"
+  },
+  "책장 비우기": {
+    "en": "Empty collection",
+    "ja": "コレクションを空にする"
+  },
+  "모든 권을 완독했어요": {
+    "en": "All books finished",
+    "ja": "すべての本を読了しました"
+  },
+  "아직 읽기 전이에요": {
+    "en": "Not started yet",
+    "ja": "まだ読み始めていません"
+  },
+  "{0}권을 읽는 중": {
+    "en": "Reading book {0}",
+    "ja": "{0}冊目を読書中"
+  },
+  "{0}권부터 이어 읽어보세요": {
+    "en": "Continue from book {0}",
+    "ja": "{0}冊目から続きを読みましょう"
+  },
+  "{0}분": {
+    "en": "{0} min",
+    "ja": "{0}分"
+  },
+  "번역 중…": {
+    "en": "Translating…",
+    "ja": "翻訳中…"
+  },
+  "번역 준비를 눌러 언어 데이터를 내려받으세요.": {
+    "en": "Tap Prepare translation to download language data.",
+    "ja": "翻訳の準備を押して言語データをダウンロードしてください。"
+  },
+  "영어": {
+    "en": "English",
+    "ja": "英語"
+  },
+  "한국어": {
+    "en": "Korean",
+    "ja": "韓国語"
+  },
+  "설정을 적용하지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not apply settings. Please try again.",
+    "ja": "設定を適用できませんでした。もう一度お試しください。"
+  },
+  "기기 설정 → 손쉬운 사용 → 읽기 및 말하기에서 {0} 음성을 설치해 주세요.": {
+    "en": "Install a {0} voice in Settings → Accessibility → Read & Speak.",
+    "ja": "設定 → アクセシビリティ → 読み上げとスピーチで{0}の音声をインストールしてください。"
+  },
+  "기기 TTS 설정에서 {0} 오프라인 음성을 설치해 주세요.": {
+    "en": "Install an offline {0} voice in device TTS settings.",
+    "ja": "端末のTTS設定で{0}のオフライン音声をインストールしてください。"
+  },
+  "책을 처리하지 못했습니다: {0}": {
+    "en": "Could not process the book: {0}",
+    "ja": "本を処理できませんでした：{0}"
+  },
+  "{0}배\n{1}": {
+    "en": "{0}×\n{1}",
+    "ja": "{0}倍\n{1}"
+  },
+  "듣기 설정, {0}배, {1}": {
+    "en": "Listening settings, {0}×, {1}",
+    "ja": "読み上げ設定、{0}倍、{1}"
+  },
+  "항목 {0}": {
+    "en": "Item {0}",
+    "ja": "項目 {0}"
+  },
+  "{0}장": {
+    "en": "Chapter {0}",
+    "ja": "第{0}章"
+  },
+  "이 장 {0} / {1}": {
+    "en": "Chapter {0} / {1}",
+    "ja": "この章 {0} / {1}"
+  },
+  "다음 권 {0} 이어서 읽기": {
+    "en": "Continue with {0}",
+    "ja": "次の本「{0}」を読む"
+  },
+  "다음 권 {0}": {
+    "en": "Next book: {0}",
+    "ja": "次の本：{0}"
+  },
+  "마지막 페이지\n다음: {0}": {
+    "en": "Last page\nNext: {0}",
+    "ja": "最終ページ\n次：{0}"
+  },
+  "책갈피 {0}개": {
+    "en": "{0} bookmarks",
+    "ja": "ブックマーク{0}個"
+  },
+  "검색 결과 {0}개": {
+    "en": "{0} results",
+    "ja": "検索結果{0}件"
+  },
+  "{0}개 표시": {
+    "en": "{0} results shown",
+    "ja": "{0}件表示"
+  },
+  "기기에 설치된 한국어 음성을 사용합니다. 음성 추가: iPhone 설정 → 손쉬운 사용 → 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어. 다운로드 후 독서 화면을 다시 열어 주세요.": {
+    "en": "Uses installed Korean voices. Add voices in iPhone Settings → Accessibility → Read & Speak (or Spoken Content) → Voices → Korean. Reopen the reader after downloading.",
+    "ja": "端末の韓国語音声を使用します。iPhoneの設定 → アクセシビリティ → 読み上げとスピーチ（または読み上げコンテンツ）→ 音声 → 韓国語で追加し、ダウンロード後に読書画面を開き直してください。"
+  },
+  "앱·독서 화면을 벗어나거나 화면을 잠그면 멈춥니다. 돌아와도 자동으로 재생하지 않습니다.": {
+    "en": "Stops when leaving the app or reader, or locking the screen. Does not resume automatically.",
+    "ja": "アプリ・読書画面を離れるか画面をロックすると停止します。戻っても自動再生しません。"
+  },
+  "한국어 음성 {0}": {
+    "en": "Korean voice {0}",
+    "ja": "韓国語の音声 {0}"
+  },
+  "다운로드 완료": {
+    "en": "Downloaded",
+    "ja": "ダウンロード済み"
+  },
+  "다운로드": {
+    "en": "Download",
+    "ja": "ダウンロード"
+  },
+  " · 이미 등록된 책 {0}권": {
+    "en": " · {0} already imported",
+    "ja": "・登録済み{0}冊"
+  },
+  " · 건너뛴 파일 {0}개": {
+    "en": " · {0} skipped",
+    "ja": "・スキップ{0}個"
+  },
+  "이미지를 읽거나 저장하지 못했습니다. 20MB 이하 JPG·PNG·WebP인지 확인해 주세요.": {
+    "en": "Could not read or save images. Check that they are JPG, PNG or WebP files no larger than 20 MB.",
+    "ja": "画像の読み込み・保存ができませんでした。20MB以下のJPG・PNG・WebPか確認してください。"
+  },
+  "진행률을 확인할 수 없습니다.": {
+    "en": "Progress is unavailable.",
+    "ja": "進捗を確認できません。"
+  },
+  "이전 진행률: {0}%": {
+    "en": "Previous progress: {0}%",
+    "ja": "以前の進捗：{0}%"
+  },
+  "문자 위치로 계산한 후보를 직접 확인할 수 있습니다.": {
+    "en": "You can review a suggested position based on the character offset.",
+    "ja": "文字位置から計算した候補を確認できます。"
+  },
+  "이 기기에 백업 저장 기록이 없습니다.": {
+    "en": "No backup saved on this device.",
+    "ja": "この端末にバックアップの保存記録はありません。"
+  },
+  "마지막 백업: {0}": {
+    "en": "Last backup: {0}",
+    "ja": "最終バックアップ：{0}"
+  },
+  "책을 많이 추가했거나 기기를 바꾸기 전에는 백업을 저장해 주세요.": {
+    "en": "Save a backup after adding many books or before changing devices.",
+    "ja": "本を多く追加した後や端末を変更する前にバックアップしてください。"
+  },
+  "완결": {
+    "en": "Completed",
+    "ja": "完結"
+  },
+  "연재 중": {
+    "en": "Ongoing",
+    "ja": "連載中"
+  },
+  "{0}개 찾음": {
+    "en": "{0} results",
+    "ja": "{0}件見つかりました"
+  },
+  "{0}개 찾음 · 더 보기": {
+    "en": "{0} results · Show more",
+    "ja": "{0}件・もっと見る"
+  },
+  "{0}개 찾음 · 검색 완료": {
+    "en": "{0} results · Search complete",
+    "ja": "{0}件・検索完了"
+  },
+  "선택을 마치면 번역합니다.": {
+    "en": "Translation starts when you finish selecting.",
+    "ja": "選択が終わると翻訳します。"
+  },
+  "글꼴 파일을 준비하지 못했습니다. 앱을 다시 실행해 주세요.": {
+    "en": "Could not prepare font files. Restart the app.",
+    "ja": "フォントを準備できませんでした。アプリを再起動してください。"
+  },
+  "목록을 끝까지 읽지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not load the full list. Please try again.",
+    "ja": "一覧を最後まで読み込めませんでした。もう一度お試しください。"
+  },
+  "진행 중인 다운로드를 기다려 주세요.": {
+    "en": "Please wait for the current download.",
+    "ja": "ダウンロードが完了するまでお待ちください。"
+  },
+  "안전한 다운로드 서버 주소가 필요합니다.": {
+    "en": "A secure download server address is required.",
+    "ja": "安全なダウンロードサーバーのアドレスが必要です。"
+  },
+  "서버 응답이 너무 큽니다.": {
+    "en": "The server response is too large.",
+    "ja": "サーバーの応答が大きすぎます。"
+  },
+  "목록을 읽을 수 없습니다.": {
+    "en": "Could not load the list.",
+    "ja": "一覧を読み込めません。"
+  },
+  "다운로드 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.": {
+    "en": "Could not connect to the download server. Please try again later.",
+    "ja": "ダウンロードサーバーに接続できませんでした。しばらくしてからお試しください。"
+  },
+  "인터넷 연결을 확인해 주세요. 내려받은 책과 글꼴은 오프라인에서 사용할 수 있습니다.": {
+    "en": "Check your internet connection. Downloaded books and fonts are available offline.",
+    "ja": "インターネット接続を確認してください。ダウンロード済みの本とフォントはオフラインで利用できます。"
+  },
+  "연결 시간이 초과되었습니다. 다시 시도해 주세요.": {
+    "en": "The connection timed out. Please try again.",
+    "ja": "接続がタイムアウトしました。もう一度お試しください。"
+  },
+  "저장된 글꼴 목록을 읽지 못했습니다.": {
+    "en": "Could not load the saved font list.",
+    "ja": "保存されたフォント一覧を読み込めませんでした。"
+  },
+  "파일이 변경되었습니다. 목록을 새로고침해 주세요.": {
+    "en": "The file has changed. Please refresh the list.",
+    "ja": "ファイルが変更されました。一覧を更新してください。"
+  },
+  "잘못된 파일 주소입니다.": {
+    "en": "Invalid file address.",
+    "ja": "ファイルのアドレスが正しくありません。"
+  },
+  "파일을 내려받지 못했습니다. 다시 시도해 주세요.": {
+    "en": "Could not download the file. Please try again.",
+    "ja": "ファイルをダウンロードできませんでした。もう一度お試しください。"
+  },
+  "파일 크기가 일치하지 않습니다.": {
+    "en": "The file size does not match.",
+    "ja": "ファイルサイズが一致しません。"
+  },
+  "파일 검증에 실패했습니다. 다시 내려받아 주세요.": {
+    "en": "File verification failed. Please download it again.",
+    "ja": "ファイルの検証に失敗しました。もう一度ダウンロードしてください。"
+  },
+  "작품 안에서 내려받을 회차를 선택해 주세요.": {
+    "en": "Open the series and choose an episode to download.",
+    "ja": "作品を開いて、ダウンロードする話を選択してください。"
+  },
+  "설치한 글꼴 목록의 저장 한도에 도달했습니다.": {
+    "en": "The installed font list has reached its storage limit.",
+    "ja": "インストール済みフォント一覧の保存上限に達しました。"
+  },
+  "다운로드가 중단되었습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.": {
+    "en": "Download interrupted. Check your internet connection and try again.",
+    "ja": "ダウンロードが中断されました。インターネット接続を確認して、もう一度お試しください。"
+  },
+  "다운로드 시간이 초과되었습니다. 다시 시도해 주세요.": {
+    "en": "The download timed out. Please try again.",
+    "ja": "ダウンロードがタイムアウトしました。もう一度お試しください。"
+  },
+  "저장된 광고 선택을 확인하지 못했습니다. 다시 선택해 주세요.": {
+    "en": "Could not load your ad preference. Please choose again.",
+    "ja": "広告設定を読み込めませんでした。もう一度選択してください。"
+  },
+  "광고 개인정보 확인을 완료하지 못해 광고를 잠시 중단했습니다. 독서는 계속할 수 있습니다.": {
+    "en": "Ads are paused because the privacy check could not be completed. You can keep reading.",
+    "ja": "広告のプライバシー確認が完了しなかったため、広告を一時停止しました。読書は続けられます。"
+  },
+  "광고 개인정보 설정을 적용하지 못해 광고 요청을 중단했습니다. 독서는 계속할 수 있습니다.": {
+    "en": "Ads are paused because privacy settings could not be applied. You can keep reading.",
+    "ja": "広告のプライバシー設定を適用できなかったため、広告を停止しました。読書は続けられます。"
+  },
+  "{0}화 · {1}": {
+    "en": "Episode {0} · {1}",
+    "ja": "第{0}話 · {1}"
+  },
+  "원문 위치를 직접 확인해 주세요.": {
+    "en": "Please check the position in the original text.",
+    "ja": "原文の位置を直接確認してください。"
+  },
+  "[쿠피리더] 광고 신고": {
+    "en": "[Koofy Reader] Report an ad",
+    "ja": "[Koofy Reader] 広告の報告"
+  },
+  "[쿠피리더] 문의": {
+    "en": "[Koofy Reader] Inquiry",
+    "ja": "[Koofy Reader] お問い合わせ"
+  },
+  "발생 시각:\n광고 위치:\n광고 내용:\n기기 및 OS:\n": {
+    "en": "Time:\nAd placement:\nAd content:\nDevice and OS:\n",
+    "ja": "発生日時:\n広告の表示場所:\n広告の内容:\n端末とOS:\n"
+  },
+  "기기 및 OS:\n문의 내용:\n": {
+    "en": "Device and OS:\nInquiry:\n",
+    "ja": "端末とOS:\nお問い合わせ内容:\n"
+  },
+  "{0}/{1}권 백업 준비 중": {
+    "en": "Preparing backup: {0}/{1} books",
+    "ja": "バックアップを準備中: {0}/{1}冊"
+  },
+  "“{0}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ({1})": {
+    "en": "Could not back up “{0}”. Check the original file and available storage. ({1})",
+    "ja": "「{0}」をバックアップできませんでした。元のファイルと空き容量を確認してください。({1})"
+  },
+  "기록을 복구하지 못했습니다. 저장 공간을 확인해 주세요.": {
+    "en": "Could not recover reading records. Check available storage.",
+    "ja": "読書記録を復元できませんでした。空き容量を確認してください。"
+  },
+  "기록을 저장하지 못했습니다.": {
+    "en": "Could not save reading records.",
+    "ja": "読書記録を保存できませんでした。"
+  },
+  "설정을 저장하지 못했습니다.": {
+    "en": "Could not save settings.",
+    "ja": "設定を保存できませんでした。"
+  },
+  "이미 열려 있는 책을 먼저 닫아 주세요.": {
+    "en": "Please close the open book first.",
+    "ja": "開いている本を先に閉じてください。"
+  },
+  "책의 내용이 변경되었습니다. 이전 읽기 위치를 확인해 주세요.": {
+    "en": "The book has changed. Check your previous reading position.",
+    "ja": "本の内容が変更されました。以前の読書位置を確認してください。"
+  },
+  "책을 닫은 뒤 백업을 이용해 주세요.": {
+    "en": "Close the book before using backup.",
+    "ja": "本を閉じてからバックアップしてください。"
+  },
+  "지원하지 않는 독서 기록 형식입니다.": {
+    "en": "Unsupported reading record format.",
+    "ja": "対応していない読書記録形式です。"
+  },
+  "독서 기록의 세션 또는 책 버전이 일치하지 않습니다.": {
+    "en": "The reading session or book version does not match.",
+    "ja": "読書セッションまたは本のバージョンが一致しません。"
+  },
+  "올바르지 않은 본문 위치입니다.": {
+    "en": "Invalid text position.",
+    "ja": "本文の位置が正しくありません。"
+  },
+  "책갈피가 너무 큽니다.": {
+    "en": "The bookmark is too large.",
+    "ja": "しおりのデータが大きすぎます。"
+  },
+  "책갈피 형식이 올바르지 않습니다.": {
+    "en": "Invalid bookmark format.",
+    "ja": "しおりの形式が正しくありません。"
+  },
+  "책갈피 위치가 올바르지 않습니다.": {
+    "en": "Invalid bookmark position.",
+    "ja": "しおりの位置が正しくありません。"
+  },
+  "정상적인 단일 ZIP 형식의 EPUB이 아닙니다.": {
+    "en": "This is not a valid single-ZIP EPUB.",
+    "ja": "有効な単一ZIP形式のEPUBではありません。"
+  },
+  "EPUB에 중복 파일 경로가 있습니다.": {
+    "en": "The EPUB contains duplicate file paths.",
+    "ja": "EPUBに重複するファイルパスがあります。"
+  },
+  "EPUB 파일 헤더가 일치하지 않습니다.": {
+    "en": "EPUB file headers do not match.",
+    "ja": "EPUBのファイルヘッダーが一致しません。"
+  },
+  "지원하지 않는 ZIP 압축 방식입니다.": {
+    "en": "Unsupported ZIP compression method.",
+    "ja": "対応していないZIP圧縮方式です。"
+  },
+  "EPUB 내부의 심볼릭 링크는 지원하지 않습니다.": {
+    "en": "Symbolic links inside EPUBs are not supported.",
+    "ja": "EPUB内のシンボリックリンクには対応していません。"
+  },
+  "EPUB 압축 해제 용량이 지원 범위를 초과합니다.": {
+    "en": "The unpacked EPUB exceeds the size limit.",
+    "ja": "展開後のEPUBがサイズ上限を超えています。"
+  },
+  "EPUB 필수 파일이 없습니다: {0}": {
+    "en": "A required EPUB file is missing: {0}",
+    "ja": "EPUBの必須ファイルがありません: {0}"
+  },
+  "EPUB 문서 한 개의 크기가 지원 범위를 초과합니다.": {
+    "en": "An EPUB document exceeds the size limit.",
+    "ja": "EPUB内の文書がサイズ上限を超えています。"
+  },
+  "EPUB mimetype이 올바르지 않습니다.": {
+    "en": "Invalid EPUB mimetype.",
+    "ja": "EPUBのmimetypeが正しくありません。"
+  },
+  "EPUB 패키지 경로가 없습니다.": {
+    "en": "The EPUB package path is missing.",
+    "ja": "EPUBのパッケージパスがありません。"
+  },
+  "현재 EPUB 2 또는 EPUB 3 패키지를 지원합니다.": {
+    "en": "EPUB 2 and EPUB 3 packages are supported.",
+    "ja": "EPUB 2とEPUB 3のパッケージに対応しています。"
+  },
+  "EPUB manifest ID가 올바르지 않습니다.": {
+    "en": "Invalid EPUB manifest ID.",
+    "ja": "EPUBのmanifest IDが正しくありません。"
+  },
+  "EPUB 리소스가 없습니다: {0}": {
+    "en": "An EPUB resource is missing: {0}",
+    "ja": "EPUBのリソースがありません: {0}"
+  },
+  "EPUB 읽기 순서가 없습니다.": {
+    "en": "The EPUB reading order is missing.",
+    "ja": "EPUBの読む順序がありません。"
+  },
+  "현재 XHTML 본문으로 구성된 EPUB을 지원합니다.": {
+    "en": "EPUBs with XHTML content are supported.",
+    "ja": "XHTML本文で構成されたEPUBに対応しています。"
+  },
+  "EPUB 암호화 정보가 올바르지 않습니다.": {
+    "en": "Invalid EPUB encryption information.",
+    "ja": "EPUBの暗号化情報が正しくありません。"
+  },
+  "EPUB 구조 또는 압축 데이터를 읽을 수 없습니다.": {
+    "en": "Could not read the EPUB structure or compressed data.",
+    "ja": "EPUBの構造または圧縮データを読み取れません。"
+  },
+  "EPUB에 안전하지 않은 파일 경로가 있습니다.": {
+    "en": "The EPUB contains an unsafe file path.",
+    "ja": "EPUBに安全でないファイルパスがあります。"
+  },
+  "EPUB 리소스 경로가 올바르지 않습니다.": {
+    "en": "Invalid EPUB resource path.",
+    "ja": "EPUBのリソースパスが正しくありません。"
+  },
+  "EPUB 리소스가 책 바깥을 참조합니다.": {
+    "en": "An EPUB resource points outside the book.",
+    "ja": "EPUBのリソースが本の外部を参照しています。"
+  },
+  "EPUB 리소스 경로가 비어 있습니다.": {
+    "en": "An EPUB resource path is empty.",
+    "ja": "EPUBのリソースパスが空です。"
+  },
+  "EPUB 압축 데이터가 잘렸습니다.": {
+    "en": "The compressed EPUB data is truncated.",
+    "ja": "EPUBの圧縮データが途中で切れています。"
+  },
+  "EPUB 파일 크기 또는 무결성 검사가 실패했습니다.": {
+    "en": "EPUB size or integrity verification failed.",
+    "ja": "EPUBのサイズまたは整合性の検証に失敗しました。"
+  },
+  "EPUB 압축 해제 용량이 선언된 크기를 초과합니다.": {
+    "en": "The unpacked EPUB exceeds its declared size.",
+    "ja": "展開後のEPUBが宣言されたサイズを超えています。"
+  },
+  "20MB 이하의 TXT를 선택해 주세요.": {
+    "en": "Choose a TXT file no larger than 20MB.",
+    "ja": "20MB以下のTXTファイルを選択してください。"
+  },
+  "텍스트가 아닌 데이터가 포함되어 있습니다.": {
+    "en": "The file contains non-text data.",
+    "ja": "テキスト以外のデータが含まれています。"
+  },
+  "문자 데이터가 잘렸습니다.": {
+    "en": "The character data is truncated.",
+    "ja": "文字データが途中で切れています。"
+  },
+  "CP949/EUC-KR로 읽을 수 없는 문자입니다.": {
+    "en": "A character could not be decoded as CP949/EUC-KR.",
+    "ja": "CP949/EUC-KRで読み取れない文字です。"
+  },
+  "UTF-8 변환 결과가 20MB를 초과합니다.": {
+    "en": "The UTF-8 conversion exceeds 20MB.",
+    "ja": "UTF-8への変換結果が20MBを超えています。"
+  },
+  "20MB 이하의 이미지 파일을 선택해 주세요.": {
+    "en": "Choose an image no larger than 20MB.",
+    "ja": "20MB以下の画像を選択してください。"
+  },
+  "이미지를 읽을 수 없습니다.": {
+    "en": "Could not read the image.",
+    "ja": "画像を読み取れません。"
+  },
+  "한 번에 백업할 수 있는 용량은 100MB입니다.": {
+    "en": "You can back up up to 100MB at a time.",
+    "ja": "一度にバックアップできる容量は100MBです。"
+  },
+  "백업 파일 항목이 너무 많습니다.": {
+    "en": "The backup contains too many files.",
+    "ja": "バックアップのファイル数が多すぎます。"
+  },
+  "표지 이미지가 너무 큽니다.": {
+    "en": "The cover image is too large.",
+    "ja": "表紙画像が大きすぎます。"
+  },
+  "백업 정보가 100MB 제한을 초과했습니다.": {
+    "en": "Backup metadata exceeds the 100MB limit.",
+    "ja": "バックアップ情報が100MBの上限を超えています。"
+  },
+  "백업 파일이 100MB를 초과합니다.": {
+    "en": "The backup file exceeds 100MB.",
+    "ja": "バックアップファイルが100MBを超えています。"
+  },
+  "100MB 이하의 백업 파일을 선택해 주세요.": {
+    "en": "Choose a backup file no larger than 100MB.",
+    "ja": "100MB以下のバックアップファイルを選択してください。"
+  },
+  "백업 파일이 너무 큽니다.": {
+    "en": "The backup file is too large.",
+    "ja": "バックアップファイルが大きすぎます。"
+  },
+  "올바르지 않은 백업 파일 경로입니다.": {
+    "en": "Invalid backup file path.",
+    "ja": "バックアップファイルのパスが正しくありません。"
+  },
+  "백업 해제 용량이 100MB를 초과합니다.": {
+    "en": "The unpacked backup exceeds 100MB.",
+    "ja": "展開後のバックアップが100MBを超えています。"
+  },
+  "백업 파일 크기가 일치하지 않습니다.": {
+    "en": "The backup file size does not match.",
+    "ja": "バックアップファイルのサイズが一致しません。"
+  },
+  "쿠피리더 백업 정보가 없습니다.": {
+    "en": "Koofy Reader backup metadata is missing.",
+    "ja": "Koofy Readerのバックアップ情報がありません。"
+  },
+  "지원하지 않는 백업 형식입니다.": {
+    "en": "Unsupported backup format.",
+    "ja": "対応していないバックアップ形式です。"
+  },
+  "백업 파일이 누락되었습니다.": {
+    "en": "A backup file is missing.",
+    "ja": "バックアップファイルが不足しています。"
+  },
+  "손상된 백업 파일입니다. 원래 백업을 다시 선택해 주세요.": {
+    "en": "The backup is damaged. Select the original backup again.",
+    "ja": "バックアップが破損しています。元のバックアップを選び直してください。"
+  },
+  "책 정보가 올바르지 않습니다.": {
+    "en": "Invalid book information.",
+    "ja": "本の情報が正しくありません。"
+  },
+  "책 원본이 누락되거나 지원 용량을 초과했습니다.": {
+    "en": "A book source is missing or exceeds the size limit.",
+    "ja": "本の元ファイルがないか、サイズ上限を超えています。"
+  },
+  "지원하지 않는 기본 책입니다.": {
+    "en": "Unsupported bundled book.",
+    "ja": "対応していない付属の本です。"
+  },
+  "중복된 묶음 정보입니다.": {
+    "en": "Duplicate collection information.",
+    "ja": "まとめ本の情報が重複しています。"
+  },
+  "표지 정보가 올바르지 않습니다.": {
+    "en": "Invalid cover information.",
+    "ja": "表紙の情報が正しくありません。"
+  },
+  "표지 표시 설정이 올바르지 않습니다.": {
+    "en": "Invalid cover display settings.",
+    "ja": "表紙の表示設定が正しくありません。"
+  },
+  "개인 글꼴 백업이 올바르지 않습니다.": {
+    "en": "Invalid personal font backup.",
+    "ja": "個人フォントのバックアップが正しくありません。"
+  },
+  "글꼴 백업 정보가 올바르지 않습니다.": {
+    "en": "Invalid font backup information.",
+    "ja": "フォントのバックアップ情報が正しくありません。"
+  },
+  "글꼴 파일이 누락되었습니다.": {
+    "en": "A font file is missing.",
+    "ja": "フォントファイルがありません。"
+  },
+  "글꼴 식별자가 올바르지 않습니다.": {
+    "en": "Invalid font identifier.",
+    "ja": "フォントの識別子が正しくありません。"
+  },
+  "독서 기록이 올바르지 않습니다.": {
+    "en": "Invalid reading records.",
+    "ja": "読書記録が正しくありません。"
+  },
+  "독서 위치가 올바르지 않습니다.": {
+    "en": "Invalid reading position.",
+    "ja": "読書位置が正しくありません。"
+  },
+  "서재 상태가 올바르지 않습니다.": {
+    "en": "Invalid library state.",
+    "ja": "本棚の状態が正しくありません。"
+  },
+  "듣기 백업 정보가 올바르지 않습니다.": {
+    "en": "Invalid listening backup information.",
+    "ja": "読み上げのバックアップ情報が正しくありません。"
+  },
+  "듣기 백업 형식이 올바르지 않습니다.": {
+    "en": "Invalid listening backup format.",
+    "ja": "読み上げのバックアップ形式が正しくありません。"
+  },
+  "듣기 설정이 올바르지 않습니다.": {
+    "en": "Invalid listening settings.",
+    "ja": "読み上げ設定が正しくありません。"
+  },
+  "듣던 위치가 올바르지 않습니다.": {
+    "en": "Invalid listening position.",
+    "ja": "読み上げ位置が正しくありません。"
+  },
+  "책 묶음 정보가 손상되었습니다.": {
+    "en": "The collection information is damaged.",
+    "ja": "まとめ本の情報が破損しています。"
+  },
+  "글꼴 파일은 10MB 이하여야 합니다.": {
+    "en": "Font files must be no larger than 10MB.",
+    "ja": "フォントファイルは10MB以下にしてください。"
+  },
+  "TTF 또는 OTF 글꼴 파일을 선택해 주세요.": {
+    "en": "Choose a TTF or OTF font file.",
+    "ja": "TTFまたはOTFのフォントファイルを選択してください。"
+  },
+  "손상된 글꼴 파일입니다.": {
+    "en": "The font file is damaged.",
+    "ja": "フォントファイルが破損しています。"
+  },
+  "글꼴 내부 데이터가 올바르지 않습니다.": {
+    "en": "Invalid internal font data.",
+    "ja": "フォント内部のデータが正しくありません。"
+  },
+  "필수 글꼴 정보가 없습니다.": {
+    "en": "Required font information is missing.",
+    "ja": "必要なフォント情報がありません。"
+  },
+  "글꼴 목록이 너무 큽니다.": {
+    "en": "The font list is too large.",
+    "ja": "フォント一覧が大きすぎます。"
+  },
+  "지원하지 않는 글꼴 목록입니다.": {
+    "en": "Unsupported font list.",
+    "ja": "対応していないフォント一覧です。"
+  },
+  "글꼴 경로가 올바르지 않습니다.": {
+    "en": "Invalid font path.",
+    "ja": "フォントのパスが正しくありません。"
+  },
+  "내 글꼴은 최대 50개까지 보관할 수 있습니다.": {
+    "en": "You can store up to 50 personal fonts.",
+    "ja": "個人フォントは最大50個まで保存できます。"
+  },
+  "책의 원본 파일 경로가 없습니다.": {
+    "en": "The book source path is missing.",
+    "ja": "本の元ファイルのパスがありません。"
+  },
+  "현재 EPUB과 TXT 파일만 지원합니다.": {
+    "en": "Only EPUB and TXT files are currently supported.",
+    "ja": "現在、EPUBとTXTファイルに対応しています。"
+  },
+  "원본과 앱에 보관한 파일을 찾을 수 없습니다. 책을 다시 가져와 주세요.": {
+    "en": "The original and stored files could not be found. Import the book again.",
+    "ja": "元のファイルとアプリ内のファイルが見つかりません。本をもう一度追加してください。"
+  },
+  "빈 파일입니다.": {
+    "en": "The file is empty.",
+    "ja": "ファイルが空です。"
+  },
+  "현재 EPUB은 40MB 이하 파일을 지원합니다.": {
+    "en": "EPUB files up to 40MB are supported.",
+    "ja": "40MB以下のEPUBに対応しています。"
+  },
+  "현재 TXT는 20MB 이하 파일을 지원합니다.": {
+    "en": "TXT files up to 20MB are supported.",
+    "ja": "20MB以下のTXTに対応しています。"
+  },
+  "문자 인코딩을 읽을 수 없습니다. UTF-8 또는 BOM이 있는 UTF-16으로 저장해 주세요. CP949/EUC-KR TXT는 서재의 책 가져오기에서 미리보기를 확인해 변환할 수 있습니다.": {
+    "en": "Could not decode the text. Save it as UTF-8 or UTF-16 with a BOM. For CP949/EUC-KR TXT, import it from the library and check the preview to convert it.",
+    "ja": "文字コードを読み取れません。UTF-8またはBOM付きUTF-16で保存してください。CP949/EUC-KRのTXTは、本棚から追加してプレビューを確認すると変換できます。"
+  },
+  "본문에 지원하지 않는 제어 문자가 있습니다. 인코딩과 파일 형식을 확인해 주세요.": {
+    "en": "The text contains unsupported control characters. Check the encoding and file format.",
+    "ja": "本文に対応していない制御文字があります。文字コードとファイル形式を確認してください。"
+  },
+  "본문이 비어 있습니다.": {
+    "en": "The book text is empty.",
+    "ja": "本文が空です。"
+  },
+  "암호화된 EPUB은 아직 지원하지 않습니다.": {
+    "en": "Encrypted EPUBs are not yet supported.",
+    "ja": "暗号化されたEPUBにはまだ対応していません。"
+  },
+  "DRM 보호 EPUB은 아직 지원하지 않습니다.": {
+    "en": "DRM-protected EPUBs are not yet supported.",
+    "ja": "DRM保護されたEPUBにはまだ対応していません。"
+  },
+  "현재 스크립트나 외부 리소스를 사용하는 EPUB은 지원하지 않습니다.": {
+    "en": "EPUBs that use scripts or external resources are not currently supported.",
+    "ja": "スクリプトや外部リソースを使用するEPUBには現在対応していません。"
+  }
+}

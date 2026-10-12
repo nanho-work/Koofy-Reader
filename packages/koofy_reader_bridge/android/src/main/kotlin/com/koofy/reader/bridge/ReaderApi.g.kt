@@ -152,7 +152,9 @@ data class ReaderLaunchRequest (
   val adHiddenUntilEpochMs: Long? = null,
   /** Optional next member in the user's saved group order. */
   val nextBookTitle: String? = null,
-  val bookmarksJson: String? = null
+  val bookmarksJson: String? = null,
+  /** App UI language, independent of book content and speech language. */
+  val uiLanguage: String? = null
 )
  {
   companion object {
@@ -170,7 +172,8 @@ data class ReaderLaunchRequest (
       val adHiddenUntilEpochMs = pigeonVar_list[10] as Long?
       val nextBookTitle = pigeonVar_list[11] as String?
       val bookmarksJson = pigeonVar_list[12] as String?
-      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle, bookmarksJson)
+      val uiLanguage = pigeonVar_list[13] as String?
+      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle, bookmarksJson, uiLanguage)
     }
   }
   fun toList(): List<Any?> {
@@ -188,6 +191,7 @@ data class ReaderLaunchRequest (
       adHiddenUntilEpochMs,
       nextBookTitle,
       bookmarksJson,
+      uiLanguage,
     )
   }
   override fun equals(other: Any?): Boolean {

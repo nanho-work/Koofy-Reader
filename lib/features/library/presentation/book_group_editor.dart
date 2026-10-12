@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -52,7 +53,9 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
     return DisplayFeatureSubScreen(
       anchorPoint: Offset.zero,
       child: Scaffold(
-        appBar: AppBar(title: Text(widget.creating ? '책 묶음 만들기' : '묶음에 책 추가')),
+        appBar: AppBar(
+          title: Text(widget.creating ? tr("책 묶음 만들기") : tr("묶음에 책 추가")),
+        ),
         body: SafeArea(
           child: Column(
             children: [
@@ -62,15 +65,15 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                   child: TextField(
                     controller: _name,
                     maxLength: 100,
-                    decoration: const InputDecoration(labelText: '묶음 이름'),
+                    decoration: InputDecoration(labelText: tr("묶음 이름")),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: TextField(
-                  decoration: const InputDecoration(
-                    labelText: '책 검색',
+                  decoration: InputDecoration(
+                    labelText: tr("책 검색"),
                     prefixIcon: Icon(Icons.search),
                   ),
                   onChanged: (value) => setState(() => _query = value),
@@ -78,12 +81,12 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
               ),
               Text(
                 widget.creating
-                    ? '함께 묶을 책을 두 권 이상 선택해 주세요.'
-                    : '추가할 책을 선택해 주세요.',
+                    ? tr("함께 묶을 책을 두 권 이상 선택해 주세요.")
+                    : tr("추가할 책을 선택해 주세요."),
               ),
               Expanded(
                 child: books.isEmpty
-                    ? const Center(child: Text('추가할 수 있는 책이 없습니다.'))
+                    ? Center(child: Text(tr("추가할 수 있는 책이 없습니다.")))
                     : ListView.builder(
                         itemCount: books.length,
                         itemBuilder: (context, i) {
@@ -130,7 +133,10 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                           )
                         : null,
                     child: Text(
-                      '${_selected.length}권 ${widget.creating ? '묶기' : '추가'}',
+                      tr("{0}권 {1}", [
+                        _selected.length,
+                        widget.creating ? tr('묶기') : tr('추가'),
+                      ]),
                     ),
                   ),
                 ),

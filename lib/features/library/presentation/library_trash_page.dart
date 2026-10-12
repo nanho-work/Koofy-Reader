@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/data/library_trash_service.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/native_reader/migration/legacy_reader_archive.dart';
@@ -23,7 +24,7 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
   Future<void> restore(String id, Map<String, dynamic> entry) async {
     setState(() => busy = true);
     try {
-      if (entry['deleting'] == true) throw StateError('삭제 중인 항목입니다.');
+      if (entry['deleting'] == true) throw StateError(tr("삭제 중인 항목입니다."));
       if (entry['kind'] == 'bundle') {
         await ref.read(bookGroupRepositoryProvider).restoreBundle(id);
       } else if (entry['kind'] == 'group') {
@@ -44,13 +45,13 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
       if (mounted) {
         setState(() => entries = store.load());
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복원했습니다. 다른 묶음에 배치한 책의 현재 소속은 유지합니다.')),
+          SnackBar(content: Text(tr("복원했습니다. 다른 묶음에 배치한 책의 현재 소속은 유지합니다."))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복원하지 못했습니다. 기록은 보존했습니다. 다시 시도해 주세요.')),
+          SnackBar(content: Text(tr("복원하지 못했습니다. 기록은 보존했습니다. 다시 시도해 주세요."))),
         );
       }
     } finally {
@@ -63,30 +64,33 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(all ? '휴지통 비우기' : '영구 삭제'),
+        title: Text(all ? tr("휴지통 비우기") : tr("영구 삭제")),
         content: Text(
-          '${ids.length}개 항목의 앱 내 파일·표지·독서 기록을 영구 삭제할까요?\n복원할 수 없습니다. 다른 책과 공유하는 파일과 앱 밖에 보관한 원본은 유지됩니다.',
+          tr(
+            "{0}개 항목의 앱 내 파일·표지·독서 기록을 영구 삭제할까요?\n복원할 수 없습니다. 다른 책과 공유하는 파일과 앱 밖에 보관한 원본은 유지됩니다.",
+            [ids.length],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(tr("취소")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('영구 삭제'),
+            child: Text(tr("영구 삭제")),
           ),
         ],
       ),
     );
     if (!mounted || confirmed != true) return;
     setState(() => busy = true);
-    var message = '영구 삭제했습니다.';
+    var message = tr("영구 삭제했습니다.");
     try {
       final service = await ref.read(libraryTrashServiceProvider.future);
       await service.empty(ids);
     } catch (_) {
-      message = '일부 항목의 삭제를 완료하지 못했습니다. 남은 항목에서 다시 시도해 주세요.';
+      message = tr("일부 항목의 삭제를 완료하지 못했습니다. 남은 항목에서 다시 시도해 주세요.");
     }
     ref.invalidate(booksProvider);
     ref.invalidate(bookGroupsProvider);
@@ -107,7 +111,7 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('휴지통'),
+      title: Text(tr("휴지통")),
       actions: [
         FutureBuilder<Map<String, Map<String, dynamic>>>(
           future: entries,
@@ -115,7 +119,7 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
             onPressed: busy || !snapshot.hasData || snapshot.data!.isEmpty
                 ? null
                 : () => purge(snapshot.data!.keys.toSet(), all: true),
-            child: const Text('휴지통 비우기'),
+            child: Text(tr("휴지통 비우기")),
           ),
         ),
       ],
@@ -127,7 +131,7 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
           return Center(
             child: TextButton(
               onPressed: () => setState(() => entries = store.load()),
-              child: const Text('휴지통 다시 불러오기'),
+              child: Text(tr("휴지통 다시 불러오기")),
             ),
           );
         }
@@ -146,10 +150,12 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
             EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
           ),
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(20),
               child: Text(
-                '복원하거나 영구 삭제할 수 있습니다. 휴지통을 비우면 앱에 보관한 파일 용량을 확보합니다. 기본 제공 책의 앱 내장 원본은 삭제되지 않습니다. 휴지통의 책은 서재 백업에서 제외됩니다.',
+                tr(
+                  "복원하거나 영구 삭제할 수 있습니다. 휴지통을 비우면 앱에 보관한 파일 용량을 확보합니다. 기본 제공 책의 앱 내장 원본은 삭제되지 않습니다. 휴지통의 책은 서재 백업에서 제외됩니다.",
+                ),
               ),
             ),
             if (items.isNotEmpty)
@@ -163,17 +169,19 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                   child: Text(
                     size.hasData
-                        ? '삭제로 확보 가능한 파일 용량: ${(size.data! / 1024 / 1024).toStringAsFixed(1)} MB'
+                        ? tr("삭제로 확보 가능한 파일 용량: {0} MB", [
+                            (size.data! / 1024 / 1024).toStringAsFixed(1),
+                          ])
                         : size.hasError
-                        ? '파일 용량을 확인하지 못했습니다.'
-                        : '파일 용량 확인 중…',
+                        ? tr("파일 용량을 확인하지 못했습니다.")
+                        : tr("파일 용량 확인 중…"),
                   ),
                 ),
               ),
             if (items.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('휴지통이 비어 있습니다.'),
+                child: Text(tr("휴지통이 비어 있습니다.")),
               ),
             for (final item in items)
               ListTile(
@@ -188,12 +196,17 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
                   children: [
                     Text(
                       item.value['deleting'] == true
-                          ? '삭제 미완료 · 다시 시도해 주세요.'
+                          ? tr("삭제 미완료 · 다시 시도해 주세요.")
                           : item.value['kind'] == 'bundle'
-                          ? '${(item.value['books'] as List).length}권 · ${item.value['keepShelf'] == true ? '책장 비우기' : '묶음책 삭제'}'
+                          ? tr("{0}권 · {1}", [
+                              (item.value['books'] as List).length,
+                              item.value['keepShelf'] == true
+                                  ? tr('책장 비우기')
+                                  : tr('묶음책 삭제'),
+                            ])
                           : item.value['kind'] == 'group'
-                          ? '해제한 묶음'
-                          : '서재에서 삭제한 책',
+                          ? tr("해제한 묶음")
+                          : tr("서재에서 삭제한 책"),
                     ),
                     Wrap(
                       spacing: 8,
@@ -202,12 +215,14 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
                           onPressed: busy || item.value['deleting'] == true
                               ? null
                               : () => restore(item.key, item.value),
-                          child: const Text('복원'),
+                          child: Text(tr("복원")),
                         ),
                         TextButton(
                           onPressed: busy ? null : () => purge({item.key}),
                           child: Text(
-                            item.value['deleting'] == true ? '삭제 재시도' : '영구 삭제',
+                            item.value['deleting'] == true
+                                ? tr("삭제 재시도")
+                                : tr("영구 삭제"),
                           ),
                         ),
                       ],

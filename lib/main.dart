@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
 }
 
 Future<void> _initialize() async {
+  await AppLanguage.instance.initialize();
   await StorageMigrationRunner().run();
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||

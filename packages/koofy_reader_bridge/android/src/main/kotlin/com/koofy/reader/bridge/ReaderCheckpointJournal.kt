@@ -58,7 +58,7 @@ internal class ReaderCheckpointJournal(filesDir: File) {
                     ReaderEvent(protocolVersion = 1, sessionId = File(path).name,
                         sessionGeneration = 0, publicationId = publication, contentRevision = "",
                         sequence = 0, kind = "recoveryIssue", errorCode = "checkpoint_corrupt",
-                        message = "읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다.")
+                        message = L("읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다."))
                 }
             }
             .sortedWith(compareBy({ it.sessionGeneration }, { it.sequence }))

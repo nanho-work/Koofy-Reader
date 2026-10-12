@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
 import 'speech_backup.dart';
@@ -90,7 +91,9 @@ class LibraryBackupService {
     final records = <Map<String, dynamic>>[];
     final coverEntries = <String, String>{};
     for (final book in allBooks) {
-      progress?.call('${records.length + 1}/${allBooks.length}권 백업 준비 중');
+      progress?.call(
+        tr('{0}/{1}권 백업 준비 중', [records.length + 1, allBooks.length]),
+      );
       final json = book.toJson()
         ..remove('localPath')
         ..remove('importSourcePath')
@@ -101,7 +104,10 @@ class LibraryBackupService {
           json['source'] = add(source.bytes, source.extension);
         } catch (error) {
           throw FormatException(
-            '“${book.title}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ($error)',
+            tr('“{0}”을 백업하지 못했습니다. 원본 파일과 저장 공간을 확인해 주세요. ({1})', [
+              book.title,
+              localizedError(error),
+            ]),
           );
         }
       }

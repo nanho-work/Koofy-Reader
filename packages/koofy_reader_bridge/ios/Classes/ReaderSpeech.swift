@@ -20,7 +20,7 @@ private final class OfflineAppleSpeechEngine: TTSEngine, AVTTSEngineDelegate {
               AVSpeechSynthesisVoice.speechVoices().contains(where: { $0.identifier == id }),
               availableVoices.contains(where: { $0.identifier == id }) else {
             return .failure(.other(NSError(domain: "KoofySpeech", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "선택한 로컬 음성을 사용할 수 없습니다."])))
+                userInfo: [NSLocalizedDescriptionKey: L("선택한 로컬 음성을 사용할 수 없습니다.")])))
         }
         if skipRemaining > 0 {
             await Task.yield()
@@ -111,7 +111,7 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
         stopPreview()
         used = true; changed()
         guard let id = voiceID, voices.contains(where: { $0.identifier == id }) else {
-            message("로컬 한국어 음성이 없습니다. iPhone 설정의 손쉬운 사용에서 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어 음성을 다운로드한 뒤 다시 열어 주세요.")
+            message(L("로컬 한국어 음성이 없습니다. iPhone 설정의 손쉬운 사용에서 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어 음성을 다운로드한 뒤 다시 열어 주세요."))
             return
         }
         used = true; busy = true; changed(); serial += 1
@@ -127,7 +127,7 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
                 try AVAudioSession.sharedInstance().setActive(true)
             } catch {
-                self.busy = false; self.changed(); self.message("다른 소리 재생이 끝난 뒤 다시 눌러 주세요."); return
+                self.busy = false; self.changed(); self.message(L("다른 소리 재생이 끝난 뒤 다시 눌러 주세요.")); return
             }
             let start: SpeechStart?
             do {
@@ -136,7 +136,7 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
             }
             catch {
                 guard generation == self.serial, !Task.isCancelled else { return }
-                self.pause(); self.message("읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요."); return
+                self.pause(); self.message(L("읽던 문장을 찾지 못했습니다. 본문 위치를 옮긴 뒤 다시 재생해 주세요.")); return
             }
             guard !Task.isCancelled, generation == self.serial, self.active, !self.closed else { return }
             self.engine.skipRemaining = start?.skip ?? 0
@@ -150,7 +150,7 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
                 config: .init(defaultLanguage: Language(code: .bcp47("ko")), voiceIdentifier: id),
                 audioSession: self.audioSession,
                 engineFactory: { [engine = self.engine] in engine }, delegate: self)
-            guard let synth else { self.pause(); self.message("이 책의 읽을 본문을 준비하지 못했습니다."); return }
+            guard let synth else { self.pause(); self.message(L("이 책의 읽을 본문을 준비하지 못했습니다.")); return }
             self.synthesizer = synth
             self.engine.voiceID = id; self.engine.speed = self.speed; self.engine.enabled = true
             self.fromVisible = false; self.playing = true; self.changed()
@@ -186,16 +186,16 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
         timer?.invalidate(); timerMinutes = minutes
         guard minutes > 0 else { return }
         timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes * 60), repeats: false) { [weak self] _ in
-            self?.timerMinutes = 0; self?.pause(); self?.message("설정한 시간이 되어 듣기를 멈췄습니다.")
+            self?.timerMinutes = 0; self?.pause(); self?.message(L("설정한 시간이 되어 듣기를 멈췄습니다."))
         }
     }
     func preview() {
         pause()
         guard active, !closed, let id = voiceID, voices.contains(where: { $0.identifier == id }),
-              let voice = AVSpeechSynthesisVoice(identifier: id) else { message("설치된 로컬 음성을 먼저 선택해 주세요."); return }
+              let voice = AVSpeechSynthesisVoice(identifier: id) else { message(L("설치된 로컬 음성을 먼저 선택해 주세요.")); return }
         do { try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio); try AVAudioSession.sharedInstance().setActive(true) }
-        catch { message("음성 재생을 시작하지 못했습니다."); return }
-        let utterance = AVSpeechUtterance(string: "안녕하세요. 쿠피리더에서 편안하게 책을 들어 보세요.")
+        catch { message(L("음성 재생을 시작하지 못했습니다.")); return }
+        let utterance = AVSpeechUtterance(string: L("안녕하세요. 쿠피리더에서 편안하게 책을 들어 보세요."))
         utterance.voice = voice; utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * Float(speed))
         previewing = true
         previewSynth.speak(utterance)
@@ -235,14 +235,14 @@ final class ReaderSpeech: NSObject, PublicationSpeechSynthesizerDelegate, AVSpee
             current = locator; save(); located(locator)
         case .stopped:
             pause()
-            message("읽기가 끝났습니다.")
+            message(L("읽기가 끝났습니다."))
         case .paused: break
         }
     }
     @MainActor func publicationSpeechSynthesizer(_ synthesizer: PublicationSpeechSynthesizer,
         utterance: PublicationSpeechSynthesizer.Utterance, didFailWithError error: PublicationSpeechSynthesizer.Error) {
         guard self.synthesizer === synthesizer, playing, !closed else { return }
-        pause(); message("음성을 재생하지 못했습니다. 기기의 한국어 음성 설치 상태를 확인해 주세요.")
+        pause(); message(L("음성을 재생하지 못했습니다. 기기의 한국어 음성 설치 상태를 확인해 주세요."))
     }
     private var positionKey: String { "reader.speech.position.\(request.publicationId)" }
     private func save() {

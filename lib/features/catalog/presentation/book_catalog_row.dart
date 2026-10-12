@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import '../data/reader_catalog.dart';
 
@@ -32,14 +33,14 @@ class BookCatalogRow extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
-                tooltip: '닫기',
+                tooltip: tr("닫기"),
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
             Text(item.title, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
-            Text('${item.author} · ${item.category}'),
+            Text('${item.author} · ${tr(item.category)}'),
             const SizedBox(height: 8),
             Text('${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB'),
             if (item.description.isNotEmpty) ...[
@@ -47,7 +48,10 @@ class BookCatalogRow extends StatelessWidget {
               Text(item.description),
             ],
             const SizedBox(height: 24),
-            Text('출처·이용 조건', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              tr("출처·이용 조건"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             if (item.source.isNotEmpty) ...[
               SelectableText(item.source),
@@ -81,14 +85,19 @@ class BookCatalogRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.displayTitle,
+                      item.seriesId == null
+                          ? item.title
+                          : tr('{0}화 · {1}', [
+                              item.episodeNumber,
+                              item.episodeTitle,
+                            ]),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${item.author} · ${item.category}',
+                      '${item.author} · ${tr(item.category)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -111,7 +120,7 @@ class BookCatalogRow extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: progress,
                     strokeWidth: 2,
-                    semanticsLabel: '${item.title} 다운로드 중',
+                    semanticsLabel: tr("{0} 다운로드 중", [item.title]),
                     semanticsValue: '${(progress! * 100).round()}%',
                   ),
                 ),
@@ -120,7 +129,7 @@ class BookCatalogRow extends StatelessWidget {
           else
             IconButton(
               key: ValueKey('book-download-${item.id}'),
-              tooltip: '${item.title} ${installed ? '다운로드 완료' : '다운로드'}',
+              tooltip: '${item.title} ${tr(installed ? '다운로드 완료' : '다운로드')}',
               onPressed: onDownload,
               icon: Icon(installed ? Icons.check : Icons.download_outlined),
               color: colors.primary,

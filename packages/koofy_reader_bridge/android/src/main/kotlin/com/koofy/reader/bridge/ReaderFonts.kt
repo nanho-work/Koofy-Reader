@@ -56,7 +56,7 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
     }
 
     val optionIds: List<String> get() = listOf("default") + families.map { it.id }
-    val optionLabels: List<String> get() = listOf("기본") + families.map { it.label }
+    val optionLabels: List<String> get() = listOf(L("기본")) + families.map { it.label }
 
     private fun downloaded(context: Context, overrideDirectory: File?, personal: Boolean = false): List<Family> {
         val directory = overrideDirectory ?: File(context.filesDir, "cloud_reader/fonts")
@@ -144,7 +144,7 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
     companion object {
         val ids = listOf("default", "maplestory", "hakgyoansim-siganpyo")
         fun isValidId(id: String?) = (id ?: "default") in ids || id?.matches(Regex("(remote|personal)_[a-f0-9]{32}")) == true
-        val labels = listOf("기본", "메이플스토리", "학교안심 시간표")
+        val labels get() = listOf(L("기본"), "메이플스토리", "학교안심 시간표")
         private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it) }
     }

@@ -209,6 +209,8 @@ struct ReaderLaunchRequest: Hashable {
   /// Optional next member in the user's saved group order.
   var nextBookTitle: String? = nil
   var bookmarksJson: String? = nil
+  /// App UI language, independent of book content and speech language.
+  var uiLanguage: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -226,6 +228,7 @@ struct ReaderLaunchRequest: Hashable {
     let adHiddenUntilEpochMs: Int64? = nilOrValue(pigeonVar_list[10])
     let nextBookTitle: String? = nilOrValue(pigeonVar_list[11])
     let bookmarksJson: String? = nilOrValue(pigeonVar_list[12])
+    let uiLanguage: String? = nilOrValue(pigeonVar_list[13])
 
     return ReaderLaunchRequest(
       protocolVersion: protocolVersion,
@@ -240,7 +243,8 @@ struct ReaderLaunchRequest: Hashable {
       bannerAdUnitId: bannerAdUnitId,
       adHiddenUntilEpochMs: adHiddenUntilEpochMs,
       nextBookTitle: nextBookTitle,
-      bookmarksJson: bookmarksJson
+      bookmarksJson: bookmarksJson,
+      uiLanguage: uiLanguage
     )
   }
   func toList() -> [Any?] {
@@ -258,6 +262,7 @@ struct ReaderLaunchRequest: Hashable {
       adHiddenUntilEpochMs,
       nextBookTitle,
       bookmarksJson,
+      uiLanguage,
     ]
   }
   static func == (lhs: ReaderLaunchRequest, rhs: ReaderLaunchRequest) -> Bool {

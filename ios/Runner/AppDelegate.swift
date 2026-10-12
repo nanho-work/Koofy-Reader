@@ -5,16 +5,23 @@ import AppTrackingTransparency
 import UserMessagingPlatform
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterPluginRegistrant {
   private let adConsent = ReaderAdConsent()
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
+    // Flutter 3.35 creates the storyboard engine after the scene connects.
+    // Register plugins against that engine, rather than an absent app window.
+    pluginRegistrant = self
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func register(with registry: FlutterPluginRegistry) {
+    GeneratedPluginRegistrant.register(with: registry)
     let channel = FlutterMethodChannel(name: "com.koofylab.koofyreader/privacy",
-      binaryMessenger: registrar(forPlugin: "KoofyPrivacy")!.messenger())
+      binaryMessenger: registry.registrar(forPlugin: "KoofyPrivacy")!.messenger())
     channel.setMethodCallHandler { [weak self] call, result in
       if call.method == "prepareConsent" || call.method == "showConsentOptions" {
         guard let self else { result(FlutterError(code: "consent_unavailable", message: "App unavailable", details: nil)); return }
@@ -30,7 +37,6 @@ import UserMessagingPlatform
       LPMPrivacySettings.setCCPA(!allowed)
       result(nil)
     }
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
 

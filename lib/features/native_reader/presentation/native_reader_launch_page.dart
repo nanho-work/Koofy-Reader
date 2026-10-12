@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'dart:io';
@@ -44,7 +45,7 @@ class _NativeReaderLaunchPageState
   StreamSubscription<ReaderEvent>? _events;
   StreamSubscription<Object>? _errors;
   String? _error;
-  String _status = '책을 준비하고 있습니다…';
+  String _status = tr("책을 준비하고 있습니다…");
   bool _launching = false;
   bool _initialLocationConsumed = false;
   bool _leaveRequested = false;
@@ -80,7 +81,9 @@ class _NativeReaderLaunchPageState
       _errors = services.coordinator.errors.listen((error) {
         if (mounted) {
           setState(
-            () => _error = '읽기 기록 저장을 확인하지 못했습니다. 다시 열면 복구를 시도합니다.\n$error',
+            () => _error = tr("읽기 기록 저장을 확인하지 못했습니다. 다시 열면 복구를 시도합니다.\n{0}", [
+              error,
+            ]),
           );
         }
       });
@@ -109,7 +112,7 @@ class _NativeReaderLaunchPageState
         _nextBook = null;
       }
       if (!mounted || _leaveRequested) return;
-      setState(() => _status = '읽던 위치를 불러오고 있습니다…');
+      setState(() => _status = tr("읽던 위치를 불러오고 있습니다…"));
       // Read storage afresh on every launch, including after earning a reward.
       final ads = await ref.read(adRepositoryProvider).getState();
       // Ad initialization must not delay opening an offline book.
@@ -131,7 +134,11 @@ class _NativeReaderLaunchPageState
     } on _LaunchCancelled {
       if (mounted) _leaveRequested = true;
     } catch (error) {
-      if (mounted) setState(() => _error = '책을 열지 못했습니다.\n$error');
+      if (mounted) {
+        setState(
+          () => _error = tr("책을 열지 못했습니다.\n{0}", [localizedError(error)]),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _launching = false);
@@ -152,7 +159,7 @@ class _NativeReaderLaunchPageState
         _book.id == widget.book.id &&
         widget.initialLocatorJson != null) {
       if (widget.initialContentRevision != publication.contentRevision) {
-        throw StateError('책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요.');
+        throw StateError(tr("책의 내용이 변경되었습니다. 이전 기록을 다시 확인해 주세요."));
       }
       return publication.restoreLocator(widget.initialLocatorJson);
     }
@@ -165,18 +172,20 @@ class _NativeReaderLaunchPageState
       final start = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('책의 내용이 변경되었습니다'),
-          content: const Text(
-            '이전 버전의 읽기 기록은 보존했습니다. 변경된 본문에는 같은 위치를 적용할 수 없습니다. 처음 열고 목차에서 읽던 곳을 찾아 주세요.',
+          title: Text(tr("책의 내용이 변경되었습니다")),
+          content: Text(
+            tr(
+              "이전 버전의 읽기 기록은 보존했습니다. 변경된 본문에는 같은 위치를 적용할 수 없습니다. 처음 열고 목차에서 읽던 곳을 찾아 주세요.",
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('서재로'),
+              child: Text(tr("서재로")),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('변경된 책 열기'),
+              child: Text(tr("변경된 책 열기")),
             ),
           ],
         ),
@@ -200,28 +209,35 @@ class _NativeReaderLaunchPageState
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('이전 읽기 위치 확인'),
+        title: Text(tr("이전 읽기 위치 확인")),
         content: SingleChildScrollView(
           child: Text(
-            '이전 기록은 보존했습니다. 현재 본문에서 같은 위치임을 확인할 수 없어 자동으로 이동하지 않습니다.'
-            '\n\n${ratio == null ? '진행률을 확인할 수 없습니다.' : '이전 진행률: ${(ratio * 100).floor()}%'}'
-            '\n${record.excerpt(offset)}'
-            '${candidate == null ? '' : '\n\n문자 위치로 계산한 후보를 직접 확인할 수 있습니다.'}',
+            [
+              tr("이전 기록은 보존했습니다. 현재 본문에서 같은 위치임을 확인할 수 없어 자동으로 이동하지 않습니다."),
+              '\n\n',
+              ratio == null
+                  ? tr('진행률을 확인할 수 없습니다.')
+                  : tr('이전 진행률: {0}%', [(ratio * 100).floor()]),
+              '\n',
+              record.excerpt(offset),
+              if (candidate != null)
+                '\n\n${tr('문자 위치로 계산한 후보를 직접 확인할 수 있습니다.')}',
+            ].join(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'cancel'),
-            child: const Text('서재로'),
+            child: Text(tr("서재로")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'start'),
-            child: const Text('처음 열고 목차에서 찾기'),
+            child: Text(tr("처음 열고 목차에서 찾기")),
           ),
           if (candidate != null)
             FilledButton(
               onPressed: () => Navigator.pop(context, 'candidate'),
-              child: const Text('후보 위치 확인'),
+              child: Text(tr("후보 위치 확인")),
             ),
         ],
       ),
@@ -237,9 +253,9 @@ class _NativeReaderLaunchPageState
     switch (event.kind) {
       case 'ready':
         _initialLocationConsumed = true;
-        setState(() => _status = '책을 읽고 있습니다.');
+        setState(() => _status = tr("책을 읽고 있습니다."));
       case 'error':
-        setState(() => _error = event.message ?? '독서 화면에서 오류가 발생했습니다.');
+        setState(() => _error = event.message ?? tr("독서 화면에서 오류가 발생했습니다."));
       case 'closed':
         setState(() => _closed = true);
         ref.invalidate(nativeLibraryPositionsProvider);
@@ -258,7 +274,7 @@ class _NativeReaderLaunchPageState
             !_leaveRequested) {
           setState(() {
             _book = _nextBook!;
-            _status = '다음 권을 준비하고 있습니다…';
+            _status = tr("다음 권을 준비하고 있습니다…");
           });
           unawaited(_open());
         } else if (_error == null) {
@@ -289,7 +305,7 @@ class _NativeReaderLaunchPageState
       final services = await ref.read(nativeReaderServicesProvider.future);
       if (!mounted) return;
       final support = services.supportDirectory;
-      if (support == null) throw StateError('글꼴 저장소를 찾지 못했습니다.');
+      if (support == null) throw StateError(tr("글꼴 저장소를 찾지 못했습니다."));
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
           builder: (_) => PersonalFontsPage(
@@ -302,7 +318,12 @@ class _NativeReaderLaunchPageState
       );
       if (mounted && !_leaveRequested) await _open();
     } catch (error) {
-      if (mounted) setState(() => _error = '글꼴 관리 화면을 열지 못했습니다.\n$error');
+      if (mounted) {
+        setState(
+          () =>
+              _error = tr("글꼴 관리 화면을 열지 못했습니다.\n{0}", [localizedError(error)]),
+        );
+      }
     }
   }
 
@@ -310,7 +331,7 @@ class _NativeReaderLaunchPageState
     if (_launching) {
       setState(() {
         _leaveRequested = true;
-        _status = '책 열기를 취소하고 있습니다…';
+        _status = tr("책 열기를 취소하고 있습니다…");
       });
       return;
     }
@@ -320,7 +341,11 @@ class _NativeReaderLaunchPageState
         _returnToLibrary();
       }
     } catch (error) {
-      if (mounted) setState(() => _error = '독서 화면을 닫지 못했습니다.\n$error');
+      if (mounted) {
+        setState(
+          () => _error = tr("독서 화면을 닫지 못했습니다.\n{0}", [localizedError(error)]),
+        );
+      }
     }
   }
 
@@ -365,9 +390,9 @@ class _NativeReaderLaunchPageState
                 if (_coordinator?.activeSessionId == null)
                   FilledButton(
                     onPressed: _launching ? null : _open,
-                    child: const Text('다시 시도'),
+                    child: Text(tr("다시 시도")),
                   ),
-                TextButton(onPressed: _leave, child: const Text('서재로 돌아가기')),
+                TextButton(onPressed: _leave, child: Text(tr("서재로 돌아가기"))),
               ],
             ],
           ),

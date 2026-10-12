@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/application/legacy_text_import.dart';
@@ -23,7 +24,7 @@ Future<Book?> importWithTextPreview(
     final accept = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('한글 텍스트 확인'),
+        title: Text(tr("한글 텍스트 확인")),
         content: SizedBox(
           width: 480,
           child: SingleChildScrollView(
@@ -33,8 +34,10 @@ Future<Book?> importWithTextPreview(
               children: [
                 Text(path.split(RegExp(r'[/\\]')).last),
                 const SizedBox(height: 12),
-                const Text(
-                  'CP949/EUC-KR 방식으로 읽었습니다. 아래 한글이 정상인지 확인해 주세요. 가져오면 앱 안의 사본만 UTF-8로 저장하며 원본 파일은 바꾸지 않습니다.',
+                Text(
+                  tr(
+                    "CP949/EUC-KR 방식으로 읽었습니다. 아래 한글이 정상인지 확인해 주세요. 가져오면 앱 안의 사본만 UTF-8로 저장하며 원본 파일은 바꾸지 않습니다.",
+                  ),
                 ),
                 const Divider(),
                 Text(String.fromCharCodes(text.runes.take(1400))),
@@ -45,11 +48,11 @@ Future<Book?> importWithTextPreview(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('이 파일 건너뛰기'),
+            child: Text(tr("이 파일 건너뛰기")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('확인 후 가져오기'),
+            child: Text(tr("확인 후 가져오기")),
           ),
         ],
       ),

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:async';
 
 import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
@@ -82,6 +83,7 @@ class NativeReaderCoordinator {
         await gateway.open(
           ReaderLaunchRequest(
             protocolVersion: 1,
+            uiLanguage: AppLanguage.instance.code,
             sessionId: session.id,
             sessionGeneration: session.generation,
             publicationId: publicationId,

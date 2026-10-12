@@ -86,6 +86,7 @@ void main() {
       await old.customStatement(
         'ALTER TABLE reader_positions DROP COLUMN bookmarks_json',
       );
+      await old.customStatement('DROP TABLE reader_deleted_sessions');
       await old.customStatement('PRAGMA user_version=3');
       await old.close();
       final upgraded = NativeReaderStore(NativeDatabase(file));

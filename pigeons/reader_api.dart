@@ -54,6 +54,7 @@ class ReaderLaunchRequest {
     this.adHiddenUntilEpochMs,
     this.nextBookTitle,
     this.bookmarksJson,
+    this.uiLanguage,
   });
   int protocolVersion;
   String sessionId;
@@ -72,6 +73,9 @@ class ReaderLaunchRequest {
   /// Optional next member in the user's saved group order.
   String? nextBookTitle;
   String? bookmarksJson;
+
+  /// App UI language, independent of book content and speech language.
+  String? uiLanguage;
 }
 
 class ReaderEvent {
@@ -101,6 +105,7 @@ class ReaderEvent {
   String? errorCode;
   String? message;
   String? bookmarksJson;
+
 }
 
 @HostApi()

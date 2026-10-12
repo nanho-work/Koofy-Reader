@@ -57,6 +57,8 @@ void main() {
     final reward = _Reward();
     await mount(tester, ads, reward);
     expect(find.byType(FilledButton), findsOneWidget);
+    await tester.ensureVisible(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('광고 보고 2시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
     expect(ads.hours, 2);
@@ -90,6 +92,8 @@ void main() {
     final ads = _Ads();
     final reward = _Reward()..result = false;
     await mount(tester, ads, reward);
+    await tester.ensureVisible(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('광고 보고 2시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
     expect(ads.hours, isNull);

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +67,10 @@ class SeriesCatalogRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${series.seriesStatusLabel} · ${series.episodeCount}화 공개',
+                  tr("{0} · {1}화 공개", [
+                    tr(series.seriesStatusLabel),
+                    series.episodeCount,
+                  ]),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -121,7 +125,9 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
       await ref.read(catalogDownloadProvider.notifier).download(item);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${item.episodeNumber}화를 내 서재에 추가했습니다.')),
+        SnackBar(
+          content: Text(tr("{0}화를 내 서재에 추가했습니다.", [item.episodeNumber])),
+        ),
       );
     } catch (error) {
       if (mounted) {
@@ -129,8 +135,8 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
           SnackBar(
             content: Text(
               error is CatalogException
-                  ? error.message
-                  : '다운로드하지 못했습니다. 다시 시도해 주세요.',
+                  ? tr(error.message)
+                  : tr("다운로드하지 못했습니다. 다시 시도해 주세요."),
             ),
           ),
         );
@@ -165,7 +171,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('다운로드가 끝날 때까지 잠시 기다려 주세요.')),
+            SnackBar(content: Text(tr("다운로드가 끝날 때까지 잠시 기다려 주세요."))),
           );
         }
       },
@@ -174,7 +180,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
           title: Text(series.title),
           actions: [
             IconButton(
-              tooltip: '회차 목록 새로고침',
+              tooltip: tr("회차 목록 새로고침"),
               onPressed: download.busy ? null : _refresh,
               icon: const Icon(Icons.refresh),
             ),
@@ -217,7 +223,11 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '${series.seriesStatusLabel} · ${catalog.valueOrNull?.length ?? series.episodeCount}화 공개',
+                                      tr("{0} · {1}화 공개", [
+                                        tr(series.seriesStatusLabel),
+                                        catalog.valueOrNull?.length ??
+                                            series.episodeCount,
+                                      ]),
                                     ),
                                   ],
                                 ),
@@ -230,7 +240,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                           ],
                           ExpansionTile(
                             tilePadding: EdgeInsets.zero,
-                            title: const Text('출처·이용 조건'),
+                            title: Text(tr("출처·이용 조건")),
                             children: [
                               Align(
                                 alignment: Alignment.centerLeft,
@@ -251,8 +261,8 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                             key: const ValueKey('series-episode-search'),
                             controller: _search,
                             onChanged: (_) => _changed(),
-                            decoration: const InputDecoration(
-                              hintText: '회차 번호·제목 검색',
+                            decoration: InputDecoration(
+                              hintText: tr("회차 번호·제목 검색"),
                               prefixIcon: Icon(Icons.search),
                             ),
                           ),
@@ -261,7 +271,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                             spacing: 8,
                             children: [
                               ChoiceChip(
-                                label: const Text('처음부터'),
+                                label: Text(tr("처음부터")),
                                 selected: !_newest,
                                 onSelected: (_) {
                                   _newest = false;
@@ -269,7 +279,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                                 },
                               ),
                               ChoiceChip(
-                                label: const Text('최신순'),
+                                label: Text(tr("최신순")),
                                 selected: _newest,
                                 onSelected: (_) {
                                   _newest = true;
@@ -305,13 +315,15 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                                 const SizedBox(height: 16),
                                 Text(
                                   catalog.error is CatalogException
-                                      ? (catalog.error as CatalogException)
-                                            .message
-                                      : '회차 목록이나 다운로드 상태를 확인하지 못했습니다.',
+                                      ? tr(
+                                          (catalog.error as CatalogException)
+                                              .message,
+                                        )
+                                      : tr("회차 목록이나 다운로드 상태를 확인하지 못했습니다."),
                                 ),
                                 TextButton(
                                   onPressed: download.busy ? null : _refresh,
-                                  child: const Text('다시 시도'),
+                                  child: Text(tr("다시 시도")),
                                 ),
                               ],
                               if (!catalog.isLoading &&
@@ -323,8 +335,10 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                                   ),
                                   child: Text(
                                     query.isEmpty
-                                        ? '아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.'
-                                        : '검색 조건에 맞는 회차가 없습니다.',
+                                        ? tr(
+                                            "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.",
+                                          )
+                                        : tr("검색 조건에 맞는 회차가 없습니다."),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),

@@ -115,7 +115,7 @@ internal class OfflineSpeechEngine private constructor(private val native: TextT
         native.setSpeechRate(speed.toFloat())
         val preview = "preview-${++serial}"
         previewId = preview
-        return native.speak("안녕하세요. 쿠피리더에서 편안하게 책을 들어 보세요.", TextToSpeech.QUEUE_FLUSH,
+        return native.speak(L("안녕하세요. 쿠피리더에서 편안하게 책을 들어 보세요."), TextToSpeech.QUEUE_FLUSH,
             Bundle().apply { putString(TextToSpeech.Engine.KEY_FEATURE_EMBEDDED_SYNTHESIS, "true") }, preview) == TextToSpeech.SUCCESS
     }
     override fun stop() {

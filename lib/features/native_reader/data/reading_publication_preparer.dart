@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/domain/reader_guide.dart';
 import 'dart:convert';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'dart:io' as io;
@@ -118,9 +119,12 @@ class ReadingPublicationPreparer {
     final author = book.author;
     // Renaming the guide in the library must not invalidate existing locators.
     final bodyTitle = BundledBooks.matches(book, BundledBooks.guide)
-        ? '사용 방법 안내'
+        ? (ReaderGuide.language == 'ko' ? '사용 방법 안내' : ReaderGuide.title)
         : title;
     final continuation = BundledBooks.hasContinuation(book);
+    final guideLanguage = book.isReaderGuide && ReaderGuide.language != 'ko'
+        ? ReaderGuide.language
+        : 'und';
     final prepared = await Isolate.run(
       () => _prepareContent(
         source.bytes,
@@ -128,13 +132,18 @@ class ReadingPublicationPreparer {
         bodyTitle,
         author,
         continuation: continuation,
+        language: guideLanguage,
       ),
     );
     final cover = showRegisteredCover ? await _readDisplayCover(book) : null;
     final display = cover == null
         ? (bytes: prepared.publicationBytes, added: false, firstBodyHref: null)
         : await Isolate.run(
-            () => _withDisplayCover(prepared.publicationBytes, cover),
+            () => _withDisplayCover(
+              prepared.publicationBytes,
+              cover,
+              language: guideLanguage == 'und' ? 'ko' : guideLanguage,
+            ),
           );
     final displayHash = sha256.convert(display.bytes).toString();
     final directory = io.Directory(
@@ -181,7 +190,9 @@ class ReadingPublicationPreparer {
   );
 
   Future<_SourceContent> _readSource(Book book) async {
-    final path = book.isLocalFile ? book.localPath : book.assetPath;
+    final path = book.isReaderGuide
+        ? ReaderGuide.sourceAsset
+        : (book.isLocalFile ? book.localPath : book.assetPath);
     if (path == null || path.isEmpty) {
       throw const ReadingPublicationPreparationException(
         'missing_source',
@@ -310,6 +321,7 @@ _PreparedContent _prepareContent(
   String title,
   String author, {
   bool continuation = false,
+  String language = 'und',
 }) {
   final sourceHash = sha256.convert(bytes).toString();
   final publication = extension == 'txt'
@@ -319,6 +331,7 @@ _PreparedContent _prepareContent(
           title,
           author,
           continuation: continuation,
+          language: language,
         )
       : bytes;
   if (extension == 'epub') _validateEpub(bytes);
@@ -408,6 +421,7 @@ Uint8List _textToEpub(
   String title,
   String author, {
   bool continuation = false,
+  String language = 'und',
 }) {
   final text = _decodeUnicode(
     bytes,
@@ -444,6 +458,11 @@ Uint8List _textToEpub(
   final manifest = StringBuffer();
   final spine = StringBuffer();
   final navigation = StringBuffer();
+  final contentsTitle = language == 'en'
+      ? 'Contents'
+      : language == 'ja'
+      ? '目次'
+      : '목차';
   for (var i = 0; i < sections.length; i++) {
     final name = 'section-${i.toString().padLeft(5, '0')}';
     final body = StringBuffer();
@@ -467,7 +486,7 @@ Uint8List _textToEpub(
     add(
       'EPUB/$name.xhtml',
       '''<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="und" lang="und"><head><title>${_xml(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body><section id="$name">$body</section></body></html>''',
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="$language" lang="$language"><head><title>${_xml(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body><section id="$name">$body</section></body></html>''',
     );
     manifest.writeln(
       '<item id="$name" href="$name.xhtml" media-type="application/xhtml+xml"/>',
@@ -492,12 +511,12 @@ Uint8List _textToEpub(
   add(
     'EPUB/nav.xhtml',
     '''<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="und" lang="und"><head><title>목차</title></head><body><nav epub:type="toc" id="toc"><h1>목차</h1><ol>$navigation</ol></nav></body></html>''',
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="$language" lang="$language"><head><title>$contentsTitle</title></head><body><nav epub:type="toc" id="toc"><h1>$contentsTitle</h1><ol>$navigation</ol></nav></body></html>''',
   );
   add(
     'EPUB/package.opf',
     '''<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:sha256:$sourceHash</dc:identifier><dc:title>${_xml(title)}</dc:title><dc:creator>${_xml(author)}</dc:creator><dc:language>und</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="style" href="style.css" media-type="text/css"/>$manifest</manifest><spine>$spine</spine></package>''',
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:sha256:$sourceHash</dc:identifier><dc:title>${_xml(title)}</dc:title><dc:creator>${_xml(author)}</dc:creator><dc:language>$language</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="style" href="style.css" media-type="text/css"/>$manifest</manifest><spine>$spine</spine></package>''',
   );
   return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2000));
 }

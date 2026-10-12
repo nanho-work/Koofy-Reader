@@ -20,7 +20,7 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
         let maintenance = FlutterMethodChannel(name: "koofy_reader/maintenance", binaryMessenger: registrar.messenger())
         maintenance.setMethodCallHandler { [weak instance] call, result in
             guard let instance, instance.reader == nil else {
-                result(FlutterError(code: "reader_busy", message: "독서 화면을 닫고 다시 시도해 주세요.", details: nil)); return
+                result(FlutterError(code: "reader_busy", message: L("독서 화면을 닫고 다시 시도해 주세요."), details: nil)); return
             }
             SpeechBackupChannel.handle(call, result: result)
         }
@@ -28,12 +28,13 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
     }
 
     func openReader(request: ReaderLaunchRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        ReaderStrings.language = request.uiLanguage ?? "ko"
         do {
-            guard reader == nil else { throw failure("reader_busy", "이미 책을 읽고 있습니다.") }
+            guard reader == nil else { throw failure("reader_busy", L("이미 책을 읽고 있습니다.")) }
             guard request.protocolVersion == 1, request.sessionGeneration > 0,
                   !request.sessionId.isEmpty, !request.publicationId.isEmpty,
                   !request.contentRevision.isEmpty else {
-                throw failure("invalid_request", "독서 세션 정보가 올바르지 않습니다.")
+                throw failure("invalid_request", L("독서 세션 정보가 올바르지 않습니다."))
             }
             try KoofyReaderViewController.validate(request.preferences)
             let path = URL(fileURLWithPath: request.filePath).resolvingSymlinksInPath().standardizedFileURL
@@ -45,13 +46,13 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
             guard path.pathExtension.lowercased() == "epub",
                   roots.contains(where: { path.path.hasPrefix($0 + "/") }),
                   FileManager.default.isReadableFile(atPath: path.path) else {
-                throw failure("file_access", "앱에 가져온 EPUB 파일을 찾을 수 없습니다.")
+                throw failure("file_access", L("앱에 가져온 EPUB 파일을 찾을 수 없습니다."))
             }
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
                 .first { $0.activationState == .foregroundActive }
             guard let presenter = scene?.windows.first(where: { $0.isKeyWindow })?.rootViewController, presenter.presentedViewController == nil,
                   presenter.viewIfLoaded?.window != nil else {
-                throw failure("host_unavailable", "서재 화면이 준비된 뒤 다시 열어 주세요.")
+                throw failure("host_unavailable", L("서재 화면이 준비된 뒤 다시 열어 주세요."))
             }
             let journal = try checkpointStore()
             // Never replay platform restoration arguments. Flutter recovers the
@@ -114,7 +115,7 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
 
     private func active(_ sessionId: String) throws -> KoofyReaderViewController {
         guard let reader, reader.request.sessionId == sessionId else {
-            throw failure("stale_session", "이미 종료된 독서 세션입니다.")
+            throw failure("stale_session", L("이미 종료된 독서 세션입니다."))
         }
         return reader
     }

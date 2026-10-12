@@ -105,7 +105,7 @@ internal class ReaderBannerFooter(
             load()
         } else if (!loaded) {
             message.visibility = View.VISIBLE
-            message.text = if (retryAt > now) "지금은 광고를 표시할 수 없습니다." else "광고 불러오는 중…"
+            message.text = if (retryAt > now) L("지금은 광고를 표시할 수 없습니다.") else L("광고 불러오는 중…")
         }
         handler.postDelayed(refreshTask, 60_000L)
     }
@@ -115,7 +115,7 @@ internal class ReaderBannerFooter(
         val ad = LevelPlayBannerAdView(host, unitId!!, config)
         banner = ad
         loaded = false
-        message.text = "광고 불러오는 중…"
+        message.text = L("광고 불러오는 중…")
         message.visibility = View.VISIBLE
         ad.visibility = View.INVISIBLE
         ad.setBannerListener(object : LevelPlayBannerAdViewListener {
@@ -148,7 +148,7 @@ internal class ReaderBannerFooter(
     private fun unavailable() {
         removeBanner()
         retryAt = System.currentTimeMillis() + 60_000L
-        message.text = "지금은 광고를 표시할 수 없습니다."
+        message.text = L("지금은 광고를 표시할 수 없습니다.")
         message.visibility = View.VISIBLE
     }
 

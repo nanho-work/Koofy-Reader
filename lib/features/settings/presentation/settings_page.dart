@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
 import 'package:koofy_reader/features/library/presentation/library_trash_page.dart';
@@ -49,36 +50,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final hours = minutes ~/ 60;
     final rest = minutes % 60;
     return hours == 0
-        ? '$rest분 남음'
-        : '$hours시간${rest == 0 ? '' : ' $rest분'} 남음';
+        ? tr("{0}분 남음", [rest])
+        : tr("{0}시간{1} 남음", [
+            hours,
+            rest == 0 ? '' : ' ${tr('{0}분', [rest])}',
+          ]);
   }
 
   @override
   Widget build(BuildContext context) {
     final adState = ref.watch(adStateProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
+      appBar: AppBar(title: Text(tr("설정"))),
       body: ListView(
         padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.info_outline),
-            title: const Text('앱 버전'),
+            title: Text(tr("앱 버전")),
             subtitle: ref
                 .watch(installedPackageProvider)
                 .when(
-                  data: (info) =>
-                      Text('${info.version} (빌드 ${info.buildNumber})'),
-                  loading: () => const Text('확인 중…'),
-                  error: (_, __) => const Text('버전 정보를 확인할 수 없습니다.'),
+                  data: (info) => Text(
+                    tr("{0} (빌드 {1})", [info.version, info.buildNumber]),
+                  ),
+                  loading: () => Text(tr("확인 중…")),
+                  error: (_, __) => Text(tr("버전 정보를 확인할 수 없습니다.")),
                 ),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.backup_outlined),
-            title: const Text('서재 백업·복원'),
-            subtitle: const Text('책·표지·묶음·읽던 위치를 파일로 보관'),
+            title: Text(tr("서재 백업·복원")),
+            subtitle: Text(tr("책·표지·묶음·읽던 위치를 파일로 보관")),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(
               context,
@@ -87,8 +92,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.delete_outline),
-            title: const Text('휴지통'),
-            subtitle: const Text('삭제한 책과 해제한 묶음 복원'),
+            title: Text(tr("휴지통")),
+            subtitle: Text(tr("삭제한 책과 해제한 묶음 복원")),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const LibraryTrashPage()),
@@ -97,8 +102,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('개인정보 및 광고'),
-            subtitle: const Text('광고 선택 · 개인정보처리방침 · 문의 · 광고 신고'),
+            title: Text(tr("개인정보 및 광고")),
+            subtitle: Text(tr("광고 선택 · 개인정보처리방침 · 문의 · 광고 신고")),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -111,9 +116,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               .when(
                 data: (enabled) => SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('독서 화면에 표지 표시'),
-                  subtitle: const Text(
-                    '각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.',
+                  title: Text(tr("독서 화면에 표지 표시")),
+                  subtitle: Text(
+                    tr(
+                      "각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.",
+                    ),
                   ),
                   value: enabled,
                   onChanged: _savingCover
@@ -128,9 +135,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           } catch (_) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    '표지 설정을 저장하지 못했습니다. 다시 시도해 주세요.',
+                                    tr("표지 설정을 저장하지 못했습니다. 다시 시도해 주세요."),
                                   ),
                                 ),
                               );
@@ -140,25 +147,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           }
                         },
                 ),
-                loading: () => const ListTile(title: Text('표지 설정을 불러오는 중…')),
+                loading: () => ListTile(title: Text(tr("표지 설정을 불러오는 중…"))),
                 error: (_, __) => ListTile(
-                  title: const Text('표지 설정 다시 불러오기'),
+                  title: Text(tr("표지 설정 다시 불러오기")),
                   onTap: () => ref.invalidate(readerCoverEnabledProvider),
                 ),
               ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('문제 신고용 진단 정보'),
-            subtitle: const Text('앱 버전과 독서 설정 확인·복사'),
+            title: Text(tr("문제 신고용 진단 정보")),
+            subtitle: Text(tr("앱 버전과 독서 설정 확인·복사")),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const DiagnosticsPage()),
             ),
           ),
           const Divider(height: 24),
-          Text('광고 없이 읽기', style: Theme.of(context).textTheme.titleLarge),
+          Text(tr("광고 없이 읽기"), style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          const Text('리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.'),
+          Text(tr("리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.")),
           const SizedBox(height: 16),
           if (LevelPlayIds.testSuite)
             TextButton(
@@ -167,21 +174,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   await LevelPlay.launchTestSuite();
                 }
               },
-              child: const Text('LevelPlay 광고 연동 테스트'),
+              child: Text(tr("LevelPlay 광고 연동 테스트")),
             ),
           adState.when(
-            loading: () => const Text('광고 상태를 불러오는 중입니다.'),
+            loading: () => Text(tr("광고 상태를 불러오는 중입니다.")),
             error: (_, __) => TextButton(
               onPressed: () => ref.invalidate(adStateProvider),
-              child: const Text('광고 상태를 불러오지 못했습니다. 다시 시도'),
+              child: Text(tr("광고 상태를 불러오지 못했습니다. 다시 시도")),
             ),
             data: (state) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   state.isBannerHidden
-                      ? '광고 숨김 · ${_remaining(state.hiddenUntil!)}'
-                      : '광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다.',
+                      ? tr("광고 숨김 · {0}", [_remaining(state.hiddenUntil!)])
+                      : tr("광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다."),
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
@@ -190,16 +197,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       : _runRewardedFlow,
                   child: Text(
                     _busy
-                        ? '처리 중…'
+                        ? tr("처리 중…")
                         : state.isBannerHidden
-                        ? '광고 숨김 적용 중'
-                        : '광고 보고 2시간 광고 없이 읽기',
+                        ? tr("광고 숨김 적용 중")
+                        : tr("광고 보고 2시간 광고 없이 읽기"),
                   ),
                 ),
                 if (state.isBannerHidden)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 8),
-                    child: Text('숨김 시간이 끝나면 다시 시청할 수 있습니다.'),
+                    child: Text(tr("숨김 시간이 끝나면 다시 시청할 수 있습니다.")),
                   ),
               ],
             ),
@@ -226,17 +233,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SnackBar(
           content: Text(
             result == true
-                ? '2시간 동안 배너 광고를 숨깁니다.'
+                ? tr("2시간 동안 배너 광고를 숨깁니다.")
                 : result == false
-                ? '광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.'
-                : '지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다.',
+                ? tr("광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.")
+                : tr("지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다."),
           ),
         ),
       );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')),
+          SnackBar(content: Text(tr("광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."))),
         );
       }
     } finally {

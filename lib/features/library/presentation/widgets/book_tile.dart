@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:math' as math;
 import 'dart:io';
 
@@ -183,7 +184,7 @@ class BookTile extends StatelessWidget {
         height: 48,
         child: IconButton(
           padding: EdgeInsets.zero,
-          tooltip: '${book.title} 더보기',
+          tooltip: tr("{0} 더보기", [book.title]),
           onPressed: onMore,
           icon: Container(
             width: 28,

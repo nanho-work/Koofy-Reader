@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:convert';
 
 import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
@@ -21,10 +22,10 @@ class LibraryReadingState {
   final bool finished;
 
   String get progressLabel => needsMigration
-      ? '이전 읽기 기록 확인'
+      ? tr("이전 읽기 기록 확인")
       : progression == null
-      ? '읽던 위치 저장됨'
-      : '${(progression! * 100).floor()}% 읽음';
+      ? tr("읽던 위치 저장됨")
+      : tr("{0}% 읽음", [(progression! * 100).floor()]);
 }
 
 /// Presentation only: never translate an old text offset into a Readium locator.

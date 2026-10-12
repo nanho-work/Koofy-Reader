@@ -1,20 +1,24 @@
+import 'reader_guide.dart';
+
 enum BookSourceType { asset, localFile }
 
 class Book {
   const Book({
     required this.id,
-    required this.title,
+    required String title,
     required this.author,
-    required this.description,
+    required String description,
     required this.sourceType,
     this.assetPath,
     this.localPath,
     this.coverPath,
-    this.coverAssetPath,
+    String? coverAssetPath,
     this.importSourcePath,
     this.sourceHash,
     this.originalFileName,
-  });
+  }) : _title = title,
+       _description = description,
+       _coverAssetPath = coverAssetPath;
 
   factory Book.asset({
     required String id,
@@ -61,16 +65,25 @@ class Book {
   }
 
   final String id;
-  final String title;
+  final String _title;
+  bool get isReaderGuide =>
+      !isLocalFile &&
+      id == ReaderGuide.id &&
+      assetPath == ReaderGuide.canonicalAsset;
+  String get title => isReaderGuide ? ReaderGuide.title : _title;
   final String author;
-  final String description;
+  final String _description;
+  String get description =>
+      isReaderGuide ? ReaderGuide.description : _description;
   final BookSourceType sourceType;
   final String? assetPath;
   final String? localPath;
   final String? coverPath;
 
   /// Bundled default; a personal file cover takes precedence.
-  final String? coverAssetPath;
+  final String? _coverAssetPath;
+  String? get coverAssetPath =>
+      isReaderGuide ? ReaderGuide.coverAsset : _coverAssetPath;
 
   /// Original picker identity for duplicate selection; never used to read a book.
   final String? importSourcePath;
@@ -85,14 +98,14 @@ class Book {
 
   Book withCoverPath(String? path) => Book(
     id: id,
-    title: title,
+    title: _title,
     author: author,
-    description: description,
+    description: _description,
     sourceType: sourceType,
     assetPath: assetPath,
     localPath: localPath,
     coverPath: path,
-    coverAssetPath: coverAssetPath,
+    coverAssetPath: _coverAssetPath,
     importSourcePath: importSourcePath,
     sourceHash: sourceHash,
     originalFileName: originalFileName,
@@ -101,14 +114,14 @@ class Book {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'title': title,
+      'title': _title,
       'author': author,
-      'description': description,
+      'description': _description,
       'sourceType': sourceType.name,
       'assetPath': assetPath,
       'localPath': localPath,
       'coverPath': coverPath,
-      'coverAssetPath': coverAssetPath,
+      'coverAssetPath': _coverAssetPath,
       'importSourcePath': importSourcePath,
       'sourceHash': sourceHash,
       'originalFileName': matchingFileName,

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
@@ -17,7 +18,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
   final _key = GlobalKey<LevelPlayBannerAdViewState>();
   bool _ready = false;
   bool _loaded = false;
-  String _message = '광고 불러오는 중…';
+  String _message = tr("광고 불러오는 중…");
   @override
   void initState() {
     super.initState();
@@ -30,7 +31,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
     if (!mounted) return;
     setState(() {
       _ready = ready;
-      if (!ready) _message = '지금은 광고를 표시할 수 없습니다.';
+      if (!ready) _message = tr("지금은 광고를 표시할 수 없습니다.");
     });
   }
 
@@ -114,7 +115,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
     if (mounted) {
       setState(() {
         _loaded = false;
-        _message = '지금은 광고를 표시할 수 없습니다.';
+        _message = tr("지금은 광고를 표시할 수 없습니다.");
       });
     }
   }
@@ -127,7 +128,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget>
     if (mounted) {
       setState(() {
         _loaded = false;
-        _message = '지금은 광고를 표시할 수 없습니다.';
+        _message = tr("지금은 광고를 표시할 수 없습니다.");
       });
     }
   }

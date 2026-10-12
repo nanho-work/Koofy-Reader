@@ -47,7 +47,7 @@ final class ReaderCheckpointStore {
                 return ReaderEvent(protocolVersion: 1, sessionId: url.lastPathComponent,
                     sessionGeneration: 0, publicationId: publication, contentRevision: "",
                     sequence: 0, kind: "recoveryIssue", errorCode: "checkpoint_corrupt",
-                    message: "읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다.")
+                    message: L("읽기 복구 기록이 손상되었습니다. 원본 기록은 보존되어 있습니다."))
             }
         }.sorted {
             ($0.sessionGeneration, $0.sequence) < ($1.sessionGeneration, $1.sequence)
@@ -86,7 +86,7 @@ final class ReaderCheckpointStore {
                 let record = try JSONDecoder().decode(Checkpoint.self, from: Data(contentsOf: candidate))
                 guard record.version == 1, record.protocolVersion == 1,
                       record.sequence > 0, record.sessionGeneration > 0 else {
-                    throw PigeonError(code: "checkpoint_corrupt", message: "읽기 복구 기록의 버전 또는 순서가 잘못되었습니다.", details: nil)
+                    throw PigeonError(code: "checkpoint_corrupt", message: L("읽기 복구 기록의 버전 또는 순서가 잘못되었습니다."), details: nil)
                 }
                 return record
             } catch { lastError = error }

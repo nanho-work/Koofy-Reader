@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -36,19 +37,21 @@ class _LegacyRecordsPageState extends ConsumerState<LegacyRecordsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('이전 기록과 북마크')),
+    appBar: AppBar(title: Text(tr("이전 기록과 북마크"))),
     body: FutureBuilder(
       future: _data,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('기록을 읽지 못했습니다.\n${snapshot.error}'));
+          return Center(
+            child: Text(tr("기록을 읽지 못했습니다.\n{0}", [snapshot.error])),
+          );
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final (record, publication, error) = snapshot.data!;
         if (record == null) {
-          return const Center(child: Text('이 책에는 이전 기록이 없습니다.'));
+          return Center(child: Text(tr("이 책에는 이전 기록이 없습니다.")));
         }
         Widget location(String title, int? offset) {
           final map = publication?.textMap;
@@ -84,26 +87,31 @@ class _LegacyRecordsPageState extends ConsumerState<LegacyRecordsPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            const Text(
-              '이전 기록 원본은 그대로 보존되어 있습니다. 확인된 본문 위치는 눌러서 열 수 있습니다. 위치를 변환할 수 없는 기록은 아래 문장과 원본 기록을 참고해 목차에서 찾아 주세요.',
+            Text(
+              tr(
+                "이전 기록 원본은 그대로 보존되어 있습니다. 확인된 본문 위치는 눌러서 열 수 있습니다. 위치를 변환할 수 없는 기록은 아래 문장과 원본 기록을 참고해 목차에서 찾아 주세요.",
+              ),
             ),
             if (error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(error),
               ),
-            if (record.hasProgress) location('이전에 읽던 위치', record.offset),
+            if (record.hasProgress) location(tr("이전에 읽던 위치"), record.offset),
             for (var i = 0; i < record.bookmarks.length; i++)
-              location('북마크 ${i + 1}', record.bookmarks[i]),
+              location(tr("북마크 {0}", [i + 1]), record.bookmarks[i]),
             if (record.bookmarks.isEmpty)
-              const ListTile(title: Text('저장된 이전 북마크가 없습니다.')),
+              ListTile(title: Text(tr("저장된 이전 북마크가 없습니다."))),
             ExpansionTile(
-              title: const Text('보존된 원본 기록 보기'),
+              title: Text(tr("보존된 원본 기록 보기")),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: SelectableText(
-                    '읽기 위치\n${record.rawProgress ?? "없음"}\n\n북마크\n${record.rawBookmarks ?? "없음"}',
+                    tr("읽기 위치\n{0}\n\n북마크\n{1}", [
+                      record.rawProgress ?? tr("없음"),
+                      record.rawBookmarks ?? tr("없음"),
+                    ]),
                   ),
                 ),
               ],
@@ -114,7 +122,7 @@ class _LegacyRecordsPageState extends ConsumerState<LegacyRecordsPage> {
                   builder: (_) => NativeReaderLaunchPage(book: widget.book),
                 ),
               ),
-              child: const Text('책 열기'),
+              child: Text(tr("책 열기")),
             ),
           ],
         );

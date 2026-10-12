@@ -15,25 +15,25 @@ extension _LibraryGroups on _LibraryPageState {
             shrinkWrap: true,
             children: [
               ListTile(
-                title: Text('${ids.length}권을 가져왔어요'),
-                subtitle: const Text('묶음에 넣을 책과 순서를 다음 화면에서 확인하세요.'),
+                title: Text(tr("{0}권을 가져왔어요", [ids.length])),
+                subtitle: Text(tr("묶음에 넣을 책과 순서를 다음 화면에서 확인하세요.")),
               ),
               if (ids.length >= 2)
                 ListTile(
                   leading: const Icon(Icons.create_new_folder_outlined),
-                  title: const Text('새 묶음 만들기'),
+                  title: Text(tr("새 묶음 만들기")),
                   onTap: () => Navigator.pop(context, 'new'),
                 ),
               for (final group in groups)
                 ListTile(
                   leading: const Icon(Icons.library_books_outlined),
                   title: Text(group.title),
-                  subtitle: const Text('이 묶음에 추가'),
+                  subtitle: Text(tr("이 묶음에 추가")),
                   onTap: () => Navigator.pop(context, group.id),
                 ),
               ListTile(
                 leading: const Icon(Icons.close),
-                title: const Text('각각 보관'),
+                title: Text(tr("각각 보관")),
                 onTap: () => Navigator.pop(context),
               ),
             ],
@@ -48,14 +48,14 @@ extension _LibraryGroups on _LibraryPageState {
         if (group != null) await _addGroupBooks(group, initialIds: ids);
       }
     } catch (_) {
-      _snack('책은 가져왔지만 묶음 목록을 불러오지 못했습니다. 서재에서 묶음으로 정리해 주세요.');
+      _snack(tr("책은 가져왔지만 묶음 목록을 불러오지 못했습니다. 서재에서 묶음으로 정리해 주세요."));
     }
   }
 
   List<Book> _ungroupedBooks() {
     final groups = ref.read(bookGroupsProvider).valueOrNull;
     if (groups == null || ref.read(bookGroupsProvider).hasError) {
-      throw StateError('묶음 목록을 먼저 불러와 주세요.');
+      throw StateError(tr("묶음 목록을 먼저 불러와 주세요."));
     }
     final ids = groups.expand((g) => g.bookIds).toSet();
     return (ref.read(booksProvider).valueOrNull ?? <Book>[])
@@ -72,7 +72,7 @@ extension _LibraryGroups on _LibraryPageState {
     try {
       final books = _ungroupedBooks();
       if (books.length < 2) {
-        _snack('묶이지 않은 책이 두 권 이상 있어야 합니다.');
+        _snack(tr("묶이지 않은 책이 두 권 이상 있어야 합니다."));
         return;
       }
       final selection = await Navigator.of(context).push<GroupSelection>(
@@ -94,11 +94,11 @@ extension _LibraryGroups on _LibraryPageState {
         () => ref
             .read(bookGroupRepositoryProvider)
             .create(selection.title, selection.ids),
-        '책 묶음을 만들었습니다.',
+        tr("책 묶음을 만들었습니다."),
       );
       _clearShelfFilters();
     } catch (_) {
-      _snack('묶음을 만들지 못했습니다. 목록을 새로고침해 주세요.');
+      _snack(tr("묶음을 만들지 못했습니다. 목록을 새로고침해 주세요."));
     }
   }
 
@@ -110,7 +110,7 @@ extension _LibraryGroups on _LibraryPageState {
     try {
       final books = _ungroupedBooks();
       if (books.isEmpty) {
-        _snack('추가할 수 있는 책이 없습니다. 다른 묶음의 책은 먼저 꺼내 주세요.');
+        _snack(tr("추가할 수 있는 책이 없습니다. 다른 묶음의 책은 먼저 꺼내 주세요."));
         return;
       }
       final selection = await Navigator.of(context).push<GroupSelection>(
@@ -131,10 +131,10 @@ extension _LibraryGroups on _LibraryPageState {
       await _changeGroup(
         () =>
             ref.read(bookGroupRepositoryProvider).add(group.id, selection.ids),
-        '묶음에 추가했습니다.',
+        tr("묶음에 추가했습니다."),
       );
     } catch (_) {
-      _snack('책을 추가하지 못했습니다. 목록을 새로고침해 주세요.');
+      _snack(tr("책을 추가하지 못했습니다. 목록을 새로고침해 주세요."));
     }
   }
 
@@ -151,11 +151,11 @@ extension _LibraryGroups on _LibraryPageState {
         child: ListView(
           shrinkWrap: true,
           children: [
-            const ListTile(title: Text('추가할 묶음 선택')),
+            ListTile(title: Text(tr("추가할 묶음 선택"))),
             for (final group in groups)
               ListTile(
                 title: Text(group.title),
-                subtitle: Text('${group.bookIds.length}권'),
+                subtitle: Text(tr("{0}권", [group.bookIds.length])),
                 onTap: () => Navigator.pop(context, group.id),
               ),
           ],
@@ -165,7 +165,7 @@ extension _LibraryGroups on _LibraryPageState {
     if (!mounted || id == null) return;
     await _changeGroup(
       () => ref.read(bookGroupRepositoryProvider).add(id, [book.id]),
-      '묶음에 추가했습니다.',
+      tr("묶음에 추가했습니다."),
     );
   }
 
@@ -195,49 +195,49 @@ extension _LibraryGroups on _LibraryPageState {
             children: [
               ListTile(
                 title: Text(group.title),
-                subtitle: Text('${group.bookIds.length}권의 책 묶음'),
+                subtitle: Text(tr("{0}권의 책 묶음", [group.bookIds.length])),
               ),
               ListTile(
                 leading: const Icon(Icons.add),
-                title: const Text('묶음에 책 추가'),
+                title: Text(tr("묶음에 책 추가")),
                 onTap: () => Navigator.pop(context, 'add'),
               ),
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
-                title: const Text('묶음 이름 변경'),
+                title: Text(tr("묶음 이름 변경")),
                 onTap: () => Navigator.pop(context, 'rename'),
               ),
               ListTile(
                 leading: const Icon(Icons.add_photo_alternate_outlined),
                 title: Text(
-                  group.coverPath == null ? '표지 이미지 등록' : '표지 이미지 변경',
+                  group.coverPath == null ? tr("표지 이미지 등록") : tr("표지 이미지 변경"),
                 ),
                 onTap: () => Navigator.pop(context, 'cover'),
               ),
               if (group.coverPath != null)
                 ListTile(
                   leading: const Icon(Icons.restore),
-                  title: const Text('표지 초기화'),
+                  title: Text(tr("표지 초기화")),
                   onTap: () => Navigator.pop(context, 'reset'),
                 ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
-                title: const Text('묶음책 삭제'),
-                subtitle: const Text('묶음과 안의 책을 함께 휴지통으로 옮깁니다.'),
+                title: Text(tr("묶음책 삭제")),
+                subtitle: Text(tr("묶음과 안의 책을 함께 휴지통으로 옮깁니다.")),
                 onTap: () => Navigator.pop(context, 'trash'),
               ),
               if (inside)
                 ListTile(
                   leading: const Icon(Icons.cleaning_services_outlined),
-                  title: const Text('묶음책장 비우기'),
-                  subtitle: const Text('책만 휴지통으로 옮기고 빈 묶음은 남깁니다.'),
+                  title: Text(tr("묶음책장 비우기")),
+                  subtitle: Text(tr("책만 휴지통으로 옮기고 빈 묶음은 남깁니다.")),
                   enabled: group.bookIds.isNotEmpty,
                   onTap: () => Navigator.pop(context, 'empty'),
                 ),
               ListTile(
                 leading: const Icon(Icons.folder_off_outlined),
-                title: const Text('묶음 해제'),
-                subtitle: const Text('책은 모두 서재로 돌아갑니다.'),
+                title: Text(tr("묶음 해제")),
+                subtitle: Text(tr("책은 모두 서재로 돌아갑니다.")),
                 onTap: () => Navigator.pop(context, 'dissolve'),
               ),
             ],
@@ -253,18 +253,22 @@ extension _LibraryGroups on _LibraryPageState {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(keepShelf ? '묶음책장 비우기' : '묶음책 삭제'),
+            title: Text(keepShelf ? tr("묶음책장 비우기") : tr("묶음책 삭제")),
             content: Text(
-              '“${group.title}”의 책 ${group.bookIds.length}권을 휴지통으로 옮길까요?\n${keepShelf ? '빈 묶음은 유지됩니다.' : '묶음도 함께 이동합니다.'} 설정의 휴지통에서 한 번에 복원할 수 있습니다.',
+              tr("“{0}”의 책 {1}권을 휴지통으로 옮길까요?\n{2} 설정의 휴지통에서 한 번에 복원할 수 있습니다.", [
+                group.title,
+                group.bookIds.length,
+                keepShelf ? tr('빈 묶음은 유지됩니다.') : tr('묶음도 함께 이동합니다.'),
+              ]),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: Text(tr("취소")),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('휴지통으로 이동'),
+                child: Text(tr("휴지통으로 이동")),
               ),
             ],
           ),
@@ -276,9 +280,9 @@ extension _LibraryGroups on _LibraryPageState {
               .trashGroup(group.id, keepShelf: keepShelf);
           ref.invalidate(booksProvider);
           ref.invalidate(bookGroupsProvider);
-          if (mounted) _snack('휴지통으로 옮겼습니다. 설정에서 복원할 수 있습니다.');
+          if (mounted) _snack(tr("휴지통으로 옮겼습니다. 설정에서 복원할 수 있습니다."));
         } catch (_) {
-          if (mounted) _snack('작업을 완료하지 못했습니다. 휴지통과 목록을 확인해 주세요.');
+          if (mounted) _snack(tr("작업을 완료하지 못했습니다. 휴지통과 목록을 확인해 주세요."));
         }
       case 'add':
         await _addGroupBooks(group);
@@ -287,7 +291,7 @@ extension _LibraryGroups on _LibraryPageState {
         if (!mounted || name == null) return;
         await _changeGroup(
           () => ref.read(bookGroupRepositoryProvider).rename(group.id, name),
-          '묶음 이름을 변경했습니다.',
+          tr("묶음 이름을 변경했습니다."),
         );
       case 'cover':
         await _groupCover(group);
@@ -297,18 +301,21 @@ extension _LibraryGroups on _LibraryPageState {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('묶음 해제'),
+            title: Text(tr("묶음 해제")),
             content: Text(
-              '“${group.title}”의 책 ${group.bookIds.length}권을 서재로 꺼낼까요? 책과 읽던 위치는 유지됩니다.',
+              tr("“{0}”의 책 {1}권을 서재로 꺼낼까요? 책과 읽던 위치는 유지됩니다.", [
+                group.title,
+                group.bookIds.length,
+              ]),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: Text(tr("취소")),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('묶음 해제'),
+                child: Text(tr("묶음 해제")),
               ),
             ],
           ),
@@ -316,7 +323,7 @@ extension _LibraryGroups on _LibraryPageState {
         if (!mounted || confirmed != true) return;
         await _changeGroup(
           () => ref.read(bookGroupRepositoryProvider).dissolve(group.id),
-          '묶음을 해제했습니다. 책은 서재에 있습니다.',
+          tr("묶음을 해제했습니다. 책은 서재에 있습니다."),
         );
     }
   }
@@ -327,24 +334,24 @@ extension _LibraryGroups on _LibraryPageState {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, update) => AlertDialog(
-          title: const Text('묶음 이름 변경'),
+          title: Text(tr("묶음 이름 변경")),
           content: TextFormField(
             initialValue: name,
             autofocus: true,
             maxLength: 100,
-            decoration: const InputDecoration(labelText: '묶음 이름'),
+            decoration: InputDecoration(labelText: tr("묶음 이름")),
             onChanged: (text) => update(() => value = text),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
+              child: Text(tr("취소")),
             ),
             FilledButton(
               onPressed: value.trim().isEmpty
                   ? null
                   : () => Navigator.pop(context, value.trim()),
-              child: const Text('저장'),
+              child: Text(tr("저장")),
             ),
           ],
         ),
@@ -367,18 +374,18 @@ extension _LibraryGroups on _LibraryPageState {
         if (!mounted || result == null) return;
         final path = result.files.single.path;
         if (path == null) {
-          _snack('이미지를 열 수 없습니다.');
+          _snack(tr("이미지를 열 수 없습니다."));
           return;
         }
         await covers.setImage(group.id, path);
       }
       if (!mounted) return;
       ref.invalidate(bookGroupsProvider);
-      _snack(reset ? '기본 표지로 되돌렸습니다.' : '묶음 표지를 적용했습니다.');
+      _snack(reset ? tr("기본 표지로 되돌렸습니다.") : tr("묶음 표지를 적용했습니다."));
     } on FormatException catch (e) {
-      _snack(e.message);
+      _snack(tr(e.message));
     } catch (_) {
-      _snack('표지를 저장하지 못했습니다. 다른 이미지로 다시 시도해 주세요.');
+      _snack(tr("표지를 저장하지 못했습니다. 다른 이미지로 다시 시도해 주세요."));
     } finally {
       _setGroupBusy(false);
     }
@@ -402,22 +409,22 @@ extension _LibraryGroups on _LibraryPageState {
           content: Text(message),
           duration: const Duration(seconds: 6),
           action: SnackBarAction(
-            label: '실행 취소',
+            label: tr("실행 취소"),
             onPressed: () async {
               try {
                 final undone = await repository.undo(change);
                 if (!mounted) return;
                 ref.invalidate(bookGroupsProvider);
-                if (!undone) _snack('이후에 묶음을 변경해서 되돌릴 수 없습니다.');
+                if (!undone) _snack(tr("이후에 묶음을 변경해서 되돌릴 수 없습니다."));
               } catch (_) {
-                _snack('실행 취소를 저장하지 못했습니다. 다시 확인해 주세요.');
+                _snack(tr("실행 취소를 저장하지 못했습니다. 다시 확인해 주세요."));
               }
             },
           ),
         ),
       );
     } catch (_) {
-      _snack('묶음 변경을 저장하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
+      _snack(tr("묶음 변경을 저장하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."));
     } finally {
       _setGroupBusy(false);
     }
@@ -453,18 +460,18 @@ extension _LibraryGroups on _LibraryPageState {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('묶음에 추가'),
+              title: Text(tr("묶음에 추가")),
               content: Text(
-                '“${details.data.title}”을 “${group.title}”에 추가할까요?',
+                tr("“{0}”을 “{1}”에 추가할까요?", [details.data.title, group.title]),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('취소'),
+                  child: Text(tr("취소")),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('추가'),
+                  child: Text(tr("추가")),
                 ),
               ],
             ),
@@ -474,7 +481,7 @@ extension _LibraryGroups on _LibraryPageState {
             () => ref.read(bookGroupRepositoryProvider).add(group.id, [
               details.data.id,
             ]),
-            '묶음에 추가했습니다.',
+            tr("묶음에 추가했습니다."),
           );
         }
       },

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/app_footer_ad_shell.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -70,7 +71,9 @@ Future<void> pumpLibrary(
       if (Platform.isMacOS) {
         await ui.loadFontFromList(
           await File(
-            '/System/Library/Fonts/AppleSDGothicNeo.ttc',
+            AppLanguage.instance.code == 'ja'
+                ? '/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc'
+                : '/System/Library/Fonts/AppleSDGothicNeo.ttc',
           ).readAsBytes(),
           fontFamily: 'Roboto',
         );
@@ -164,6 +167,21 @@ Future<void> capture(WidgetTester tester, String name) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final language in ['ko', 'en', 'ja']) {
+    testWidgets('localized library fits a compact screen: $language', (
+      tester,
+    ) async {
+      await AppLanguage.instance.initialize();
+      await AppLanguage.instance.select(language);
+      addTearDown(() => AppLanguage.instance.select('ko'));
+      await pumpLibrary(tester, size: const Size(320, 700));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('language-picker')), findsOneWidget);
+      expect(find.text(tr('나의 책')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await capture(tester, 'language-$language');
+    });
+  }
   for (final size in [
     const Size(320, 700),
     const Size(390, 844),

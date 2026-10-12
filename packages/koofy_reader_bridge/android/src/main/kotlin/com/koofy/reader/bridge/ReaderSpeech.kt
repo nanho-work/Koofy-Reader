@@ -33,9 +33,9 @@ import org.readium.r2.shared.util.getOrElse
 internal typealias ReaderSpeechEngine = TtsEngine<AndroidTtsSettings, AndroidTtsPreferences, AndroidTtsEngine.Error, AndroidTtsEngine.Voice>
 
 internal enum class SpeechPreparationFailure(val userMessage: String) {
-    ENGINE_INITIALIZATION("기기의 음성 엔진을 시작하지 못했습니다. 잠시 후 다시 시도하거나 기기 음성 설정을 확인해 주세요."),
-    CONTENT_SERVICE_MISSING("책의 본문 읽기 기능을 준비하지 못했습니다. 앱 업데이트를 확인해 주세요."),
-    CONTENT_UNAVAILABLE("현재 위치에서 읽을 본문을 준비하지 못했습니다. 본문 페이지로 이동한 뒤 다시 시도해 주세요."),
+    ENGINE_INITIALIZATION(L("기기의 음성 엔진을 시작하지 못했습니다. 잠시 후 다시 시도하거나 기기 음성 설정을 확인해 주세요.")),
+    CONTENT_SERVICE_MISSING(L("책의 본문 읽기 기능을 준비하지 못했습니다. 앱 업데이트를 확인해 주세요.")),
+    CONTENT_UNAVAILABLE(L("현재 위치에서 읽을 본문을 준비하지 못했습니다. 본문 페이지로 이동한 뒤 다시 시도해 주세요.")),
 }
 
 /** Foreground-only owner; the visual reader's checkpoint is deliberately not the audio checkpoint. */
@@ -118,10 +118,10 @@ internal class ReaderSpeech(
                     if (generation != serial || !active || closed) return@withTimeout
                     val voice = voices.firstOrNull { it.id.value == voiceId }
                     if (voice == null) {
-                        message("로컬 한국어 음성을 선택해 주세요. 듣기 설정에서 음성을 확인할 수 있습니다.")
+                        message(L("로컬 한국어 음성을 선택해 주세요. 듣기 설정에서 음성을 확인할 수 있습니다."))
                         return@withTimeout
                     }
-                    if (!requestFocus()) { message("다른 소리 재생이 끝난 뒤 다시 눌러 주세요."); return@withTimeout }
+                    if (!requestFocus()) { message(L("다른 소리 재생이 끝난 뒤 다시 눌러 주세요.")); return@withTimeout }
                     nav.submitPreferences(preferences())
                     if (generation != serial || !active || closed) { releaseFocus(); return@withTimeout }
                     seeking = true
@@ -138,10 +138,10 @@ internal class ReaderSpeech(
                 }
             } catch (_: kotlinx.coroutines.CancellationException) {
                 // A stop while initialization is pending must never become delayed playback.
-                if (generation == serial) message("음성 준비 시간이 초과되었습니다. 다시 시도해 주세요.")
+                if (generation == serial) message(L("음성 준비 시간이 초과되었습니다. 다시 시도해 주세요."))
             } catch (_: Exception) {
                 android.util.Log.w("KoofySpeech", "preparation_failed: unexpected")
-                message("책 읽어주기를 준비하지 못했습니다. 독서 화면을 다시 열어 시도해 주세요.")
+                message(L("책 읽어주기를 준비하지 못했습니다. 독서 화면을 다시 열어 시도해 주세요."))
             }
             finally { if (generation == serial) { if (!playing) busy = false; changed() } }
         }
@@ -208,10 +208,10 @@ internal class ReaderSpeech(
             nav.playback.collect { state ->
                 when (state.state) {
                     TtsNavigator.State.Ended -> {
-                        if (playing) message("책 읽기가 끝났습니다.")
+                        if (playing) message(L("책 읽기가 끝났습니다."))
                         pause()
                     }
-                    is TtsNavigator.State.Failure -> { pause(); message("음성을 재생하지 못했습니다. 오프라인 음성 설치 상태를 확인해 주세요.") }
+                    is TtsNavigator.State.Failure -> { pause(); message(L("음성을 재생하지 못했습니다. 오프라인 음성 설치 상태를 확인해 주세요.")) }
                     else -> {
                         if (playing && !busy && !state.playWhenReady) pause()
                     }
@@ -246,7 +246,7 @@ internal class ReaderSpeech(
         pause()
         if (!active || closed || !requestFocus()) return
         val id = voiceId
-        if (id == null || (engine as? OfflineSpeechEngine)?.preview(id, speed) != true) { releaseFocus(); message("설치된 로컬 음성을 먼저 선택해 주세요.") }
+        if (id == null || (engine as? OfflineSpeechEngine)?.preview(id, speed) != true) { releaseFocus(); message(L("설치된 로컬 음성을 먼저 선택해 주세요.")) }
     }
     fun stopPreview() { if (!playing) { engine?.stop(); releaseFocus() } }
     fun pause() {
@@ -270,7 +270,7 @@ internal class ReaderSpeech(
     fun setFollow(value: Boolean) { follow = value; prefs.edit().putBoolean("follow", value).apply() }
     fun setTimer(minutes: Int) {
         timer?.cancel(); timerMinutes = minutes
-        if (minutes > 0) timer = host.lifecycleScope.launch { delay(minutes * 60_000L); timerMinutes = 0; pause(); message("설정한 시간이 되어 듣기를 멈췄습니다.") }
+        if (minutes > 0) timer = host.lifecycleScope.launch { delay(minutes * 60_000L); timerMinutes = 0; pause(); message(L("설정한 시간이 되어 듣기를 멈췄습니다.")) }
     }
     private fun save() {
         val position = current ?: return

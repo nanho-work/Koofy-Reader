@@ -128,7 +128,7 @@ final class ReaderBannerFooter: UIView {
             message.isHidden = true
         } else {
             message.isHidden = false
-            message.text = Date() < retryAt ? "지금은 광고를 표시할 수 없습니다." : "광고 불러오는 중…"
+            message.text = Date() < retryAt ? L("지금은 광고를 표시할 수 없습니다.") : L("광고 불러오는 중…")
         }
         schedule()
     }
@@ -149,7 +149,7 @@ final class ReaderBannerFooter: UIView {
             self.removeBanner()
             self.retryAt = Date().addingTimeInterval(60)
             self.message.isHidden = false
-            self.message.text = "지금은 광고를 표시할 수 없습니다."
+            self.message.text = L("지금은 광고를 표시할 수 없습니다.")
         }
         callbacks.interacted = { [weak self] in self?.onAdInteraction?() }
         listener = callbacks
@@ -164,7 +164,7 @@ final class ReaderBannerFooter: UIView {
             ad.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         message.isHidden = false
-        message.text = "광고 불러오는 중…"
+        message.text = L("광고 불러오는 중…")
         if let controller { ad.loadAd(with: controller) }
     }
 }

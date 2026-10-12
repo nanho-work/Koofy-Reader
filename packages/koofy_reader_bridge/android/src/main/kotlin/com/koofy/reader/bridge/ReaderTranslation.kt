@@ -53,9 +53,9 @@ internal class ReaderTranslation(
     private val noisy = object : BroadcastReceiver() { override fun onReceive(context: Context?, intent: Intent?) { stopVoice() } }
     private val script = activity.assets.open("reader_selection.js").bufferedReader().use { it.readText() }
     private val text = TextView(activity).apply { textSize = 15f; setPadding(dp(12), dp(4), dp(12), dp(4)) }
-    private val download = button("번역 준비 · Wi-Fi") { prepare() }
-    private val originalVoice = button("원문 듣기") { speak(source, "en") }
-    private val translatedVoice = button("번역 듣기") { speak(result, "ko") }
+    private val download = button(L("번역 준비 · Wi-Fi")) { prepare() }
+    private val originalVoice = button(L("원문 듣기")) { speak(source, "en") }
+    private val translatedVoice = button(L("번역 듣기")) { speak(result, "ko") }
     private val badge = ImageView(activity).apply { adjustViewBounds = true; contentDescription = "powered by Google Translate" }
     private fun dp(n: Int) = (n * activity.resources.displayMetrics.density).toInt()
     private fun button(label: String, action: () -> Unit) = Button(activity).apply {
@@ -65,8 +65,8 @@ internal class ReaderTranslation(
     init {
         ContextCompat.registerReceiver(activity, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
         val header = LinearLayout(activity)
-        header.addView(TextView(activity).apply { text = "영어 → 한국어 · 번역"; textSize = 14f; setPadding(dp(12), 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(button("끄기") { onClose() }, LinearLayout.LayoutParams(dp(64), dp(44)))
+        header.addView(TextView(activity).apply { text = L("영어 → 한국어 · 번역"); textSize = 14f; setPadding(dp(12), 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(button(L("끄기")) { onClose() }, LinearLayout.LayoutParams(dp(64), dp(44)))
         view.addView(header)
         view.addView(ScrollView(activity).apply { addView(text) }, LinearLayout.LayoutParams(-1, 0, 1f))
         val actions = LinearLayout(activity)
@@ -75,9 +75,9 @@ internal class ReaderTranslation(
         actions.addView(download, LinearLayout.LayoutParams(0, dp(44), 1f))
         view.addView(actions)
         view.addView(badge, LinearLayout.LayoutParams(dp(140), dp(22)).apply { gravity = android.view.Gravity.END; rightMargin = dp(12) })
-        badge.setOnClickListener { AlertDialog.Builder(activity).setTitle("Google Translate 자동 번역")
-            .setMessage("선택한 본문은 기기 안에서 번역합니다. 번역은 학습 참고용이며 정확성·신뢰성·특정 목적 적합성을 보장하지 않습니다. Google은 번역에 관한 명시적·묵시적 보증을 제공하지 않습니다. 처음에는 Wi-Fi로 언어 데이터를 내려받아야 합니다. SDK는 성능·사용 통계를 Google에 전송할 수 있습니다.")
-            .setPositiveButton("확인", null).show() }
+        badge.setOnClickListener { AlertDialog.Builder(activity).setTitle(L("Google Translate 자동 번역"))
+            .setMessage(L("선택한 본문은 기기 안에서 번역합니다. 번역은 학습 참고용이며 정확성·신뢰성·특정 목적 적합성을 보장하지 않습니다. Google은 번역에 관한 명시적·묵시적 보증을 제공하지 않습니다. 처음에는 Wi-Fi로 언어 데이터를 내려받아야 합니다. SDK는 성능·사용 통계를 Google에 전송할 수 있습니다."))
+            .setPositiveButton(L("확인"), null).show() }
     }
     fun palette(p: ReaderPalette) {
         view.setBackgroundColor(p.background); text.setTextColor(p.foreground)
@@ -89,7 +89,7 @@ internal class ReaderTranslation(
     fun enable() {
         enabled = true; view.visibility = View.VISIBLE
         translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.KOREAN).build())
-        ready = false; text.text = "단어를 길게 누르고 선택 범위를 조절하세요. 번역 준비는 Wi-Fi에서 진행합니다."
+        ready = false; text.text = L("단어를 길게 누르고 선택 범위를 조절하세요. 번역 준비는 Wi-Fi에서 진행합니다.")
         val token = ++modelGeneration
         RemoteModelManager.getInstance().getDownloadedModels(TranslateRemoteModel::class.java).addOnSuccessListener { models ->
             if (enabled && token == modelGeneration) { ready = models.any { it.language == TranslateLanguage.KOREAN }; controls() }
@@ -98,20 +98,20 @@ internal class ReaderTranslation(
     }
     private fun controls() {
         originalVoice.isEnabled = source.isNotEmpty(); translatedVoice.isEnabled = result.isNotEmpty()
-        download.text = if (downloading) "준비 중…" else if (ready) "다시 번역" else "번역 준비 · Wi-Fi"
+        download.text = if (downloading) L("준비 중…") else if (ready) L("다시 번역") else L("번역 준비 · Wi-Fi")
         download.isEnabled = !downloading
     }
     fun prepare() {
         val engine = translator ?: return
         if (ready) { identity = ""; return }
-        downloading = true; controls(); text.text = "Wi-Fi에서 번역 데이터를 준비하고 있습니다. 끄기를 눌러 독서를 계속할 수 있습니다."
+        downloading = true; controls(); text.text = L("Wi-Fi에서 번역 데이터를 준비하고 있습니다. 끄기를 눌러 독서를 계속할 수 있습니다.")
         val token = ++modelGeneration
         preparationTimeout?.cancel()
         preparationTimeout = activity.lifecycleScope.launch {
             delay(180_000)
             if (enabled && downloading && token == modelGeneration) {
                 modelGeneration++; downloading = false
-                text.text = "번역 준비가 지연되고 있습니다. Wi-Fi 연결을 확인하고 다시 시도하세요."
+                text.text = L("번역 준비가 지연되고 있습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.")
                 controls()
             }
         }
@@ -119,7 +119,7 @@ internal class ReaderTranslation(
             if (!enabled || disposed || token != modelGeneration) return@addOnCompleteListener
             preparationTimeout?.cancel()
             downloading = false; ready = task.isSuccessful; identity = ""
-            text.text = if (ready) "준비됐습니다. 단어나 문장을 길게 눌러 선택하세요." else "번역 데이터를 준비하지 못했습니다. Wi-Fi 연결을 확인하고 다시 시도하세요."
+            text.text = if (ready) L("준비됐습니다. 단어나 문장을 길게 눌러 선택하세요.") else L("번역 데이터를 준비하지 못했습니다. Wi-Fi 연결을 확인하고 다시 시도하세요.")
             controls()
         }
     }
@@ -148,17 +148,17 @@ internal class ReaderTranslation(
         if (key != pending) {
             pending = key; identity = ""; pendingAt = android.os.SystemClock.uptimeMillis(); generation++; stopVoice()
             source = selected; result = ""; controls()
-            if (selected.isNotEmpty()) { pauseBook(); text.text = if (selected.length > 2000) "한 번에 2,000자까지 선택해 주세요." else "$selected\n\n선택을 마치면 번역합니다." }
-            else text.text = "단어나 문장을 길게 눌러 선택하세요."
+            if (selected.isNotEmpty()) { pauseBook(); text.text = if (selected.length > 2000) L("한 번에 2,000자까지 선택해 주세요.") else selected + "\n\n" + L("선택을 마치면 번역합니다.") }
+            else text.text = L("단어나 문장을 길게 눌러 선택하세요.")
         }
         if (selected.isEmpty() || selected.length > 2000 || snapshot.optBoolean("busy") || key == identity || android.os.SystemClock.uptimeMillis() - pendingAt < 500) return
-        if (!ready) { if (!downloading) text.text = "$selected\n\n번역 준비를 눌러 언어 데이터를 내려받으세요."; return }
+        if (!ready) { if (!downloading) text.text = selected + "\n\n" + L("번역 준비를 눌러 언어 데이터를 내려받으세요."); return }
         identity = key; val token = ++generation
-        text.text = "$selected\n\n번역 중…"
+        text.text = selected + "\n\n" + L("번역 중…")
         translator?.translate(selected)?.addOnSuccessListener { translated ->
             if (enabled && foreground && token == generation) { result = translated; text.text = "$selected\n\n$translated"; controls() }
         }?.addOnFailureListener {
-            if (enabled && foreground && token == generation) { text.text = "$selected\n\n번역하지 못했습니다. 다시 번역을 눌러 주세요."; controls() }
+            if (enabled && foreground && token == generation) { text.text = selected + "\n\n" + L("번역하지 못했습니다. 다시 번역을 눌러 주세요."); controls() }
         }
     }
     private fun speak(value: String, language: String) {
@@ -175,14 +175,14 @@ internal class ReaderTranslation(
                         if (id == "selection-$voiceGeneration") stopVoice()
                     } }
                 })
-                if (enabled && foreground) Toast.makeText(activity, if (ttsReady) "음성이 준비됐습니다. 듣기를 다시 눌러 주세요." else "기기 음성 엔진을 사용할 수 없습니다.", Toast.LENGTH_SHORT).show()
+                if (enabled && foreground) Toast.makeText(activity, if (ttsReady) L("음성이 준비됐습니다. 듣기를 다시 눌러 주세요.") else L("기기 음성 엔진을 사용할 수 없습니다."), Toast.LENGTH_SHORT).show()
             }
             return
         }
         val engine = tts ?: return
         if (!ttsReady) return
         val voice = engine.voices?.filter { it.locale.language == language && !it.isNetworkConnectionRequired && !(it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) ?: false) }?.maxByOrNull { it.quality }
-        if (voice == null) { Toast.makeText(activity, "기기 TTS 설정에서 ${if (language == "en") "영어" else "한국어"} 오프라인 음성을 설치해 주세요.", Toast.LENGTH_LONG).show(); return }
+        if (voice == null) { Toast.makeText(activity, L("기기 TTS 설정에서 {0} 오프라인 음성을 설치해 주세요.", L(if (language == "en") "영어" else "한국어")), Toast.LENGTH_LONG).show(); return }
         @Suppress("DEPRECATION")
         val granted = audio.requestAudioFocus(focus, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         if (granted != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return

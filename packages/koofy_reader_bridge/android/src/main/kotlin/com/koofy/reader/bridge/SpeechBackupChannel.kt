@@ -47,7 +47,7 @@ internal class SpeechBackupChannel(context: Context, messenger: BinaryMessenger)
                     }
                     else -> result.notImplemented()
                 }
-            } catch (_: Exception) { result.error("speech_backup_failed", "듣기 기록을 백업·복원하지 못했습니다. 독서 화면을 닫고 다시 시도해 주세요.", null) }
+            } catch (_: Exception) { result.error("speech_backup_failed", L("듣기 기록을 백업·복원하지 못했습니다. 독서 화면을 닫고 다시 시도해 주세요."), null) }
         }
     }
     fun dispose() = channel.setMethodCallHandler(null)

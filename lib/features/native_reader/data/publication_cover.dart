@@ -65,8 +65,14 @@ Future<Uint8List?> _readDisplayCover(Book book) async {
 
 ({Uint8List bytes, bool added, String? firstBodyHref}) _withDisplayCover(
   Uint8List original,
-  Uint8List cover,
-) {
+  Uint8List cover, {
+  String language = 'ko',
+}) {
+  final coverTitle = language == 'en'
+      ? 'Cover'
+      : language == 'ja'
+      ? '表紙'
+      : '표지';
   final archive = ZipDecoder().decodeBytes(original);
   final files = {for (final f in archive.files) f.name: f};
   final container = XmlDocument.parse(
@@ -234,7 +240,7 @@ body[data-koofy-cover]::before {
       final link = XmlElement(
         XmlName('a', list.name.prefix),
         [XmlAttribute(XmlName('href'), '${'../' * depth}$firstPath')],
-        [XmlText('표지')],
+        [XmlText(coverTitle)],
       );
       list.children.insert(
         0,
@@ -286,7 +292,7 @@ body[data-koofy-cover]::before {
           node(
             'navLabel',
             children: [
-              node('text', children: [XmlText('표지')]),
+              node('text', children: [XmlText(coverTitle)]),
             ],
           ),
           node(
@@ -314,7 +320,14 @@ body[data-koofy-cover]::before {
     if (file.name == 'mimetype') continue;
     add(file.name, replaced[file.name] ?? file.content);
   }
-  add(readerCoverHref, utf8.encode(_displayCoverHtml));
+  add(
+    readerCoverHref,
+    utf8.encode(
+      _displayCoverHtml
+          .replaceFirst('lang="ko"', 'lang="$language"')
+          .replaceFirst('<title>표지</title>', '<title>$coverTitle</title>'),
+    ),
+  );
   add(readerCoverHref.replaceAll('cover.xhtml', 'image.png'), cover);
   return (
     bytes: ZipEncoder().encodeBytes(output, modified: DateTime.utc(2000)),

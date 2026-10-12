@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요.')),
+          SnackBar(content: Text(tr("묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요."))),
         );
       }
     } finally {
@@ -120,11 +121,11 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
         anchorPoint: Offset.zero,
         child: Scaffold(
           appBar: AppBar(
-            title: Text(group?.title ?? '책 묶음'),
+            title: Text(group?.title ?? tr("책 묶음")),
             actions: [
               if (group != null)
                 IconButton(
-                  tooltip: '묶음 관리',
+                  tooltip: tr("묶음 관리"),
                   icon: const Icon(Icons.more_horiz),
                   onPressed: () => widget.onGroupMenu(group),
                 ),
@@ -140,18 +141,18 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             children: [
                               Text(
                                 groups.hasError
-                                    ? '묶음을 불러오지 못했습니다.'
-                                    : '묶음이 해제되었습니다.',
+                                    ? tr("묶음을 불러오지 못했습니다.")
+                                    : tr("묶음이 해제되었습니다."),
                               ),
                               if (groups.hasError)
                                 TextButton(
                                   onPressed: () =>
                                       ref.invalidate(bookGroupsProvider),
-                                  child: const Text('다시 시도'),
+                                  child: Text(tr("다시 시도")),
                                 ),
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text('서재로 돌아가기'),
+                                child: Text(tr("서재로 돌아가기")),
                               ),
                             ],
                           ),
@@ -179,16 +180,26 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             Expanded(
                               child: Text(
                                 progressLoading
-                                    ? '읽기 기록 불러오는 중'
+                                    ? tr("읽기 기록 불러오는 중")
                                     : progressError
-                                    ? '읽기 기록 확인 필요'
-                                    : '총 ${members.length}권 · 완독 $finishedCount권\n${activeIndex != null
-                                          ? '$activeIndex권을 읽는 중'
-                                          : members.isNotEmpty && finishedCount == members.length
-                                          ? '모든 권을 완독했어요'
-                                          : finishedCount > 0 && unread.isNotEmpty
-                                          ? '${members.indexOf(unread.first) + 1}권부터 이어 읽어보세요'
-                                          : '아직 읽기 전이에요'}',
+                                    ? tr("읽기 기록 확인 필요")
+                                    : tr("총 {0}권 · 완독 {1}권\n{2}", [
+                                        members.length,
+                                        finishedCount,
+                                        activeIndex != null
+                                            ? tr('{0}권을 읽는 중', [activeIndex])
+                                            : members.isNotEmpty &&
+                                                  finishedCount ==
+                                                      members.length
+                                            ? tr('모든 권을 완독했어요')
+                                            : finishedCount > 0 &&
+                                                  unread.isNotEmpty
+                                            ? tr('{0}권부터 이어 읽어보세요', [
+                                                members.indexOf(unread.first) +
+                                                    1,
+                                              ])
+                                            : tr('아직 읽기 전이에요'),
+                                      ]),
                               ),
                             ),
                           ],
@@ -198,19 +209,22 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             !progressError &&
                             members.isNotEmpty)
                           Semantics(
-                            label: '총 ${members.length}권 중 $finishedCount권 완독',
+                            label: tr("총 {0}권 중 {1}권 완독", [
+                              members.length,
+                              finishedCount,
+                            ]),
                             child: LinearProgressIndicator(
                               value: finishedCount / members.length,
                             ),
                           ),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(top: 12),
-                          child: Text('순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.'),
+                          child: Text(tr("순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.")),
                         ),
                         const SizedBox(height: 16),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('묶음 안의 책 표지 표시'),
+                          title: Text(tr("묶음 안의 책 표지 표시")),
                           value: group.showMemberCovers,
                           onChanged: _reordering
                               ? null
@@ -238,7 +252,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                   }
                                 },
                           icon: const Icon(Icons.collections_outlined),
-                          label: const Text('묶음 안의 표지 일괄 등록'),
+                          label: Text(tr("묶음 안의 표지 일괄 등록")),
                         ),
                         TextButton.icon(
                           onPressed: _reordering || members.length < 2
@@ -258,7 +272,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                       );
                                 }),
                           icon: const Icon(Icons.sort),
-                          label: const Text('제목·회차 순으로 정렬'),
+                          label: Text(tr("제목·회차 순으로 정렬")),
                         ),
                         if (recent.isNotEmpty)
                           FilledButton.icon(
@@ -270,7 +284,9 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                   )
                                 : null,
                             icon: const Icon(Icons.menu_book_outlined),
-                            label: Text('${recent.first.title} · 이어 읽기'),
+                            label: Text(
+                              tr("{0} · 이어 읽기", [recent.first.title]),
+                            ),
                           ),
                         if (recent.isEmpty && unread.isNotEmpty)
                           FilledButton.icon(
@@ -282,12 +298,14 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                   )
                                 : null,
                             icon: const Icon(Icons.menu_book_outlined),
-                            label: Text('${unread.first.title} · 읽기 시작'),
+                            label: Text(
+                              tr("{0} · 읽기 시작", [unread.first.title]),
+                            ),
                           ),
                         OutlinedButton.icon(
                           onPressed: () => widget.onAdd(group),
                           icon: const Icon(Icons.add),
-                          label: const Text('묶음에 책 추가'),
+                          label: Text(tr("묶음에 책 추가")),
                         ),
                         if (progressLoading) const LinearProgressIndicator(),
                         if (progressError)
@@ -296,12 +314,14 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                               ref.invalidate(libraryReadingStateProvider);
                               ref.invalidate(libraryCompletionProvider);
                             },
-                            child: const Text('읽기 기록 다시 불러오기'),
+                            child: Text(tr("읽기 기록 다시 불러오기")),
                           ),
                         if (members.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.all(24),
-                            child: Text('비어 있는 묶음입니다. 책을 추가하거나 묶음을 해제할 수 있어요.'),
+                            child: Text(
+                              tr("비어 있는 묶음입니다. 책을 추가하거나 묶음을 해제할 수 있어요."),
+                            ),
                           ),
                         const SizedBox(height: 12),
                       ],
@@ -325,8 +345,8 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                       } catch (_) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('순서를 저장하지 못했습니다. 다시 시도해 주세요.'),
+                            SnackBar(
+                              content: Text(tr("순서를 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );
                         }
@@ -350,14 +370,16 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                         title: Text('${index + 1}. ${book.title}'),
                         subtitle: Text(
                           progressError
-                              ? '읽기 기록 확인 필요'
+                              ? tr("읽기 기록 확인 필요")
                               : progressLoading
-                              ? '기록 불러오는 중'
+                              ? tr("기록 불러오는 중")
                               : switch (status(book)) {
-                                  LibraryBookStatus.finished => '완독',
-                                  LibraryBookStatus.unread => '아직 읽지 않음',
-                                  LibraryBookStatus.reading =>
-                                    '읽는 중 · ${state?.progressLabel ?? '위치 저장됨'}',
+                                  LibraryBookStatus.finished => tr("완독"),
+                                  LibraryBookStatus.unread => tr("아직 읽지 않음"),
+                                  LibraryBookStatus.reading => tr(
+                                    "읽는 중 · {0}",
+                                    [state?.progressLabel ?? tr('위치 저장됨')],
+                                  ),
                                 },
                         ),
                         onTap: canOpen ? () => _open(book, state) : null,
@@ -365,7 +387,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: '${book.title} 더보기',
+                              tooltip: tr("{0} 더보기", [book.title]),
                               icon: const Icon(Icons.more_horiz),
                               onPressed: () =>
                                   widget.onBookMenu(book, state, status(book)),
@@ -374,7 +396,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                               index: index,
                               enabled: !_reordering,
                               child: Semantics(
-                                label: '${book.title} 순서 변경',
+                                label: tr("{0} 순서 변경", [book.title]),
                                 child: const Padding(
                                   padding: EdgeInsets.all(10),
                                   child: Icon(Icons.drag_handle),

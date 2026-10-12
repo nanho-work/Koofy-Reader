@@ -1,3 +1,5 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/ads/presentation/app_ad_route_observer.dart';
 import 'branding/startup_splash.dart';
@@ -24,27 +26,35 @@ class _KoofyReaderAppState extends State<KoofyReaderApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Koofy Reader',
-      navigatorObservers: [_ads],
-      theme: KoofyTheme.forBrightness(Brightness.light),
-      darkTheme: KoofyTheme.forBrightness(Brightness.dark),
-      initialRoute: AppRoutes.library,
-      onGenerateRoute: AppRouter.onGenerateRoute,
-      builder: (context, child) {
-        return StartupSplash(
-          child: PrivacyGate(
-            child: StartupUpdateGate(
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _ads.visible,
-                child: child ?? const SizedBox.shrink(),
-                builder: (context, visible, navigator) =>
-                    AppFooterAdShell(showFooterAd: visible, child: navigator!),
+    return ListenableBuilder(
+      listenable: AppLanguage.instance,
+      builder: (context, _) => MaterialApp(
+        locale: AppLanguage.instance.locale,
+        supportedLocales: const [Locale('ko'), Locale('en'), Locale('ja')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        title: 'Koofy Reader',
+        navigatorObservers: [_ads],
+        theme: KoofyTheme.forBrightness(Brightness.light),
+        darkTheme: KoofyTheme.forBrightness(Brightness.dark),
+        initialRoute: AppRoutes.library,
+        onGenerateRoute: AppRouter.onGenerateRoute,
+        builder: (context, child) {
+          return StartupSplash(
+            child: PrivacyGate(
+              child: StartupUpdateGate(
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _ads.visible,
+                  child: child ?? const SizedBox.shrink(),
+                  builder: (context, visible, navigator) => AppFooterAdShell(
+                    showFooterAd: visible,
+                    child: navigator!,
+                  ),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

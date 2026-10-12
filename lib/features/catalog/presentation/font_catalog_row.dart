@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
@@ -33,7 +34,7 @@ class FontCatalogRow extends ConsumerWidget {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
-                tooltip: '닫기',
+                tooltip: tr("닫기"),
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
               ),
@@ -48,7 +49,10 @@ class FontCatalogRow extends ConsumerWidget {
               Text(item.description),
             ],
             const SizedBox(height: 24),
-            Text('출처·이용 조건', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              tr("출처·이용 조건"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             if (item.source.isNotEmpty) ...[
               SelectableText(item.source),
@@ -56,7 +60,7 @@ class FontCatalogRow extends ConsumerWidget {
             ],
             SelectableText(item.license),
             const SizedBox(height: 24),
-            const Text('내려받은 글꼴은 책의 독서 설정에서 선택할 수 있어요.'),
+            Text(tr("내려받은 글꼴은 책의 독서 설정에서 선택할 수 있어요.")),
           ],
         ),
       ),
@@ -84,7 +88,7 @@ class FontCatalogRow extends ConsumerWidget {
           children: [
             Expanded(
               child: Semantics(
-                label: '${item.title}, 글꼴 정보',
+                label: tr("{0}, 글꼴 정보", [item.title]),
                 button: true,
                 onTap: () => _details(context),
                 child: ExcludeSemantics(
@@ -132,7 +136,7 @@ class FontCatalogRow extends ConsumerWidget {
                     child: CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 2,
-                      semanticsLabel: '${item.title} 다운로드 중',
+                      semanticsLabel: tr("{0} 다운로드 중", [item.title]),
                       semanticsValue: '${(progress! * 100).round()}%',
                     ),
                   ),
@@ -142,8 +146,8 @@ class FontCatalogRow extends ConsumerWidget {
               IconButton(
                 key: ValueKey('font-download-${item.id}'),
                 tooltip: installed
-                    ? '${item.title} 다운로드 완료'
-                    : '${item.title} 다운로드',
+                    ? tr("{0} 다운로드 완료", [item.title])
+                    : tr("{0} 다운로드", [item.title]),
                 onPressed: onDownload,
                 icon: Icon(installed ? Icons.check : Icons.download_outlined),
                 color: colors.primary,

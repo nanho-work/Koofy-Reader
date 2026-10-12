@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,14 +34,14 @@ class _StartupUpdateGateState extends ConsumerState<StartupUpdateGate> {
     future: _check,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const Scaffold(
+        return Scaffold(
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('업데이트 확인 중…'),
+                Text(tr("업데이트 확인 중…")),
               ],
             ),
           ),
@@ -72,14 +73,14 @@ class _StartupUpdateGateState extends ConsumerState<StartupUpdateGate> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        notice.required ? '업데이트가 필요합니다' : notice.title,
+                        notice.required ? tr("업데이트가 필요합니다") : notice.title,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 12),
                       Text(notice.message),
                       const SizedBox(height: 12),
                       Text(
-                        '새 버전 ${notice.latestVersion}',
+                        tr("새 버전 {0}", [notice.latestVersion]),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       if (_error != null) ...[
@@ -90,12 +91,12 @@ class _StartupUpdateGateState extends ConsumerState<StartupUpdateGate> {
                       const SizedBox(height: 24),
                       FilledButton(
                         onPressed: _opening ? null : () => _open(notice),
-                        child: Text(_opening ? '스토어 여는 중…' : '업데이트'),
+                        child: Text(_opening ? tr("스토어 여는 중…") : tr("업데이트")),
                       ),
                       if (!notice.required)
                         TextButton(
                           onPressed: _opening ? null : _later,
-                          child: const Text('나중에'),
+                          child: Text(tr("나중에")),
                         ),
                     ],
                   ),
@@ -123,11 +124,15 @@ class _StartupUpdateGateState extends ConsumerState<StartupUpdateGate> {
         notice.storeUrl,
       );
       if (!opened && mounted) {
-        setState(() => _error = '스토어를 열지 못했습니다. 다시 누르거나 아래 주소를 복사해 이용해 주세요.');
+        setState(
+          () => _error = tr("스토어를 열지 못했습니다. 다시 누르거나 아래 주소를 복사해 이용해 주세요."),
+        );
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _error = '스토어를 열지 못했습니다. 다시 누르거나 아래 주소를 복사해 이용해 주세요.');
+        setState(
+          () => _error = tr("스토어를 열지 못했습니다. 다시 누르거나 아래 주소를 복사해 이용해 주세요."),
+        );
       }
     } finally {
       if (mounted) setState(() => _opening = false);

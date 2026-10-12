@@ -6,7 +6,7 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
     init(speech: ReaderSpeech, palette: ReaderPalette) {
         self.speech = speech; self.palette = palette
         super.init(style: .insetGrouped)
-        title = "듣기 설정"
+        title = L("듣기 설정")
     }
     required init?(coder: NSCoder) { fatalError("Use init(speech:palette:)") }
     override func viewDidLoad() {
@@ -15,7 +15,7 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
         tableView.tintColor = palette.accent
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 56
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "완료", style: .done, target: self, action: #selector(done))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: L("완료"), style: .done, target: self, action: #selector(done))
     }
     override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); speech.stopPreview() }
     @objc private func done() { dismiss(animated: true) }
@@ -26,12 +26,12 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
         return 1
     }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        ["목소리", "읽기 속도", "취침 타이머", "본문 표시", "이어 듣기"][section]
+        [L("목소리"), L("읽기 속도"), L("취침 타이머"), L("본문 표시"), L("이어 듣기")][section]
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         switch section {
-        case 0: return "기기에 설치된 한국어 음성을 사용합니다. 음성 추가: iPhone 설정 → 손쉬운 사용 → 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어. 다운로드 후 독서 화면을 다시 열어 주세요."
-        case 3: return "앱·독서 화면을 벗어나거나 화면을 잠그면 멈춥니다. 돌아와도 자동으로 재생하지 않습니다."
+        case 0: return L("기기에 설치된 한국어 음성을 사용합니다. 음성 추가: iPhone 설정 → 손쉬운 사용 → 읽기 및 말하기(또는 콘텐츠 말하기) → 음성 → 한국어. 다운로드 후 독서 화면을 다시 열어 주세요.")
+        case 3: return L("앱·독서 화면을 벗어나거나 화면을 잠그면 멈춥니다. 돌아와도 자동으로 재생하지 않습니다.")
         default: return nil
         }
     }
@@ -47,28 +47,28 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
         switch path.section {
         case 0:
             if path.row == 0 {
-                cell.textLabel?.text = speech.voices.first { $0.identifier == speech.voiceID }?.name ?? "로컬 음성을 선택해 주세요"
-                cell.detailTextLabel?.text = speech.voices.isEmpty ? "설치된 한국어 음성이 없습니다." : "한국어 · 기기 음성"
+                cell.textLabel?.text = speech.voices.first { $0.identifier == speech.voiceID }?.name ?? L("로컬 음성을 선택해 주세요")
+                cell.detailTextLabel?.text = speech.voices.isEmpty ? L("설치된 한국어 음성이 없습니다.") : L("한국어 · 기기 음성")
                 cell.accessoryType = .disclosureIndicator
             } else {
-                cell.textLabel?.text = "선택한 음성 미리 듣기"
+                cell.textLabel?.text = L("선택한 음성 미리 듣기")
                 cell.imageView?.image = UIImage(systemName: "play.circle")
                 cell.imageView?.tintColor = palette.accent
             }
         case 1:
             let speeds = [0.75, 1.0, 1.25, 1.5, 2.0]
-            installChoices(in: cell, labels: ["0.75배", "1배", "1.25배", "1.5배", "2배"], selected: speeds.firstIndex(of: speech.speed)) { [weak self] in self?.speech.setSpeed(speeds[$0]) }
+            installChoices(in: cell, labels: [L("0.75배"), L("1배"), L("1.25배"), L("1.5배"), L("2배")], selected: speeds.firstIndex(of: speech.speed)) { [weak self] in self?.speech.setSpeed(speeds[$0]) }
         case 2:
             let minutes = [0, 15, 30, 60]
-            installChoices(in: cell, labels: ["꺼짐", "15분", "30분", "60분"], selected: minutes.firstIndex(of: speech.timerMinutes)) { [weak self] in self?.speech.setTimer(minutes[$0]) }
+            installChoices(in: cell, labels: [L("꺼짐"), L("15분"), L("30분"), L("60분")], selected: minutes.firstIndex(of: speech.timerMinutes)) { [weak self] in self?.speech.setTimer(minutes[$0]) }
         case 3:
-            cell.textLabel?.text = "음성을 따라 페이지 이동"
+            cell.textLabel?.text = L("음성을 따라 페이지 이동")
             // A wrapping row remains accessible at the largest text size.
             cell.accessoryType = speech.follow ? .checkmark : .none
             cell.accessibilityTraits = [.button]
-            cell.accessibilityValue = speech.follow ? "켜짐" : "꺼짐"
+            cell.accessibilityValue = speech.follow ? L("켜짐") : L("꺼짐")
         default:
-            cell.textLabel?.text = "저장된 듣던 위치부터 재생"
+            cell.textLabel?.text = L("저장된 듣던 위치부터 재생")
             cell.accessoryType = .disclosureIndicator
         }
         return cell
@@ -94,7 +94,7 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
             button.configuration = configuration
             button.isSelected = index == selected
             button.accessibilityLabel = label
-            button.accessibilityValue = index == selected ? "선택됨" : nil
+            button.accessibilityValue = index == selected ? L("선택됨") : nil
             button.addAction(UIAction { [weak self] _ in change(index); self?.tableView.reloadData() }, for: .touchUpInside)
             button.widthAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true
             row.addArrangedSubview(button)
@@ -121,13 +121,13 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
             else if !speech.voices.isEmpty {
                 speech.stopPreview()
                 let voices = speech.voices
-                let alert = UIAlertController(title: "한국어 목소리 선택", message: nil, preferredStyle: .alert)
+                let alert = UIAlertController(title: L("한국어 목소리 선택"), message: nil, preferredStyle: .alert)
                 for voice in voices {
                     alert.addAction(UIAlertAction(title: "\(voice.identifier == speech.voiceID ? "✓ " : "")\(voice.name)", style: .default) { [weak self] _ in
                         self?.speech.selectVoice(voice.identifier); self?.tableView.reloadData()
                     })
                 }
-                alert.addAction(UIAlertAction(title: "닫기", style: .cancel))
+                alert.addAction(UIAlertAction(title: L("닫기"), style: .cancel))
                 present(alert, animated: true)
             }
         case 3: speech.setFollow(!speech.follow); tableView.reloadData()

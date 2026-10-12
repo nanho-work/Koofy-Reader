@@ -138,6 +138,7 @@ class ReaderLaunchRequest {
     this.adHiddenUntilEpochMs,
     this.nextBookTitle,
     this.bookmarksJson,
+    this.uiLanguage,
   });
 
   int protocolVersion;
@@ -168,6 +169,9 @@ class ReaderLaunchRequest {
 
   String? bookmarksJson;
 
+  /// App UI language, independent of book content and speech language.
+  String? uiLanguage;
+
   List<Object?> _toList() {
     return <Object?>[
       protocolVersion,
@@ -183,6 +187,7 @@ class ReaderLaunchRequest {
       adHiddenUntilEpochMs,
       nextBookTitle,
       bookmarksJson,
+      uiLanguage,
     ];
   }
 
@@ -205,6 +210,7 @@ class ReaderLaunchRequest {
       adHiddenUntilEpochMs: result[10] as int?,
       nextBookTitle: result[11] as String?,
       bookmarksJson: result[12] as String?,
+      uiLanguage: result[13] as String?,
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'book_catalog_row.dart';
 import 'series_catalog.dart';
@@ -13,7 +14,7 @@ class ReaderCatalogPage extends StatelessWidget {
   final String initialBookQuery;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('도서·글꼴 다운로드')),
+    appBar: AppBar(title: Text(tr("도서·글꼴 다운로드"))),
     body: SafeArea(
       child: ReaderCatalogBrowser(initialBookQuery: initialBookQuery),
     ),
@@ -43,7 +44,7 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('다운로드가 끝날 때까지 잠시 기다려 주세요.')),
+            SnackBar(content: Text(tr("다운로드가 끝날 때까지 잠시 기다려 주세요."))),
           );
         }
       },
@@ -55,9 +56,9 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
               children: [
                 Expanded(
                   child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 0, label: Text('도서')),
-                      ButtonSegment(value: 1, label: Text('글꼴')),
+                    segments: [
+                      ButtonSegment(value: 0, label: Text(tr("도서"))),
+                      ButtonSegment(value: 1, label: Text(tr("글꼴"))),
                     ],
                     selected: {_tab},
                     onSelectionChanged: (values) => setState(() {
@@ -67,7 +68,7 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
                   ),
                 ),
                 IconButton(
-                  tooltip: '다운로드 목록 새로고침',
+                  tooltip: tr("다운로드 목록 새로고침"),
                   onPressed: busy
                       ? null
                       : () {
@@ -129,8 +130,9 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
     super.dispose();
   }
 
-  String _message(Object error) =>
-      error is CatalogException ? error.message : '목록을 처리하지 못했습니다. 다시 시도해 주세요.';
+  String _message(Object error) => error is CatalogException
+      ? tr(error.message)
+      : tr("목록을 처리하지 못했습니다. 다시 시도해 주세요.");
 
   void _changed() {
     setState(() {});
@@ -155,7 +157,9 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _books ? '내 서재에 책을 추가했습니다.' : '글꼴을 내려받았습니다. 책의 독서 설정에서 선택해 주세요.',
+            _books
+                ? tr("내 서재에 책을 추가했습니다.")
+                : tr("글꼴을 내려받았습니다. 책의 독서 설정에서 선택해 주세요."),
           ),
         ),
       );
@@ -229,12 +233,12 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                       controller: _search,
                       onChanged: (_) => _changed(),
                       decoration: InputDecoration(
-                        hintText: _books ? '제목·작가로 검색' : '글꼴 이름으로 검색',
+                        hintText: _books ? tr("제목·작가로 검색") : tr("글꼴 이름으로 검색"),
                         prefixIcon: const Icon(Icons.search),
                         suffixIcon: _search.text.isEmpty
                             ? null
                             : IconButton(
-                                tooltip: '검색어 지우기',
+                                tooltip: tr("검색어 지우기"),
                                 icon: const Icon(Icons.clear),
                                 onPressed: () {
                                   _search.clear();
@@ -258,7 +262,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                                   top: 8,
                                 ),
                                 child: ChoiceChip(
-                                  label: Text(category ?? '전체'),
+                                  label: Text(tr(category ?? "전체")),
                                   selected: _category == category,
                                   onSelected: (_) {
                                     _category = category;
@@ -273,8 +277,8 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         catalog.isLoading
-                            ? '전체 목록 불러오는 중…'
-                            : '${items.length}개 · 가나다순',
+                            ? tr("전체 목록 불러오는 중…")
+                            : tr("{0}개 · 가나다순", [items.length]),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -312,11 +316,11 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                                 Text(
                                   catalog.hasError
                                       ? _message(catalog.error!)
-                                      : '다운로드 상태를 확인하지 못했습니다.',
+                                      : tr("다운로드 상태를 확인하지 못했습니다."),
                                 ),
                                 TextButton(
                                   onPressed: download.busy ? null : _refresh,
-                                  child: const Text('다시 시도'),
+                                  child: Text(tr("다시 시도")),
                                 ),
                               ],
                             ),
@@ -333,10 +337,16 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                                               .trim()
                                               .toLowerCase() &&
                                       _category == null
-                                  ? '아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.'
+                                  ? tr(
+                                      "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.",
+                                    )
                                   : query.isNotEmpty || _category != null
-                                  ? '검색 조건에 맞는 ${_books ? '도서가' : '글꼴이'} 없습니다.'
-                                  : '아직 공개된 ${_books ? '도서가' : '글꼴이'} 없습니다.',
+                                  ? tr("검색 조건에 맞는 {0} 없습니다.", [
+                                      tr(_books ? '도서가' : '글꼴이'),
+                                    ])
+                                  : tr("아직 공개된 {0} 없습니다.", [
+                                      tr(_books ? '도서가' : '글꼴이'),
+                                    ]),
                               textAlign: TextAlign.center,
                             ),
                           ),

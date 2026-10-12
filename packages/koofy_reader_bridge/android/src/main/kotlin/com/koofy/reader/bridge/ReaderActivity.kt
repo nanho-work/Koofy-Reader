@@ -143,7 +143,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         lifecycleScope.launch { openPublication() }
         openingTimeout = lifecycleScope.launch {
             delay(30_000)
-            if (!session.ready && !loadingFailed) fail("open_timeout", "책을 표시하는 데 시간이 너무 오래 걸립니다.")
+            if (!session.ready && !loadingFailed) fail("open_timeout", L("책을 표시하는 데 시간이 너무 오래 걸립니다."))
         }
     }
 
@@ -154,7 +154,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
         outer.addView(page, FrameLayout.LayoutParams(-1, -1))
         toolbar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        toolbar.addView(button("서재") { closeReader() })
+        toolbar.addView(button(L("서재")) { closeReader() })
         toolbar.addView(TextView(this).apply {
             text = session.request.title
             maxLines = 1
@@ -162,9 +162,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setTextColor(Color.rgb(40, 35, 30))
             setPadding(dp(8), 0, dp(8), 0)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        toolbar.addView(button("목차") { showContents() })
-        toolbar.addView(button("찾기") { showReaderTools() })
-        toolbar.addView(button("독서 설정") { showSettings() })
+        toolbar.addView(button(L("목차")) { showContents() })
+        toolbar.addView(button(L("찾기")) { showReaderTools() })
+        toolbar.addView(button(L("독서 설정")) { showSettings() })
         page.addView(toolbar, LinearLayout.LayoutParams(-1, dp(52)))
         container = FragmentContainerView(this).apply { id = View.generateViewId() }
         previewContainer = FragmentContainerView(this).apply {
@@ -189,12 +189,12 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         page.addView(turnHost, LinearLayout.LayoutParams(-1, 0, 1f))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         returnButton = button("↶") { returnToReading() }.apply {
-            contentDescription = "이동 전 위치로"; isEnabled = false
+            contentDescription = L("이동 전 위치로"); isEnabled = false
         }
         navigation.addView(returnButton)
-        navigation.addView(button("이전") { pageTurns?.request(false) })
+        navigation.addView(button(L("이전")) { pageTurns?.request(false) })
         status = TextView(this).apply {
-            text = "책을 여는 중…"
+            text = L("책을 여는 중…")
             gravity = Gravity.CENTER
             textSize = 12f
             maxLines = 2
@@ -202,14 +202,14 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setTextColor(Color.rgb(60, 50, 40))
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-        navigation.addView(button("다음") { pageTurns?.request(true) })
+        navigation.addView(button(L("다음")) { pageTurns?.request(true) })
         session.request.nextBookTitle?.let { title ->
-            nextBookButton = button("다음 권") {
+            nextBookButton = button(L("다음 권")) {
                 if (toolsReady()) {
-                    AlertDialog.Builder(this).setTitle("다음 권 읽기")
+                    AlertDialog.Builder(this).setTitle(L("다음 권 읽기"))
                         .setMessage(title)
-                        .setPositiveButton("열기") { _, _ -> closeReader(nextBook = true) }
-                        .setNegativeButton("취소", null).show()
+                        .setPositiveButton(L("열기")) { _, _ -> closeReader(nextBook = true) }
+                        .setNegativeButton(L("취소"), null).show()
                 }
             }
             navigation.addView(nextBookButton)
@@ -246,7 +246,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         speechButton = button("▶") { listeningMode = true; translation?.stopVoice(); speech?.toggle(); updateSpeechControls() }.apply {
             visibility = View.INVISIBLE
             textSize = 20f
-            contentDescription = "책 읽어주기 재생"
+            contentDescription = L("책 읽어주기 재생")
             setOnLongClickListener { showSpeechSettings(); true }
         }
         outer.addView(speechButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.END).apply {
@@ -254,9 +254,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         })
         speechControls = LinearLayout(this).apply {
             visibility = View.GONE
-            addView(button("⏮") { speech?.skip(false) }.apply { contentDescription = "이전 문장" }, LinearLayout.LayoutParams(0, -1, 1f))
-            addView(button("⏭") { speech?.skip(true) }.apply { contentDescription = "다음 문장" }, LinearLayout.LayoutParams(0, -1, 1f))
-            addView(button("⚙") { showSpeechSettings() }.apply { contentDescription = "듣기 설정" }, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(button("⏮") { speech?.skip(false) }.apply { contentDescription = L("이전 문장") }, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(button("⏭") { speech?.skip(true) }.apply { contentDescription = L("다음 문장") }, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(button("⚙") { showSpeechSettings() }.apply { contentDescription = L("듣기 설정") }, LinearLayout.LayoutParams(0, -1, 1f))
         }
         navigation.addView(speechControls, navigation.indexOfChild(status), LinearLayout.LayoutParams(0, -1, 1f))
         setContentView(outer)
@@ -308,14 +308,14 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             }
             publication = opened
             require(opened.conformsTo(Publication.Profile.EPUB) && !opened.isRestricted) {
-                "보호되지 않은 EPUB 파일만 지원합니다."
+                L("보호되지 않은 EPUB 파일만 지원합니다.")
             }
             require(opened.metadata.presentation.layout != EpubLayout.FIXED) {
-                "고정 레이아웃 EPUB은 아직 지원하지 않습니다."
+                L("고정 레이아웃 EPUB은 아직 지원하지 않습니다.")
             }
-            require(opened.readingOrder.isNotEmpty()) { "책에 읽을 본문이 없습니다." }
+            require(opened.readingOrder.isNotEmpty()) { L("책에 읽을 본문이 없습니다.") }
             val initial = session.locatorJson?.let { parseLocator(it) }
-            if (initial != null) require(opened.linkWithHref(initial.href) != null) { "저장한 본문 위치를 찾을 수 없습니다." }
+            if (initial != null) require(opened.linkWithHref(initial.href) != null) { L("저장한 본문 위치를 찾을 수 없습니다.") }
             lastLocator = initial
             initialTarget = initial
             restoreTarget = initial
@@ -380,7 +380,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            fail("open_failed", error.message ?: "책을 열 수 없습니다.")
+            fail("open_failed", error.message ?: L("책을 열 수 없습니다."))
         }
     }
 
@@ -388,14 +388,14 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (session.closing || loadingFailed) return
         if (!session.ready && initialTarget != null &&
             initialTarget!!.href.removeFragment() != locator.href.removeFragment()) {
-            fail("initial_restore_failed", "저장한 챕터로 이동하지 못했습니다. 기존 읽기 기록은 보존됩니다.")
+            fail("initial_restore_failed", L("저장한 챕터로 이동하지 못했습니다. 기존 읽기 기록은 보존됩니다."))
             return
         }
         if (layoutPending) return
         val target = restoreTarget
         if (target != null && !restoreIssued) {
             restoreIssued = true
-            if (navigator?.go(target, false) != true) fail("restore_failed", "읽던 위치를 복원하지 못했습니다.")
+            if (navigator?.go(target, false) != true) fail("restore_failed", L("읽던 위치를 복원하지 못했습니다."))
             return
         }
         if (target != null && target.href.removeFragment() != locator.href.removeFragment()) return
@@ -444,17 +444,17 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 openingTimeout?.cancel()
                 status.text = buildString {
                     locator.locations.totalProgression?.let { append("${(it * 100).toInt()}% · ") }
-                    append("이 장 ${pageIndex + 1} / $totalPages")
-                    if (hingeFallback) append(" · 한쪽 화면")
+                    append(L("이 장 {0} / {1}", pageIndex + 1, totalPages))
+                    if (hingeFallback) append(L(" · 한쪽 화면"))
                 }
-                if (isReaderDisplayCover(saved)) status.text = "표지"
+                if (isReaderDisplayCover(saved)) status.text = L("표지")
                 atBookEnd = snapshot.optBoolean("resourceEnd", false) &&
                     publication?.readingOrder?.lastOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
-                nextBookButton?.text = if (atBookEnd) "이어서 읽기" else "다음 권"
+                nextBookButton?.text = if (atBookEnd) L("이어서 읽기") else L("다음 권")
                 if (atBookEnd) {
-                    status.text = session.request.nextBookTitle?.let { "마지막 페이지\n다음: $it" } ?: "마지막 페이지"
-                    nextBookButton?.contentDescription = "다음 권 ${session.request.nextBookTitle} 이어서 읽기"
-                } else nextBookButton?.contentDescription = "다음 권 ${session.request.nextBookTitle}"
+                    status.text = session.request.nextBookTitle?.let { L("마지막 페이지\n다음: {0}", it) } ?: L("마지막 페이지")
+                    nextBookButton?.contentDescription = L("다음 권 {0} 이어서 읽기", session.request.nextBookTitle)
+                } else nextBookButton?.contentDescription = L("다음 권 {0}", session.request.nextBookTitle)
                 emit(kind)
                 if (target != null) {
                     val completed = toolsNavigationCompleted
@@ -465,7 +465,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                fail("anchor_capture_failed", "본문 위치를 확인하지 못했습니다. 저장된 기록은 보존됩니다. 책을 다시 열어 주세요.")
+                fail("anchor_capture_failed", L("본문 위치를 확인하지 못했습니다. 저장된 기록은 보존됩니다. 책을 다시 열어 주세요."))
             }
         }
     }
@@ -476,11 +476,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             closeReader(downloadSeries = true)
             return
         }
-        Toast.makeText(this, "외부 링크는 독서 화면에서 열지 않습니다.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, L("외부 링크는 독서 화면에서 열지 않습니다."), Toast.LENGTH_SHORT).show()
     }
 
     override fun onResourceLoadFailed(href: Url, error: ReadError) {
-        runOnUiThread { fail("resource_failed", "책의 일부 내용을 불러오지 못했습니다.") }
+        runOnUiThread { fail("resource_failed", L("책의 일부 내용을 불러오지 못했습니다.")) }
     }
 
     fun goToLocator(json: String) {
@@ -522,7 +522,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         restoreTimeout?.cancel()
         restoreTimeout = lifecycleScope.launch {
             delay(12_000)
-            if (restoreTarget != null) fail("restore_timeout", "읽던 위치 복원이 완료되지 않았습니다. 책을 다시 열어 주세요.")
+            if (restoreTarget != null) fail("restore_timeout", L("읽던 위치 복원이 완료되지 않았습니다. 책을 다시 열어 주세요."))
         }
     }
 
@@ -669,7 +669,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (speech?.playing == true || speech?.busy == true) listeningMode = true
         speechButton.visibility = if ((listeningMode || speech?.playing == true || getSharedPreferences("reader_speech", MODE_PRIVATE).getBoolean("alwaysShow", false)) && chromeVisible) View.VISIBLE else View.INVISIBLE
         speechButton.text = if (speech?.busy == true) "…" else if (speech?.playing == true) "Ⅱ" else "▶"
-        speechButton.contentDescription = if (speech?.playing == true || speech?.busy == true) "책 읽어주기 일시정지" else "책 읽어주기 재생"
+        speechButton.contentDescription = if (speech?.playing == true || speech?.busy == true) L("책 읽어주기 일시정지") else L("책 읽어주기 재생")
         val transport = listeningMode || speech?.playing == true || speech?.busy == true
         speechControls.visibility = if (transport) View.VISIBLE else View.GONE
         status.visibility = if (transport) View.GONE else View.VISIBLE
@@ -677,9 +677,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         val rate = speech?.speed?.toString()?.removeSuffix(".0") ?: "1"
         val timer = speech?.timerMinutes ?: 0
         (speechControls.getChildAt(2) as Button).apply {
-            text = "${rate}배\n${if (timer > 0) "${timer}분" else "타이머 꺼짐"}"
+            text = L("{0}배\n{1}", rate, if (timer > 0) L("{0}분", timer) else L("타이머 꺼짐"))
             textSize = 11f
-            contentDescription = "듣기 설정, ${rate}배, ${if (timer > 0) "타이머 ${timer}분 설정" else "타이머 꺼짐"}"
+            contentDescription = L("듣기 설정, {0}배, {1}", rate, if (timer > 0) L("{0}분", timer) else L("타이머 꺼짐"))
         }
     }
 
@@ -710,7 +710,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     private fun toolsReady() = session.ready && !session.closing && restoreTarget == null && captureJob?.isActive != true
     private fun jumpFromTools(target: Locator) {
-        if (!toolsReady()) { Toast.makeText(this, "본문 위치 확인 후 다시 눌러 주세요.", Toast.LENGTH_SHORT).show(); return }
+        if (!toolsReady()) { Toast.makeText(this, L("본문 위치 확인 후 다시 눌러 주세요."), Toast.LENGTH_SHORT).show(); return }
         val source = lastLocator ?: return
         try {
             goToLocator(target.toJSON().toString())
@@ -719,7 +719,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 if (navigationHistory.size > 20) navigationHistory.removeFirst()
                 returnButton.isEnabled = true
             }
-        } catch (_: Exception) { Toast.makeText(this, "해당 위치로 이동하지 못했습니다.", Toast.LENGTH_SHORT).show() }
+        } catch (_: Exception) { Toast.makeText(this, L("해당 위치로 이동하지 못했습니다."), Toast.LENGTH_SHORT).show() }
     }
     private fun returnToReading() {
         if (!toolsReady() || navigationHistory.isEmpty()) return
@@ -729,7 +729,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 navigationHistory.removeLast()
                 returnButton.isEnabled = navigationHistory.isNotEmpty()
             }
-        } catch (_: Exception) { Toast.makeText(this, "이전 위치로 돌아가지 못했습니다.", Toast.LENGTH_SHORT).show() }
+        } catch (_: Exception) { Toast.makeText(this, L("이전 위치로 돌아가지 못했습니다."), Toast.LENGTH_SHORT).show() }
     }
     private fun showReaderTools() {
         speech?.pause()
@@ -758,10 +758,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             items.forEach { flattened += it; add(it.children) }
         }
         add(links)
-        AlertDialog.Builder(this).setTitle("목차")
-            .setItems(flattened.mapIndexed { index, link -> link.title ?: "${index + 1}장" }.toTypedArray()) { _, index ->
+        AlertDialog.Builder(this).setTitle(L("목차"))
+            .setItems(flattened.mapIndexed { index, link -> link.title ?: L("{0}장", index + 1) }.toTypedArray()) { _, index ->
                 publication?.locatorFromLink(flattened[index])?.let { jumpFromTools(it) }
-            }.setNegativeButton("닫기", null).show().also { dialog ->
+            }.setNegativeButton(L("닫기"), null).show().also { dialog ->
                 val colors = ReaderPalette.forTheme(session.preferences.theme)
                 dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.background))
                 fun tint(view: View) {
@@ -864,10 +864,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     finish()
                 } else {
                     session.closing = false
-                    AlertDialog.Builder(this@ReaderActivity).setTitle("읽기 기록 저장 실패")
-                        .setMessage("기기 저장 공간을 확인한 뒤 다시 시도해 주세요.")
-                        .setPositiveButton("다시 저장") { _, _ -> closeReader(nextBook, manageFonts, downloadSeries) }
-                        .setNegativeButton("계속 읽기", null).show()
+                    AlertDialog.Builder(this@ReaderActivity).setTitle(L("읽기 기록 저장 실패"))
+                        .setMessage(L("기기 저장 공간을 확인한 뒤 다시 시도해 주세요."))
+                        .setPositiveButton(L("다시 저장")) { _, _ -> closeReader(nextBook, manageFonts, downloadSeries) }
+                        .setNegativeButton(L("계속 읽기"), null).show()
                 }
             }
         }
@@ -876,7 +876,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private fun emit(kind: String) {
         ReaderRuntime.emit(session.event(kind)) { result ->
             if (result.isFailure && !isFinishing) {
-                status.text = "읽기 기록 저장 실패 · 저장 공간을 확인해 주세요"
+                status.text = L("읽기 기록 저장 실패 · 저장 공간을 확인해 주세요")
             }
         }
     }
@@ -890,9 +890,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         openingTimeout?.cancel()
         status.text = message
         ReaderRuntime.emit(session.event("error", code, message))
-        AlertDialog.Builder(this).setTitle("책을 표시할 수 없습니다")
+        AlertDialog.Builder(this).setTitle(L("책을 표시할 수 없습니다"))
             .setMessage(message).setCancelable(false)
-            .setPositiveButton("서재로") { _, _ -> closeReader() }.show()
+            .setPositiveButton(L("서재로")) { _, _ -> closeReader() }.show()
     }
 
     override fun onDestroy() {
