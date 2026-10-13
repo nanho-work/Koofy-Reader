@@ -119,3 +119,10 @@ AdMob 인스턴스는 이미 비활성 상태여서 현재 광고 공급에 참�
 - Android AdMob 앱 `ca-app-pub-5773331970563455~3449808968`은 `검토 필요`, 앱 스토어 세부정보 미연결 상태였다. 스토어 연결 화면에서 실제 패키지 `com.koofylab.koofyreader`를 검색했으나 결과가 없었다. Android Google 입찰 활성화 및 스토어 연결 변경은 수행하지 않았다.
 - 검증 범위는 콘솔 승인 상태·광고 ID·그룹 배정·활성화 저장이다. 실제 기기 광고 노출·보상 지급이나 수익 발생을 검증한 것은 아니다. Android는 스토어 검색·연결이 가능해진 뒤 승인 상태를 확인하고 활성화한다.
 - iOS 활성화 증빙: `/tmp/koofy-admob-20261004/ios-google-active.jpg`.
+
+## 2026-10-12 Android 정식 출시 후 연결 재시도
+
+- 사용자 요청으로 Android 기존 AdMob 앱의 스토어 연결을 시도했다. 공개 Google Play URL 및 패키지명 `com.koofylab.koofyreader` 모두 검색 결과 없음. 승인 상태는 여전히 `검토 필요`다.
+- LevelPlay Android 앱 `283bb581d`는 `Temp` 상태. Edit에서 Live app과 공개 스토어 URL(기본 주소 및 hl=ko 원본 주소)을 입력했으나 `Invalid URL`로 저장 실패. Cancel로 미저장 변경을 취소하고 Temp 유지 확인.
+- 출시 정보 인식 지연 가능성이 있으나 원인은 확정하지 못했다. AdMob 인증/승인 후 Google 배너·리워드 활성화 필요. 기존 광고 설정·앱 코드 변경 없음.
+- 증빙: `work/ads-launch-2026-10-12/admob-search-pending.png`, `work/ads-launch-2026-10-12/levelplay-url-pending.png`.
