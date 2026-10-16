@@ -10,9 +10,9 @@ internal data class ReaderPalette(
 ) {
     companion object {
         fun forTheme(theme: String): ReaderPalette = when (ReaderTheme.resolve(theme)) {
-            "light" -> ReaderPalette(0xFFF7F5EE.toInt(), 0xFF26382D.toInt(), 0xFF657060.toInt(), 0xFFECEDE4.toInt(), 0xFF345641.toInt())
-            "sepia" -> ReaderPalette(0xFFF7F4ED.toInt(), 0xFF26382D.toInt(), 0xFF687265.toInt(), 0xFFEAECE2.toInt(), 0xFF345641.toInt())
-            "dark" -> ReaderPalette(0xFF202520.toInt(), 0xFFEDECE3.toInt(), 0xFFB3BBAE.toInt(), 0xFF2C332D.toInt(), 0xFFAECAB1.toInt())
+            "light" -> ReaderPalette(0xFFFAF9F5.toInt(), 0xFF2D332F.toInt(), 0xFF636B64.toInt(), 0xFFF0EFE9.toInt(), 0xFF3F5C49.toInt())
+            "sepia" -> ReaderPalette(0xFFF3EDE0.toInt(), 0xFF39392F.toInt(), 0xFF676353.toInt(), 0xFFE8E0D0.toInt(), 0xFF536047.toInt())
+            "dark" -> ReaderPalette(0xFF1C211F.toInt(), 0xFFE7E9E2.toInt(), 0xFFA7AFA7.toInt(), 0xFF272E29.toInt(), 0xFFB0C3B1.toInt())
             else -> forTheme("sepia")
         }
     }

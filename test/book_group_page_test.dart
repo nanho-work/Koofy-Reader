@@ -215,7 +215,8 @@ void main() {
         books: shelf_test.demoBooks.take(4).toList(),
       );
       await tester.pumpAndSettle();
-      expect(find.byTooltip('서재 검색'), findsNothing);
+      expect(find.byTooltip('서재 검색'), findsOneWidget);
+      await tester.tap(find.byTooltip('서재 검색'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byType(TextField));
       await tester.enterText(find.byType(TextField), '작은 생활');

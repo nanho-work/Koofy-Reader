@@ -8,7 +8,7 @@ class ReaderPalette {
   final Color secondary;
   final Color panel;
   final Color accent;
-  static const light = ReaderPalette(Color(0xFFF7F5EE), Color(0xFF26382D), Color(0xFF657060), Color(0xFFECEDE4), Color(0xFF345641));
-  static const sepia = ReaderPalette(Color(0xFFF7F4ED), Color(0xFF26382D), Color(0xFF687265), Color(0xFFEAECE2), Color(0xFF345641));
-  static const dark = ReaderPalette(Color(0xFF202520), Color(0xFFEDECE3), Color(0xFFB3BBAE), Color(0xFF2C332D), Color(0xFFAECAB1));
+  static const light = ReaderPalette(Color(0xFFFAF9F5), Color(0xFF2D332F), Color(0xFF636B64), Color(0xFFF0EFE9), Color(0xFF3F5C49));
+  static const sepia = ReaderPalette(Color(0xFFF3EDE0), Color(0xFF39392F), Color(0xFF676353), Color(0xFFE8E0D0), Color(0xFF536047));
+  static const dark = ReaderPalette(Color(0xFF1C211F), Color(0xFFE7E9E2), Color(0xFFA7AFA7), Color(0xFF272E29), Color(0xFFB0C3B1));
 }

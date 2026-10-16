@@ -21,8 +21,18 @@ class BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (book.coverPath != null || book.coverAssetPath != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+      return Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .10),
+              blurRadius: 7,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -67,7 +77,7 @@ class BookCover extends StatelessWidget {
     final foreground = Theme.of(context).colorScheme.onSurface;
     final colors = dark
         ? const [Color(0xFF354238), Color(0xFF444137), Color(0xFF39413A)]
-        : const [Color(0xFFEAE4D4), Color(0xFFDCE3D5), Color(0xFFE3D8C8)];
+        : const [Color(0xFFE8E3D7), Color(0xFFDFE4D9), Color(0xFFE6DDD4)];
     final index =
         book.id.codeUnits.fold(0, (sum, unit) => sum + unit) % colors.length;
     return Semantics(
@@ -75,7 +85,7 @@ class BookCover extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors[index],
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(4),
           boxShadow: const [
             BoxShadow(
               color: Color(0x0C000000),
@@ -86,7 +96,7 @@ class BookCover extends StatelessWidget {
           border: Border(
             left: BorderSide(
               color: foreground.withValues(alpha: 0.12),
-              width: 4,
+              width: 2,
             ),
           ),
         ),
@@ -193,11 +203,11 @@ class BookTile extends StatelessWidget {
               color: Theme.of(
                 context,
               ).colorScheme.surface.withValues(alpha: 0.9),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
               Icons.more_horiz,
-              size: 20,
+              size: 18,
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
@@ -219,7 +229,7 @@ class BookTile extends StatelessWidget {
                         color: Theme.of(
                           context,
                         ).colorScheme.onSurface.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
@@ -233,7 +243,7 @@ class BookTile extends StatelessWidget {
                         color: Theme.of(
                           context,
                         ).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(4),
                         border: Border.all(
                           color: Theme.of(
                             context,

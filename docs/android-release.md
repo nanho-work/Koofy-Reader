@@ -243,3 +243,12 @@ Play Console 업로드·심사·실기기 릴리스 테스트는 아직 하지 �
 - Play Console에 3개 언어 설명과 새 스크린샷 초안을 저장하고 기존 Alpha에서 AAB 처리를 시작했다. 최종 검토 제출 및 국가 확장은 아직 확인 전이다.
 - Play Console 최종 제출 완료: `검토 중인 변경사항` 확인. 1.5.0(14) 비공개 Alpha 100%, 영어·일본어 등록정보 신규, 한국어 설명/스크린샷 변경, 국가 170개 및 기타 국가 추가 총 7개 변경을 전송했다. 기존 7개와 합쳐 177개 명시 국가/지역 및 기타 국가 대상이며 테스터 제한은 유지한다.
 - 사전 빠른 검사와 Google 검토 후 비공개 테스터에게 자동 게시된다. 프로덕션 승격은 수행하지 않았다. 증빙: `work/release/1.5.0-14/play-submitted.png`.
+
+## 2026-10-16 Android 1.6.0 (15) 릴리즈 파일 제공
+
+- 사용자 요청: Android는 업로드/제출하지 않고 릴리즈 AAB만 생성. iOS는 별도로 심사 제출 진행.
+- pubspec 1.6.0+15, store 업데이트 채널로 AAB 빌드 성공. 도서·글꼴/검색 작업 행, 설정 슬라이드 패널, 단일 전체 테마, 책갈피 관리·삭제 취소, 세밀한 간격/자동 넘김, 이어 읽기·UI 정리 포함.
+- 파일: work/release/1.6.0-15/KoofyReader-1.6.0-15.aab (105,874,870 bytes).
+- SHA-256: 9ff214daf9c836300e81c968c44d897bae8d49847f72a405926fe06d937aed4c.
+- 패키지 com.koofylab.koofyreader, versionName 1.6.0, versionCode 15. debuggable/testOnly 비활성, 이전 1.5.0(14) 업로드 인증서 동일. jarsigner 무결성, bundletool validate, Readium 서비스 7개 보존, 64비트 ELF 10개 16KB 정렬 및 PAGE_ALIGNMENT_16K 설정 검증 통과.
+- Flutter 전체 306개 및 소스 정적 분석 통과. 릴리즈 노트 KO/EN/JA 파일과 검사 로그를 같은 폴더에 보관. Google Play Console과 Remote Config는 변경하지 않았다.

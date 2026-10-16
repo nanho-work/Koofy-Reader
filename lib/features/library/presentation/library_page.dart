@@ -654,8 +654,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       key: const ValueKey('continue-reading-card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.transparent,
+        border: Border(
+          bottom: BorderSide(color: colors.outlineVariant, width: .7),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -725,7 +727,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     if (state.progression != null) ...[
                       LinearProgressIndicator(
                         value: state.progression,
-                        minHeight: 3,
+                        minHeight: 2,
                         semanticsLabel: tr("{0} 읽은 비율", [book.title]),
                         semanticsValue: state.progressLabel,
                       ),

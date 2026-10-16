@@ -9,9 +9,9 @@ struct ReaderPalette {
     let accent: UIColor
     static func forTheme(_ theme: String) -> ReaderPalette {
         switch ReaderTheme.resolve(theme) {
-        case "light": return ReaderPalette(background: color(0xF7F5EE), foreground: color(0x26382D), secondary: color(0x657060), panel: color(0xECEDE4), accent: color(0x345641))
-        case "sepia": return ReaderPalette(background: color(0xF7F4ED), foreground: color(0x26382D), secondary: color(0x687265), panel: color(0xEAECE2), accent: color(0x345641))
-        case "dark": return ReaderPalette(background: color(0x202520), foreground: color(0xEDECE3), secondary: color(0xB3BBAE), panel: color(0x2C332D), accent: color(0xAECAB1))
+        case "light": return ReaderPalette(background: color(0xFAF9F5), foreground: color(0x2D332F), secondary: color(0x636B64), panel: color(0xF0EFE9), accent: color(0x3F5C49))
+        case "sepia": return ReaderPalette(background: color(0xF3EDE0), foreground: color(0x39392F), secondary: color(0x676353), panel: color(0xE8E0D0), accent: color(0x536047))
+        case "dark": return ReaderPalette(background: color(0x1C211F), foreground: color(0xE7E9E2), secondary: color(0xA7AFA7), panel: color(0x272E29), accent: color(0xB0C3B1))
         default: return forTheme("sepia")
         }
     }

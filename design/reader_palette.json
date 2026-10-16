@@ -1,23 +1,23 @@
 {
   "light": {
-    "background": "F7F5EE",
-    "foreground": "26382D",
-    "secondary": "657060",
-    "panel": "ECEDE4",
-    "accent": "345641"
+    "background": "FAF9F5",
+    "foreground": "2D332F",
+    "secondary": "636B64",
+    "panel": "F0EFE9",
+    "accent": "3F5C49"
   },
   "sepia": {
-    "background": "F7F4ED",
-    "foreground": "26382D",
-    "secondary": "687265",
-    "panel": "EAECE2",
-    "accent": "345641"
+    "background": "F3EDE0",
+    "foreground": "39392F",
+    "secondary": "676353",
+    "panel": "E8E0D0",
+    "accent": "536047"
   },
   "dark": {
-    "background": "202520",
-    "foreground": "EDECE3",
-    "secondary": "B3BBAE",
-    "panel": "2C332D",
-    "accent": "AECAB1"
+    "background": "1C211F",
+    "foreground": "E7E9E2",
+    "secondary": "A7AFA7",
+    "panel": "272E29",
+    "accent": "B0C3B1"
   }
 }
