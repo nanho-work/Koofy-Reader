@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.author           = { 'Koofy Reader' => 'Koofy Reader' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.swift'
-  s.resource_bundles = { 'KoofyReaderAssets' => ['Resources/*.js', 'Resources/translate-*.png', 'Resources/Fonts/*.otf', 'Resources/Fonts/catalog.json'] }
+  s.resource_bundles = { 'KoofyReaderAssets' => ['Resources/*.js', 'Resources/translate-*.png', 'Resources/Fonts/*.otf', 'Resources/Fonts/*.ttf', 'Resources/Fonts/catalog.json'] }
   s.dependency 'Flutter'
   s.dependency 'GoogleMLKit/Translate', '8.0.0'
   s.dependency 'IronSourceSDK', '9.4.0.0'

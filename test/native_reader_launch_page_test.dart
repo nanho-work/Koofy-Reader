@@ -343,7 +343,7 @@ void main() {
       await pumpUntil(tester, () => gateway.openCalls == 2);
       expect(gateway.request!.publicationId, 'next');
       expect(gateway.request!.nextBookTitle, isNull);
-      expect(gateway.request!.preferences.theme, 'dark');
+      expect(gateway.request!.preferences.theme, 'app');
       expect(
         (await tester.runAsync(
           () => coordinator.store.loadPosition('book', 'revision'),

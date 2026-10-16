@@ -116,6 +116,8 @@ private struct Checkpoint: Codable {
     let lineHeight: Double?
     let paragraphSpacing: Double?
     let pageMargins: Double?
+    let footerInfo: String?
+    let autoTurnSeconds: Int64?
     let errorCode: String?
     let message: String?
 
@@ -138,6 +140,8 @@ private struct Checkpoint: Codable {
         lineHeight = event.preferences?.lineHeight
         paragraphSpacing = event.preferences?.paragraphSpacing
         pageMargins = event.preferences?.pageMargins
+        footerInfo = event.preferences?.footerInfo
+        autoTurnSeconds = event.preferences?.autoTurnSeconds
         errorCode = event.errorCode
         message = event.message
     }
@@ -147,7 +151,7 @@ private struct Checkpoint: Codable {
         if let fontScale, let columnCount, let scroll, let theme {
             preferences = ReaderPreferences(fontScale: fontScale, columnCount: columnCount, scroll: scroll,
                 theme: theme, pageTurnStyle: pageTurnStyle, fontId: fontId,
-                lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, pageMargins: pageMargins)
+                lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, pageMargins: pageMargins, footerInfo: footerInfo, autoTurnSeconds: autoTurnSeconds)
         }
         return ReaderEvent(protocolVersion: protocolVersion, sessionId: sessionId,
             sessionGeneration: sessionGeneration, publicationId: publicationId,

@@ -15,13 +15,13 @@ for name, values in palettes.items():
 dart += '}\n'
 kotlin = banner + 'package com.koofy.reader.bridge\n\ninternal data class ReaderPalette(\n'
 kotlin += ',\n'.join('    val ' + k + ': Int' for k in keys) + '\n) {\n    companion object {\n'
-kotlin += '        fun forTheme(theme: String): ReaderPalette = when (theme) {\n'
+kotlin += '        fun forTheme(theme: String): ReaderPalette = when (ReaderTheme.resolve(theme)) {\n'
 for name, values in palettes.items():
     kotlin += '            "' + name + '" -> ReaderPalette(' + ', '.join('0xFF' + values[k] + '.toInt()' for k in keys) + ')\n'
 kotlin += '            else -> forTheme("sepia")\n        }\n    }\n}\n'
 swift = banner + 'import UIKit\n\nstruct ReaderPalette {\n'
 swift += ''.join('    let ' + k + ': UIColor\n' for k in keys)
-swift += '    static func forTheme(_ theme: String) -> ReaderPalette {\n        switch theme {\n'
+swift += '    static func forTheme(_ theme: String) -> ReaderPalette {\n        switch ReaderTheme.resolve(theme) {\n'
 for name, values in palettes.items():
     swift += '        case "' + name + '": return ReaderPalette(' + ', '.join(k + ': color(0x' + values[k] + ')' for k in keys) + ')\n'
 swift += '        default: return forTheme("sepia")\n        }\n    }\n'

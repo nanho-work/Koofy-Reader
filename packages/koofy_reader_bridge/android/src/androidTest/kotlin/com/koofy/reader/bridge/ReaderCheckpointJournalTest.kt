@@ -24,6 +24,40 @@ class ReaderCheckpointJournalTest {
 
     @After fun tearDown() { root.deleteRecursively() }
 
+
+    @Test fun settingsPanelUsesTwoThirdsOfItsOwnPane() {
+        assertEquals(260, ReaderSettingsDialog.panelWidth(390, 240))
+        assertEquals(280, ReaderSettingsDialog.panelWidth(420, 240))
+        assertEquals(240, ReaderSettingsDialog.panelWidth(320, 240))
+        assertEquals(200, ReaderSettingsDialog.panelWidth(200, 240))
+    }
+    @Test fun readerUxPreferencesAndLegacyJournalRoundTrip() {
+        val original = event("ux", 1)
+        journal.write(original.copy(preferences = original.preferences!!.copy(lineHeight = 2.75, footerInfo = "both", autoTurnSeconds = 17, fontId = "nanum-gothic")))
+        val recovered = ReaderCheckpointJournal(root).pending().single().preferences!!
+        assertEquals(2.75, recovered.lineHeight!!, 0.0)
+        assertEquals("both", recovered.footerInfo)
+        assertEquals(17L, recovered.autoTurnSeconds)
+        validatePreferences(recovered)
+    }
+    @Test fun positionLabelsExcludeDisplayCoverAndResolveOldBookmarks() {
+        fun locator(href: String, position: Int, progression: Double) = org.readium.r2.shared.publication.Locator.fromJSON(org.json.JSONObject("""{"href":"$href","type":"application/xhtml+xml","locations":{"position":$position,"progression":$progression}}"""))!!
+        val info = ReaderLocationInfo(listOf(locator("__koofy_reader_cover_v1__/cover.xhtml", 1, 0.0), locator("a.xhtml", 2, 0.0), locator("a.xhtml", 3, .5), locator("b.xhtml", 4, 0.0)))
+        assertEquals("약 33%", info.detail(locator("a.xhtml", 3, .5)))
+        val old = org.readium.r2.shared.publication.Locator.fromJSON(org.json.JSONObject("""{"href":"a.xhtml","type":"application/xhtml+xml","locations":{"progression":0.7}}"""))!!
+        assertEquals(2, info.index(old))
+        assertEquals("약 33%", info.detail(old))
+        assertEquals("약 33%", info.detail(locator("a.xhtml", 3, .5), approximate = true))
+        assertTrue(info.detail(locator("a.xhtml", 3, .5), approximate = true).contains("약 33%"))
+        // A stale position belonging to another resource cannot become an exact label.
+        assertEquals("약 66%", info.detail(locator("b.xhtml", 2, 0.0)))
+        assertEquals(info.progress(old), info.footer(old, "location"))
+        assertEquals(info.progress(old), info.footer(old, "both"))
+        assertFalse(info.detail(old).contains("위치"))
+        assertEquals("", info.footer(old, "none"))
+        assertNull(info.index(locator("missing.xhtml", 9, 0.0)))
+    }
+
     @Test fun staleAcknowledgementCannotRemoveNewerLocation() {
         journal.write(event("session-a", 1))
         journal.write(event("session-a", 2))

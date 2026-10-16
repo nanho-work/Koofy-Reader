@@ -78,6 +78,8 @@ flutter:
   assets:
     - assets/books/
     - assets/legal/
+    - assets/fonts/NanumGothic-OFL.txt
+    - assets/fonts/NanumMyeongjo-OFL.txt
     - assets/encoding/
 
   # To add assets to your application, add an assets section, like this:

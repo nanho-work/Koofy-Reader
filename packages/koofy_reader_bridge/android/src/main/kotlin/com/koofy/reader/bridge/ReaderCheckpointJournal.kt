@@ -98,6 +98,8 @@ internal class ReaderCheckpointJournal(filesDir: File) {
                 put("lineHeight", preferences.lineHeight)
                 put("paragraphSpacing", preferences.paragraphSpacing)
                 put("pageMargins", preferences.pageMargins)
+                put("footerInfo", preferences.footerInfo)
+                put("autoTurnSeconds", preferences.autoTurnSeconds)
             })
         }
     }
@@ -117,7 +119,8 @@ internal class ReaderCheckpointJournal(filesDir: File) {
             preferences = json.optJSONObject("preferences")?.let {
                 ReaderPreferences(it.getDouble("fontScale"), it.getLong("columnCount"),
                     it.getBoolean("scroll"), it.getString("theme"), it.optionalString("pageTurnStyle"), it.optionalString("fontId"),
-                    it.optionalDouble("lineHeight"), it.optionalDouble("paragraphSpacing"), it.optionalDouble("pageMargins"))
+                    it.optionalDouble("lineHeight"), it.optionalDouble("paragraphSpacing"), it.optionalDouble("pageMargins"), it.optionalString("footerInfo"),
+                    if (it.has("autoTurnSeconds") && !it.isNull("autoTurnSeconds")) it.getLong("autoTurnSeconds") else null)
             },
             errorCode = json.optionalString("errorCode"),
             message = json.optionalString("message"),

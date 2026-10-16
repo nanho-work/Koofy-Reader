@@ -66,7 +66,7 @@ void main() {
         final saved = await store.loadPosition('book', 'r1');
         expect(saved.bookmarksJson, bookmarks);
         expect(saved.locatorJson, contains('chapter.xhtml'));
-        expect(saved.preferences.theme, 'light');
+        expect(saved.preferences.theme, 'app');
       }
     },
   );

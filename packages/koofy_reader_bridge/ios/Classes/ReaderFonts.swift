@@ -8,8 +8,8 @@ import ReadiumShared
 /// Installs the bundled catalog in private storage. The navigator consumes local
 /// files, so a future downloader can supply fonts through the same interface.
 final class ReaderFonts {
-    static let ids = ["default", "maplestory", "hakgyoansim-siganpyo"]
-    static var labels: [String] { [L("기본"), "메이플스토리", "학교안심 시간표"] }
+    static let ids = ["default", "maplestory", "hakgyoansim-siganpyo", "nanum-gothic", "nanum-myeongjo"]
+    static var labels: [String] { [L("기본"), "메이플스토리", "학교안심 시간표", L("나눔고딕"), L("나눔명조")] }
 
     private struct Catalog: Decodable {
         let version: Int
@@ -55,11 +55,11 @@ final class ReaderFonts {
             let faces: [CSSFontFace] = try family.faces.map { face in
                 guard face.sha256.count == 64, face.sha256.allSatisfy({ "0123456789abcdef".contains($0) }),
                       let weight = CSSStandardFontWeight(rawValue: face.weight) else { throw Self.invalidFont() }
-                let target = directory.appendingPathComponent(face.sha256).appendingPathExtension("otf")
+                let target = directory.appendingPathComponent(face.sha256).appendingPathExtension((face.file as NSString).pathExtension)
                 if (try? Data(contentsOf: target)).map(Self.digest) != face.sha256 {
                     guard let source = resources.url(forResource: face.file, withExtension: nil) else { throw Self.invalidFont() }
                     let bytes = try Data(contentsOf: source)
-                    guard bytes.prefix(4) == Data("OTTO".utf8), Self.digest(bytes) == face.sha256 else { throw Self.invalidFont() }
+                    guard (bytes.prefix(4) == Data("OTTO".utf8) || bytes.prefix(4) == Data([0, 1, 0, 0])), Self.digest(bytes) == face.sha256 else { throw Self.invalidFont() }
                     try bytes.write(to: target, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
                 }
                 guard let file = FileURL(url: target) else { throw Self.invalidFont() }
@@ -69,7 +69,7 @@ final class ReaderFonts {
                 alternates: [.sansSerif], fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
         }
         var loadedIds = ["default"] + catalog.families.map(\.id)
-        var loadedLabels = [L("기본")] + catalog.families.map(\.label)
+        var loadedLabels = [L("기본")] + catalog.families.map { L($0.label) }
         let support = try FileManager.default.url(for: .applicationSupportDirectory,
             in: .userDomainMask, appropriateFor: nil, create: true)
         for remoteDirectory in [downloadedDirectory ?? support.appendingPathComponent("cloud_reader/fonts", isDirectory: true), support.appendingPathComponent("personal_fonts", isDirectory: true)] {

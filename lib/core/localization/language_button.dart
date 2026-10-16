@@ -8,8 +8,51 @@ class LanguageButton extends StatelessWidget {
     listenable: AppLanguage.instance,
     builder: (context, _) => PopupMenuButton<String>(
       key: const ValueKey('language-picker'),
-      tooltip: tr('언어'),
-      icon: const Icon(Icons.language),
+      tooltip:
+          '${tr('언어')} · ${const {'ko': '한국어', 'en': 'English', 'ja': '日本語'}[AppLanguage.instance.code]}',
+      icon: SizedBox(
+        width: 32,
+        height: 32,
+        child: Stack(
+          children: [
+            const Positioned(
+              left: 0,
+              top: 0,
+              child: Icon(Icons.language, size: 24),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: ExcludeSemantics(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Text(
+                    AppLanguage.instance.code.toUpperCase(),
+                    key: const ValueKey('language-badge'),
+                    textScaler: TextScaler.noScaling,
+                    style: TextStyle(
+                      fontSize: 9,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       initialValue: AppLanguage.instance.selection ?? 'system',
       onSelected: (value) async {
         try {

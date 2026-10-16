@@ -146,6 +146,10 @@ struct ReaderPreferences: Hashable {
   var lineHeight: Double? = nil
   var paragraphSpacing: Double? = nil
   var pageMargins: Double? = nil
+  /// none, progress, location, both. Null preserves the progress default.
+  var footerInfo: String? = nil
+  /// Interval only. Automatic turning always starts paused in a new session.
+  var autoTurnSeconds: Int64? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -159,6 +163,8 @@ struct ReaderPreferences: Hashable {
     let lineHeight: Double? = nilOrValue(pigeonVar_list[6])
     let paragraphSpacing: Double? = nilOrValue(pigeonVar_list[7])
     let pageMargins: Double? = nilOrValue(pigeonVar_list[8])
+    let footerInfo: String? = nilOrValue(pigeonVar_list[9])
+    let autoTurnSeconds: Int64? = nilOrValue(pigeonVar_list[10])
 
     return ReaderPreferences(
       fontScale: fontScale,
@@ -169,7 +175,9 @@ struct ReaderPreferences: Hashable {
       fontId: fontId,
       lineHeight: lineHeight,
       paragraphSpacing: paragraphSpacing,
-      pageMargins: pageMargins
+      pageMargins: pageMargins,
+      footerInfo: footerInfo,
+      autoTurnSeconds: autoTurnSeconds
     )
   }
   func toList() -> [Any?] {
@@ -183,6 +191,8 @@ struct ReaderPreferences: Hashable {
       lineHeight,
       paragraphSpacing,
       pageMargins,
+      footerInfo,
+      autoTurnSeconds,
     ]
   }
   static func == (lhs: ReaderPreferences, rhs: ReaderPreferences) -> Bool {

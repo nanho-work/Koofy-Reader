@@ -77,10 +77,8 @@ extension _LibraryGroups on _LibraryPageState {
       }
       final selection = await Navigator.of(context).push<GroupSelection>(
         MaterialPageRoute(
-          builder: (_) => Theme(
-            data: KoofyTheme.forBrightness(
-              MediaQuery.platformBrightnessOf(context),
-            ),
+          builder: (routeContext) => Theme(
+            data: Theme.of(routeContext),
             child: BookGroupEditor(
               books: books,
               initialIds: initialIds,
@@ -115,10 +113,8 @@ extension _LibraryGroups on _LibraryPageState {
       }
       final selection = await Navigator.of(context).push<GroupSelection>(
         MaterialPageRoute(
-          builder: (_) => Theme(
-            data: KoofyTheme.forBrightness(
-              MediaQuery.platformBrightnessOf(context),
-            ),
+          builder: (routeContext) => Theme(
+            data: Theme.of(routeContext),
             child: BookGroupEditor(
               books: books,
               creating: false,

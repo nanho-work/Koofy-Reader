@@ -111,12 +111,14 @@ class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
 }
 
 internal fun validatePreferences(value: ReaderPreferences) {
-    require(value.lineHeight == null || (value.lineHeight.isFinite() && value.lineHeight in 1.0..2.0)) { "Invalid line height" }
+    require(value.lineHeight == null || (value.lineHeight.isFinite() && value.lineHeight in 1.0..3.0)) { "Invalid line height" }
     require(value.paragraphSpacing == null || (value.paragraphSpacing.isFinite() && value.paragraphSpacing in 0.0..2.0)) { "Invalid paragraph spacing" }
     require(value.pageMargins == null || (value.pageMargins.isFinite() && value.pageMargins in 0.5..2.0)) { "Invalid page margins" }
+    require(value.footerInfo == null || value.footerInfo in listOf("none", "progress", "location", "both")) { "Invalid footer info" }
+    require(value.autoTurnSeconds == null || value.autoTurnSeconds in 5L..300L) { "Invalid auto-turn interval" }
     require(value.fontScale.isFinite() && value.fontScale in 0.5..3.0) { "Invalid font scale" }
     require(value.columnCount in 0L..2L) { "Invalid column count" }
-    require(value.theme in listOf("light", "sepia", "dark")) { "Invalid reader theme" }
+    require(value.theme in listOf("app", "light", "sepia", "dark")) { "Invalid reader theme" }
     require(ReaderFonts.isValidId(value.fontId)) { "Invalid reader font" }
     require(value.pageTurnStyle == null || value.pageTurnStyle in listOf("instant", "curl")) { "Invalid page turn style" }
 }

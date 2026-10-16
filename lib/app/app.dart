@@ -1,4 +1,5 @@
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/ads/presentation/app_ad_route_observer.dart';
@@ -27,14 +28,21 @@ class _KoofyReaderAppState extends State<KoofyReaderApp> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: AppLanguage.instance,
+      listenable: Listenable.merge([
+        AppLanguage.instance,
+        AppAppearance.instance,
+      ]),
       builder: (context, _) => MaterialApp(
         locale: AppLanguage.instance.locale,
         supportedLocales: const [Locale('ko'), Locale('en'), Locale('ja')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         title: 'Koofy Reader',
+        themeMode: AppAppearance.instance.mode,
         navigatorObservers: [_ads],
-        theme: KoofyTheme.forBrightness(Brightness.light),
+        theme: KoofyTheme.forBrightness(
+          Brightness.light,
+          paper: AppAppearance.instance.selection == 'sepia',
+        ),
         darkTheme: KoofyTheme.forBrightness(Brightness.dark),
         initialRoute: AppRoutes.library,
         onGenerateRoute: AppRouter.onGenerateRoute,

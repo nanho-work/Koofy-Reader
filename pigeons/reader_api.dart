@@ -21,6 +21,8 @@ class ReaderPreferences {
     this.lineHeight,
     this.paragraphSpacing,
     this.pageMargins,
+    this.footerInfo,
+    this.autoTurnSeconds,
   });
   double fontScale;
   int columnCount;
@@ -37,6 +39,12 @@ class ReaderPreferences {
   double? lineHeight;
   double? paragraphSpacing;
   double? pageMargins;
+
+  /// none, progress, location, both. Null preserves the progress default.
+  String? footerInfo;
+
+  /// Interval only. Automatic turning always starts paused in a new session.
+  int? autoTurnSeconds;
 }
 
 class ReaderLaunchRequest {

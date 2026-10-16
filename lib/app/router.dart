@@ -37,10 +37,7 @@ class AppRouter {
           settings: settings,
         );
       case AppRoutes.settings:
-        return MaterialPageRoute<void>(
-          builder: (_) => const SettingsPage(),
-          settings: settings,
-        );
+        return settingsPanelRoute(settings);
       default:
         return _errorRoute('알 수 없는 화면입니다: ${settings.name}');
     }

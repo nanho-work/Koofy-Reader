@@ -26,6 +26,49 @@ ReaderEvent checkpoint(
 
 void main() {
   test(
+    'expanded spacing and footer settings survive codec, database and legacy JSON',
+    () async {
+      final store = NativeReaderStore(NativeDatabase.memory());
+      addTearDown(store.close);
+      final session = await store.beginSession('book', 'r1');
+      final value = defaultReaderPreferences()
+        ..lineHeight = 2.75
+        ..footerInfo = 'both'
+        ..autoTurnSeconds = 17
+        ..fontId = 'nanum-myeongjo';
+      final decoded = ReaderPreferences.decode(value.encode());
+      await store.acceptCheckpoint(checkpoint(session)..preferences = decoded);
+      final saved = (await store.loadPosition('book', 'r1')).preferences;
+      expect(saved.lineHeight, 2.75);
+      expect(saved.footerInfo, 'both');
+      expect(saved.autoTurnSeconds, 17);
+      expect(saved.fontId, 'nanum-myeongjo');
+      final legacy = preferencesFromJson(
+        '{"fontScale":1.0,"columnCount":0,"scroll":false,"theme":"light"}',
+      );
+      expect(legacy.footerInfo, 'progress');
+      expect(legacy.autoTurnSeconds, 30);
+      for (final invalid in [
+        defaultReaderPreferences()..lineHeight = 3.01,
+        defaultReaderPreferences()..footerInfo = 'screen-page',
+        defaultReaderPreferences()..autoTurnSeconds = 0,
+        defaultReaderPreferences()..autoTurnSeconds = 301,
+      ]) {
+        await expectLater(
+          store.acceptCheckpoint(
+            checkpoint(session, sequence: 2)..preferences = invalid,
+          ),
+          throwsFormatException,
+        );
+      }
+      expect(
+        (await store.loadPosition('book', 'r1')).preferences.lineHeight,
+        2.75,
+      );
+    },
+  );
+
+  test(
     'permanent removal clears reading state and acknowledges stale checkpoints',
     () async {
       final store = NativeReaderStore(NativeDatabase.memory());

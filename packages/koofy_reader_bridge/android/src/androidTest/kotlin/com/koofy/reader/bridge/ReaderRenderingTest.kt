@@ -59,6 +59,211 @@ class ReaderRenderingTest {
         fixture.delete()
     }
 
+
+    @Test fun settingsPanelAccordionPreservesViewportAndReadingAnchor() {
+        launch()
+        val original = ReaderRuntime.session!!.locatorJson!!
+        var viewport = android.util.Size(0, 0)
+        var panel: ReaderSettingsDialog? = null
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+        fun view(name: String): android.view.View = ReaderSettingsDialog::class.java.getDeclaredField(name).apply { isAccessible = true }.get(panel) as android.view.View
+        fun all(view: android.view.View): List<android.view.View> = listOf(view) +
+            (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { all(view.getChildAt(it)) } else emptyList())
+        fun section(name: String) { view("root").findViewWithTag<android.view.View>("reader.settings.section.$name").performClick() }
+        fun choice(title: String): android.widget.Button = all(view("root")).filterIsInstance<android.widget.Button>().first { it.text.toString().removePrefix("✓ ") == title }
+        scenario!!.onActivity { activity ->
+            viewport = android.util.Size(navigator(activity).view!!.width, navigator(activity).view!!.height)
+            ReaderActivity::class.java.getDeclaredMethod("showSettings").apply { isAccessible = true }.invoke(activity)
+            panel = ReaderActivity::class.java.getDeclaredField("settingsDialog").apply { isAccessible = true }.get(activity) as ReaderSettingsDialog
+            dialog = ReaderSettingsDialog::class.java.getDeclaredField("dialog").apply { isAccessible = true }.get(panel) as androidx.appcompat.app.AlertDialog
+        }
+        awaitCondition("Side panel did not finish its entrance") {
+            var ready = false
+            scenario!!.onActivity { ready = view("root").width > 0 && view("shell").translationX == 0f }
+            ready
+        }
+        fun capturePanel(name: String) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("screencap -p /sdcard/Download/koofy-settings-panel-$name.png")).use { it.readBytes() }
+        }
+        capturePanel("closed")
+        scenario!!.onActivity { section("spacing") }
+        awaitCondition("Expanded spacing was not laid out") {
+            var laidOut = false
+            scenario!!.onActivity { laidOut = all(view("root")).filterIsInstance<android.widget.SeekBar>().any { it.height > 0 } }
+            laidOut
+        }
+        capturePanel("spacing")
+        scenario!!.onActivity { section("spacing") }
+        scenario!!.onActivity { activity ->
+            section("footer")
+            val options = all(view("root")).filterIsInstance<android.widget.Button>().map { it.text.toString().removePrefix("✓ ") }
+            assertTrue(options.contains("없음") && options.contains("진행률"))
+            assertFalse(options.contains("위치") || options.contains("함께"))
+            assertEquals(viewport, android.util.Size(navigator(activity).view!!.width, navigator(activity).view!!.height))
+            assertTrue(view("shell").width < view("root").width)
+            assertTrue("Overlay must cover the complete reader height", view("root").height >= viewport.height)
+            assertTrue("Panel must reach the reader bottom", view("shell").height >= viewport.height)
+            val density = activity.resources.displayMetrics.density
+            val base = if (viewport.width / density >= 700) viewport.width / 2 else viewport.width
+            assertEquals(ReaderSettingsDialog.panelWidth(base, (240 * density).toInt()), view("shell").width)
+            assertEquals(8, all(view("root")).count { it.tag?.toString()?.startsWith("reader.settings.section.") == true })
+            section("spacing")
+            assertEquals(1, all(view("root")).filterIsInstance<android.widget.SeekBar>().size)
+            section("spacing")
+            assertTrue(all(view("root")).filterIsInstance<android.widget.SeekBar>().isEmpty())
+            section("font")
+            assertNull(all(view("root")).firstOrNull { it.tag == "reader.settings.section.theme" })
+            section("page"); choice("연속 스크롤").performClick()
+        }
+        awaitCondition("Scroll mode update was not applied") { ReaderRuntime.session!!.ready && ReaderRuntime.session!!.preferences.scroll }
+        scenario!!.onActivity {
+            assertFalse(choice("두 페이지").isEnabled)
+            assertFalse(choice("책장 넘기기").isEnabled)
+            assertTrue(choice("페이지 넘김").isEnabled)
+            choice("페이지 넘김").performClick()
+        }
+        awaitCondition("Paged reading did not restore its anchor") { ReaderRuntime.session!!.ready && !ReaderRuntime.session!!.preferences.scroll && ReaderRuntime.session!!.locatorJson == original }
+        // A backdrop tap must dismiss without becoming a page turn.
+        scenario!!.onActivity { view("root").performClick() }
+        awaitCondition("Backdrop tap did not close settings") { !dialog!!.isShowing }
+        scenario!!.onActivity { activity ->
+            assertEquals(viewport, android.util.Size(navigator(activity).view!!.width, navigator(activity).view!!.height))
+            assertEquals(original, ReaderRuntime.session!!.locatorJson)
+        }
+    }
+
+    @Test fun bookmarksAddRemoveUndoAndMoveWithoutNestedActionMenus() {
+        launch()
+        val original = ReaderRuntime.session!!.locatorJson!!
+        val target = org.readium.r2.shared.publication.Locator.fromJSON(JSONObject(original))!!
+        var stored = "[]"
+        var rejectSave = false
+        var jumped: org.readium.r2.shared.publication.Locator? = null
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+        var tools: ReaderTools? = null
+        fun view(tag: String): android.view.View? = dialog?.window?.decorView?.findViewWithTag(tag)
+        scenario!!.onActivity { activity ->
+            val publication = ReaderActivity::class.java.getDeclaredField("publication").apply { isAccessible = true }.get(activity) as org.readium.r2.shared.publication.Publication
+            tools = ReaderTools(activity, activity.lifecycleScope, publication, ReaderPalette.forTheme("light"), { target }, { stored }, { value, done ->
+                if (rejectSave) done(false) else { stored = value; done(true) }
+            }, { jumped = it }, { "42%" })
+            tools!!.show()
+            dialog = ReaderTools::class.java.getDeclaredField("bookmarkDialog").apply { isAccessible = true }.get(tools) as androidx.appcompat.app.AlertDialog
+            assertEquals(L("이곳에 책갈피 추가"), (view("bookmark-toggle") as android.widget.Button).text.toString())
+            view("bookmark-toggle")!!.performClick()
+            assertEquals(1, org.json.JSONArray(stored).length())
+            assertEquals(L("이곳의 책갈피 해제"), (view("bookmark-toggle") as android.widget.Button).text.toString())
+        }
+        val originalRow = org.json.JSONArray(stored).getJSONObject(0)
+        val id = originalRow.getString("id")
+        awaitCondition("Bookmark row did not expose delete directly") {
+            var ready = false
+            scenario!!.onActivity { ready = view("bookmark-delete-$id") != null }
+            ready
+        }
+        android.os.SystemClock.sleep(500) // Let the dialog entrance animation finish before visual capture.
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("screencap -p /sdcard/Download/koofy-bookmark-manager.png")).use { it.readBytes() }
+        scenario!!.onActivity {
+            rejectSave = true
+            view("bookmark-delete-$id")!!.performClick()
+            assertEquals("Failed persistence must retain the bookmark", 1, org.json.JSONArray(stored).length())
+            rejectSave = false
+        }
+        awaitCondition("Bookmark delete action disappeared after failure") {
+            var ready = false
+            scenario!!.onActivity { ready = view("bookmark-delete-$id") != null }
+            ready
+        }
+        scenario!!.onActivity {
+            view("bookmark-delete-$id")!!.performClick()
+            assertEquals(0, org.json.JSONArray(stored).length())
+            assertEquals(android.view.View.VISIBLE, view("bookmark-undo")!!.visibility)
+            view("bookmark-undo")!!.performClick()
+            val restored = org.json.JSONArray(stored).getJSONObject(0)
+            assertEquals(id, restored.getString("id"))
+            assertEquals(originalRow.getJSONObject("locator").toString(), restored.getJSONObject("locator").toString())
+            assertEquals(L("이곳의 책갈피 해제"), (view("bookmark-toggle") as android.widget.Button).text.toString())
+            dialog!!.dismiss()
+            tools!!.show()
+            dialog = ReaderTools::class.java.getDeclaredField("bookmarkDialog").apply { isAccessible = true }.get(tools) as androidx.appcompat.app.AlertDialog
+        }
+        awaitCondition("Reopening bookmarks did not retain the saved entry") {
+            var ready = false
+            scenario!!.onActivity { ready = view("bookmark-open-$id") != null }
+            ready
+        }
+        scenario!!.onActivity {
+            view("bookmark-open-$id")!!.performClick()
+            assertFalse(dialog!!.isShowing)
+            assertTrue("Saved anchor changed: ${target.toJSON()} vs ${jumped!!.toJSON()}", ReaderBookmarkIdentity.same(target, jumped!!))
+            assertEquals(original, ReaderRuntime.session!!.locatorJson)
+        }
+    }
+
+    @Test fun accessibleSpacingFontsFooterAndAutomaticTurning() {
+        launch(preferences = ReaderPreferences(1.0, 1, false, "light", lineHeight = 2.75, fontId = "nanum-gothic", footerInfo = "both", autoTurnSeconds = 5))
+        val original = ReaderRuntime.session!!.locatorJson!!
+        val spacing = snapshot("""JSON.stringify({line:parseFloat(getComputedStyle(document.querySelector('p')).lineHeight)/parseFloat(getComputedStyle(document.querySelector('p')).fontSize),family:getComputedStyle(document.querySelector('p')).fontFamily})""")
+        assertEquals(2.75, spacing.getDouble("line"), .08)
+        assertTrue(spacing.getString("family").contains("Koofynanumgothic"))
+        assertTrue(anchorVisible(original))
+        var status = ""
+        scenario!!.onActivity { activity ->
+            status = (ReaderActivity::class.java.getDeclaredField("status").apply { isAccessible = true }.get(activity) as android.widget.TextView).text.toString()
+        }
+        assertTrue(status, !status.contains("위치") && status.contains("%"))
+        for (id in listOf("nanum-myeongjo", "nanum-gothic")) {
+            scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(fontId = id)) }
+            awaitCondition("Font change lost exact reading anchor") { runCatching { anchorVisible(original) && ReaderRuntime.session!!.locatorJson == original }.getOrDefault(false) }
+            awaitCondition("New bundled TTF did not load") { snapshot("""JSON.stringify({loaded:Array.from(document.fonts).some(f=>f.family.includes('Koofy'+ '${id.replace("-", "")}')&&f.status==='loaded')})""").getBoolean("loaded") }
+        }
+        scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(footerInfo = "none")) }
+        scenario!!.onActivity { activity ->
+            assertEquals("", (ReaderActivity::class.java.getDeclaredField("status").apply { isAccessible = true }.get(activity) as android.widget.TextView).text.toString())
+            ReaderActivity::class.java.getDeclaredMethod("startAutoTurn").apply { isAccessible = true }.invoke(activity)
+            assertTrue("Auto-turn must start even while the last font reflow is settling", ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+        }
+        awaitCondition("Automatic turn did not advance") { ReaderRuntime.session!!.locatorJson != original }
+        scenario!!.onActivity { activity ->
+            val button = ReaderActivity::class.java.getDeclaredField("autoButton").apply { isAccessible = true }.get(activity) as android.widget.Button
+            button.performClick()
+            assertFalse(ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+            assertEquals(android.view.View.VISIBLE, button.visibility)
+            assertTrue(button.text.toString().contains("▶"))
+            // A previously used, now paused speech mode cannot crowd out resume.
+            ReaderActivity::class.java.getDeclaredField("listeningMode").apply { isAccessible = true }.setBoolean(activity, true)
+            ReaderActivity::class.java.getDeclaredMethod("updateSpeechControls").apply { isAccessible = true }.invoke(activity)
+            val speechControls = ReaderActivity::class.java.getDeclaredField("speechControls").apply { isAccessible = true }.get(activity) as android.view.View
+            assertEquals(android.view.View.GONE, speechControls.visibility)
+            assertEquals(android.view.View.VISIBLE, button.visibility)
+            assertTrue(button.contentDescription.toString().contains("5초"))
+            assertTrue(button.isEnabled)
+            button.performClick()
+            assertTrue(ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+            assertTrue(button.text.toString().contains("Ⅱ"))
+        }
+        // Returning from the background leaves a visible, manually resumable control.
+        scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        scenario!!.onActivity { activity ->
+            assertFalse(ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+            val button = ReaderActivity::class.java.getDeclaredField("autoButton").apply { isAccessible = true }.get(activity) as android.widget.Button
+            assertEquals(android.view.View.VISIBLE, button.visibility)
+            assertTrue(button.text.toString().contains("▶"))
+            button.performClick()
+            assertTrue(ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+        }
+        scenario!!.onActivity { activity ->
+            ReaderActivity::class.java.getDeclaredMethod("showSettings").apply { isAccessible = true }.invoke(activity)
+            assertFalse(ReaderActivity::class.java.getDeclaredField("autoRunning").apply { isAccessible = true }.getBoolean(activity))
+        }
+        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { image ->
+            File(context.getExternalFilesDir(null), "reader-settings-ux.png").outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            image.recycle()
+        }
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("screencap -p /sdcard/Download/koofy-reader-settings-ux.png")).use { it.readBytes() }
+    }
+
     @Test fun translationUsesSelectionAndPreservesReadingCheckpoint() {
         launch(initial = null)
         fun translation(activity: ReaderActivity): ReaderTranslation {
@@ -500,7 +705,7 @@ class ReaderRenderingTest {
         assertTrue(anchorVisible(resume))
     }
 
-    @Test fun personalFontRendersAndReaderMenuHidesUnavailableSpread() {
+    @Test fun personalFontRendersAndReaderMenuKeepsUnavailableSpread() {
         val directory = File(context.filesDir, "personal_fonts").apply { mkdirs() }
         val manifest = File(directory, "catalog.json")
         val previous = if (manifest.exists()) manifest.readBytes() else null
@@ -513,25 +718,26 @@ class ReaderRenderingTest {
             manifest.writeText("""{"version":1,"families":[{"id":"$id","label":"개인 글꼴 테스트","cssFamily":"KoofyPersonal_${id.removePrefix("personal_")}","faces":[{"file":"${file.name}","weight":400,"sha256":"${file.nameWithoutExtension}"}]}]}""")
             launch(initial = null, preferences = ReaderPreferences(1.0, 1, false, "light", fontId = id))
             assertTrue(snapshot("JSON.stringify({loaded:Array.from(document.fonts).some(f=>f.family.includes('KoofyPersonal_')&&f.status==='loaded')})").getBoolean("loaded"))
+            val speechStarted = java.util.concurrent.atomic.AtomicBoolean(false)
             scenario!!.onActivity { activity ->
                 val speechButton = ReaderActivity::class.java.getDeclaredField("speechButton").apply { isAccessible = true }.get(activity) as android.widget.Button
                 assertEquals(android.view.View.INVISIBLE, speechButton.visibility)
-                var started = false
-                val settings = ReaderSettingsDialog(activity, { ReaderRuntime.session!!.preferences }, {}, canShowSpread = { false }, speechStart = { started = true })
+                val settings = ReaderSettingsDialog(activity, { ReaderRuntime.session!!.preferences }, {}, canShowSpread = { false }, speechStart = { speechStarted.set(true) })
                 settings.show()
                 val dialog = ReaderSettingsDialog::class.java.getDeclaredField("dialog").apply { isAccessible = true }.get(settings) as androidx.appcompat.app.AlertDialog
                 fun texts(view: android.view.View): List<android.widget.TextView> =
                     (if (view is android.widget.TextView) listOf(view) else emptyList()) +
                     (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
                 fun labels() = texts(dialog.window!!.decorView)
-                assertFalse(labels().any { it.text.toString().contains("두 페이지") && it is android.widget.Button })
+                dialog.window!!.decorView.findViewWithTag<android.view.View>("reader.settings.section.page").performClick()
+                assertTrue(labels().any { it.text.toString() == "두 페이지" && it is android.widget.Button && !it.isEnabled })
                 assertFalse(labels().any { it.text.toString() == "줄간격" })
-                labels().first { it.text.toString().contains("글꼴·문단 설정") }.performClick()
+                dialog.window!!.decorView.findViewWithTag<android.view.View>("reader.settings.section.spacing").performClick()
                 assertTrue(labels().any { it.text.toString() == "줄간격" })
-                labels().first { it.text.toString() == "듣기" }.performClick()
+                dialog.window!!.decorView.findViewWithTag<android.view.View>("reader.settings.section.speech").performClick()
                 labels().first { it.text.toString().contains("듣기 시작 / 재개") }.performClick()
-                assertTrue(started)
             }
+            awaitCondition("Speech action must wait for panel dismissal") { speechStarted.get() }
         } finally {
             if (previous == null) manifest.delete() else manifest.writeBytes(previous)
             if (!existed) file.delete()
@@ -566,6 +772,35 @@ class ReaderRenderingTest {
         file.writeText("interrupted download")
         ReaderFonts(context)
         assertArrayEquals(original, file.readBytes())
+    }
+
+    @Test fun appThemeFollowsShellAndPreservesExplicitBackgrounds() {
+        launch()
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", android.content.Context.MODE_PRIVATE)
+        val key = "flutter.app_theme_v1"
+        val old = prefs.getString(key, null)
+        val original = ReaderRuntime.session!!.locatorJson
+        try {
+            for (mode in listOf("dark", "light", "sepia", "system")) {
+                prefs.edit().putString(key, mode).commit()
+                scenario!!.onActivity { it.applyReaderPreferences(ReaderPreferences(1.0, 1, false, "sepia")) }
+                awaitCondition("Explicit background not ready") { ReaderRuntime.session!!.ready }
+                assertEquals("sepia", ReaderTheme.resolve("sepia"))
+                scenario!!.onActivity { it.applyReaderPreferences(ReaderPreferences(1.0, 1, false, "app")) }
+                val effective = ReaderTheme.resolve("app")
+                if (mode != "system") assertEquals(mode, effective)
+                val color = ReaderPalette.forTheme(effective).background
+                val expected = "rgb(${android.graphics.Color.red(color)}, ${android.graphics.Color.green(color)}, ${android.graphics.Color.blue(color)})"
+                awaitCondition("Follow-app canvas did not match $mode") {
+                    ReaderRuntime.session!!.ready && snapshot("JSON.stringify({background:getComputedStyle(document.documentElement).backgroundColor})").getString("background") == expected
+                }
+                assertEquals("app", ReaderRuntime.session!!.preferences.theme)
+                assertEquals(original, ReaderRuntime.session!!.locatorJson)
+            }
+        } finally {
+            if (old == null) prefs.edit().remove(key).commit() else prefs.edit().putString(key, old).commit()
+        }
     }
 
     @Test fun themeColorsMatchCanvasAndChromeWithoutMovingAnchor() {
@@ -606,7 +841,7 @@ class ReaderRenderingTest {
             var shown = false
             scenario!!.onActivity { activity ->
                 fun find(view: android.view.View) {
-                    if (view is android.widget.Button && view.text == "서재") shown = view.isShown
+                    if (view.contentDescription == "서재로 돌아가기") shown = view.isShown
                     if (view is android.view.ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))
                 }
                 find(activity.findViewById(android.R.id.content))
@@ -623,8 +858,8 @@ class ReaderRenderingTest {
         assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
     }
 
-    @Test fun englishReaderLabelsPreserveBookText() = localizedReader("en", "Library", "Reading settings")
-    @Test fun japaneseReaderLabelsPreserveBookText() = localizedReader("ja", "本棚", "読書設定")
+    @Test fun englishReaderLabelsPreserveBookText() = localizedReader("en", "Back to library", "Reading settings")
+    @Test fun japaneseReaderLabelsPreserveBookText() = localizedReader("ja", "本棚に戻る", "読書設定")
 
     private fun localizedReader(language: String, library: String, settings: String) {
         ReaderStrings.language = language
@@ -635,8 +870,11 @@ class ReaderRenderingTest {
                     (if (view is android.widget.TextView) listOf(view.text.toString()) else emptyList()) +
                     (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
                 val labels = texts(activity.window.decorView)
-                assertTrue(labels.toString(), labels.contains(library))
-                assertTrue(labels.toString(), labels.contains(settings))
+                fun descriptions(view: android.view.View): List<String> = listOfNotNull(view.contentDescription?.toString()) +
+                    (if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { descriptions(view.getChildAt(it)) } else emptyList())
+                val accessibleLabels = labels + descriptions(activity.window.decorView)
+                assertTrue(accessibleLabels.toString(), accessibleLabels.contains(library))
+                assertTrue(accessibleLabels.toString(), accessibleLabels.contains(settings))
                 assertTrue("Book title must stay in its original language", labels.contains("한글 독서 엔진 검증"))
                 ReaderActivity::class.java.getDeclaredMethod("showSettings").apply { isAccessible = true }.invoke(activity)
             }

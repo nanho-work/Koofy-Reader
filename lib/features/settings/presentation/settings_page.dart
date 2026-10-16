@@ -3,6 +3,7 @@ import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
 import 'package:koofy_reader/features/library/presentation/library_trash_page.dart';
 import 'dart:async';
+import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
@@ -16,6 +17,46 @@ import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 import 'package:koofy_reader/features/backup/presentation/backup_page.dart';
 import 'package:koofy_reader/features/updates/data/update_service.dart';
+
+Route<void> settingsPanelRoute(RouteSettings settings) =>
+    PageRouteBuilder<void>(
+      settings: settings,
+      opaque: false,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      barrierLabel: tr('닫기'),
+      transitionDuration: const Duration(milliseconds: 240),
+      reverseTransitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, _, __) => DisplayFeatureSubScreen(
+        anchorPoint: Offset(MediaQuery.sizeOf(context).width, 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = settingsPanelWidth(constraints.maxWidth);
+            return Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: width,
+                child: Material(
+                  elevation: 16,
+                  child: const SafeArea(child: SettingsPage()),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      transitionsBuilder: (context, animation, _, child) => SlideTransition(
+        position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: child,
+      ),
+    );
+
+double settingsPanelWidth(double width) {
+  final base = width >= 700 ? width / 2 : width;
+  return (base * 2 / 3).clamp(width < 240 ? width : 240, width).toDouble();
+}
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -43,6 +84,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.dispose();
   }
 
+  String _themeLabel(String mode) => switch (mode) {
+    'light' => '밝게',
+    'sepia' => '종이색',
+    'dark' => '어둡게',
+    _ => '기기 설정 따르기',
+  };
+
   String _remaining(DateTime until) {
     final minutes = (until.difference(DateTime.now()).inSeconds / 60)
         .ceil()
@@ -61,10 +109,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final adState = ref.watch(adStateProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(tr("설정"))),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(tr("설정")),
+        actions: [
+          IconButton(
+            tooltip: tr("닫기"),
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ],
+      ),
       body: ListView(
         padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
         children: [
+          ListenableBuilder(
+            listenable: AppAppearance.instance,
+            builder: (context, _) => ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              leading: const Icon(Icons.brightness_6_outlined),
+              title: Text(tr('앱 테마')),
+              subtitle: Text(tr(_themeLabel(AppAppearance.instance.selection))),
+              children: [
+                for (final mode in ['system', 'light', 'sepia', 'dark'])
+                  ListTile(
+                    title: Text(tr(_themeLabel(mode))),
+                    leading: Icon(
+                      mode == AppAppearance.instance.selection
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                    ),
+                    selected: mode == AppAppearance.instance.selection,
+                    onTap: () async {
+                      try {
+                        await AppAppearance.instance.selectBackground(mode);
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(tr('테마를 저장하지 못했습니다. 다시 시도해 주세요.')),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+              ],
+            ),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.info_outline),

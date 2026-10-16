@@ -91,7 +91,7 @@ class NativeReaderCoordinator {
             filePath: filePath,
             title: title,
             initialLocatorJson: initialLocator,
-            preferences: position.preferences,
+            preferences: position.preferences..theme = 'app',
             bannerAdUnitId: bannerAdUnitId,
             adHiddenUntilEpochMs: adHiddenUntilEpochMs,
             nextBookTitle: nextBookTitle,

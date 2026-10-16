@@ -94,7 +94,11 @@ data class ReaderPreferences (
   /** Null preserves publisher defaults. Units: line multiple, rem, margin scale. */
   val lineHeight: Double? = null,
   val paragraphSpacing: Double? = null,
-  val pageMargins: Double? = null
+  val pageMargins: Double? = null,
+  /** none, progress, location, both. Null preserves the progress default. */
+  val footerInfo: String? = null,
+  /** Interval only. Automatic turning always starts paused in a new session. */
+  val autoTurnSeconds: Long? = null
 )
  {
   companion object {
@@ -108,7 +112,9 @@ data class ReaderPreferences (
       val lineHeight = pigeonVar_list[6] as Double?
       val paragraphSpacing = pigeonVar_list[7] as Double?
       val pageMargins = pigeonVar_list[8] as Double?
-      return ReaderPreferences(fontScale, columnCount, scroll, theme, pageTurnStyle, fontId, lineHeight, paragraphSpacing, pageMargins)
+      val footerInfo = pigeonVar_list[9] as String?
+      val autoTurnSeconds = pigeonVar_list[10] as Long?
+      return ReaderPreferences(fontScale, columnCount, scroll, theme, pageTurnStyle, fontId, lineHeight, paragraphSpacing, pageMargins, footerInfo, autoTurnSeconds)
     }
   }
   fun toList(): List<Any?> {
@@ -122,6 +128,8 @@ data class ReaderPreferences (
       lineHeight,
       paragraphSpacing,
       pageMargins,
+      footerInfo,
+      autoTurnSeconds,
     )
   }
   override fun equals(other: Any?): Boolean {

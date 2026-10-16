@@ -38,10 +38,10 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
                     val face = faces.getJSONObject(faceIndex)
                     val hash = face.getString("sha256")
                     check(hash.matches(Regex("[a-f0-9]{64}")))
-                    val file = File(directory, "$hash.otf")
+                    val file = File(directory, "$hash.${face.getString("file").substringAfterLast('.')}")
                     if (!file.isFile || digest(file.readBytes()) != hash) {
                         val bytes = context.assets.open(face.getString("file")).use { it.readBytes() }
-                        check(bytes.take(4).toByteArray().toString(Charsets.US_ASCII) == "OTTO" && digest(bytes) == hash) {
+                        check((bytes.take(4).toByteArray().toString(Charsets.US_ASCII) == "OTTO" || bytes.take(4).toByteArray().contentEquals(byteArrayOf(0, 1, 0, 0))) && digest(bytes) == hash) {
                             "Invalid bundled font"
                         }
                         val target = AtomicFile(file)
@@ -49,14 +49,14 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
                         try { output.write(bytes); target.finishWrite(output) }
                         catch (error: Exception) { target.failWrite(output); throw error }
                     }
-                    Face(file, face.getInt("weight"), requireNotNull(Url("__koofy_fonts/$hash.otf")))
+                    Face(file, face.getInt("weight"), requireNotNull(Url("__koofy_fonts/${file.name}")))
                 })
         }
         families = bundled + downloaded(context, downloadedDirectory) + downloaded(context, File(context.filesDir, "personal_fonts"), personal = true)
     }
 
     val optionIds: List<String> get() = listOf("default") + families.map { it.id }
-    val optionLabels: List<String> get() = listOf(L("기본")) + families.map { it.label }
+    val optionLabels: List<String> get() = listOf(L("기본")) + families.map { L(it.label) }
 
     private fun downloaded(context: Context, overrideDirectory: File?, personal: Boolean = false): List<Family> {
         val directory = overrideDirectory ?: File(context.filesDir, "cloud_reader/fonts")
@@ -142,9 +142,9 @@ internal class ReaderFonts(context: Context, downloadedDirectory: File? = null) 
     }
 
     companion object {
-        val ids = listOf("default", "maplestory", "hakgyoansim-siganpyo")
+        val ids = listOf("default", "maplestory", "hakgyoansim-siganpyo", "nanum-gothic", "nanum-myeongjo")
         fun isValidId(id: String?) = (id ?: "default") in ids || id?.matches(Regex("(remote|personal)_[a-f0-9]{32}")) == true
-        val labels get() = listOf(L("기본"), "메이플스토리", "학교안심 시간표")
+        val labels get() = listOf(L("기본"), "메이플스토리", "학교안심 시간표", L("나눔고딕"), L("나눔명조"))
         private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it) }
     }

@@ -17,15 +17,144 @@ import org.readium.r2.shared.util.getOrElse
 internal class ReaderTools(private val context: Context, private val scope: CoroutineScope,
     private val publication: Publication, private val palette: ReaderPalette, private val current: () -> Locator?,
     private val bookmarks: () -> String, private val save: (String, (Boolean) -> Unit) -> Unit,
-    private val jump: (Locator) -> Unit) {
+    private val jump: (Locator) -> Unit, private val detail: (Locator) -> String = { "" }) {
+    private var bookmarkDialog: AlertDialog? = null
+    private var saving = false
+    private fun entries() = JSONArray(bookmarks()).let { rows -> (0 until rows.length()).map { rows.getJSONObject(it) } }
+    private fun encoded(rows: List<JSONObject>) = JSONArray().apply { rows.forEach { put(it) } }.toString()
+    private fun matching(rows: List<JSONObject>, locator: Locator?) = locator?.let { target ->
+        rows.firstOrNull { row -> ReaderBookmarkIdentity.decode(row.getJSONObject("locator"))?.let { ReaderBookmarkIdentity.same(it, target) } == true }
+    }
+    private fun commit(rows: List<JSONObject>, done: (Boolean) -> Unit) {
+        if (saving) return
+        saving = true
+        save(encoded(rows)) { ok -> scope.launch(Dispatchers.Main.immediate) {
+            saving = false; done(ok)
+        } }
+    }
     fun show() {
-        AlertDialog.Builder(context).setTitle(L("찾기 · 책갈피"))
-            .setItems(arrayOf(L("본문 검색"), L("현재 위치에 책갈피 추가"), L("책갈피 목록"))) { _, i ->
-                when (i) { 0 -> search(); 1 -> add(); 2 -> list() }
-            }.setNegativeButton(L("닫기"), null).show().also(::tint)
+        if (bookmarkDialog?.isShowing == true) return
+        val anchor = current()
+        var undo: Pair<JSONObject, Int>? = null
+        var rows = entries().reversed()
+        fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
+        fun action(title: String, destructive: Boolean = false, block: () -> Unit) = Button(context).apply {
+            text = title; isAllCaps = false; textSize = 14f; minimumHeight = dp(48); minWidth = 0; minimumWidth = 0
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(if (destructive) if (palette.background == ReaderPalette.forTheme("dark").background) 0xFFFFB4AB.toInt() else 0xFFB3261E.toInt() else palette.accent)
+            setOnClickListener { if (!saving) block() }
+        }
+        fun text(value: String, secondary: Boolean = false) = TextView(context).apply {
+            this.text = value; textSize = if (secondary) 12f else 16f
+            setTextColor(if (secondary) palette.secondary else palette.foreground)
+            setPadding(0, dp(4), 0, dp(4)); maxLines = if (secondary) 2 else 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val panel = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(palette.background); setPadding(dp(16), dp(8), dp(16), dp(8)) }
+        val title = text(L("책갈피"))
+        val header = LinearLayout(context).apply { gravity = android.view.Gravity.CENTER_VERTICAL; isBaselineAligned = false }
+        header.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
+        val dialog = AlertDialog.Builder(context).create(); bookmarkDialog = dialog
+        header.addView(action(L("닫기")) { dialog.dismiss() })
+        panel.addView(header)
+        val toggle = action("") {}; toggle.tag = "bookmark-toggle"
+        panel.addView(toggle)
+        val undoButton = action(L("삭제 실행 취소")) {}; undoButton.tag = "bookmark-undo"; panel.addView(undoButton)
+        val empty = text(L("저장한 책갈피가 없습니다."), true).apply { gravity = android.view.Gravity.CENTER; visibility = android.view.View.GONE }
+        panel.addView(empty, LinearLayout.LayoutParams(-1, 0, 1f))
+        val list = ListView(context).apply { tag = "bookmark-list"; dividerHeight = dp(1); divider = android.graphics.drawable.ColorDrawable(palette.secondary and 0x00ffffff or 0x22000000) }
+        panel.addView(list, LinearLayout.LayoutParams(-1, 0, 1f)); list.emptyView = empty
+        lateinit var refresh: () -> Unit
+        fun remove(id: String) {
+            val all = entries(); val index = all.indexOfFirst { it.getString("id") == id }
+            if (index < 0) { refresh(); return }
+            val deleted = JSONObject(all[index].toString())
+            commit(all.filterNot { it.getString("id") == id }) { ok ->
+                if (ok) undo = deleted to index else message(L("삭제하지 못했습니다."))
+                refresh()
+            }
+        }
+        fun rename(id: String) {
+            val row = entries().firstOrNull { it.getString("id") == id } ?: return
+            val field = EditText(context).apply { setSingleLine(); setText(row.getString("label")); selectAll() }
+            val editor = AlertDialog.Builder(context).setTitle(L("책갈피 이름")).setView(field).setPositiveButton(L("저장"), null).setNegativeButton(L("취소"), null).create()
+            editor.show(); tint(editor)
+            editor.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (saving) return@setOnClickListener
+                val all = entries()
+                all.firstOrNull { it.getString("id") == id }?.put("label", ReaderBookmarkIdentity.label(field.text.toString()))
+                commit(all) { ok -> if (ok) editor.dismiss() else message(L("저장하지 못했습니다. 다시 시도해 주세요.")); refresh() }
+            }
+        }
+        val adapter = object : BaseAdapter() {
+            override fun getCount() = rows.size
+            override fun getItem(position: Int) = rows[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val row = rows[position]; val id = row.getString("id")
+                val locator = ReaderBookmarkIdentity.decode(row.getJSONObject("locator"))
+                val item = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)); setBackgroundColor(palette.background) }
+                item.addView(text(row.getString("label")))
+                if (locator != null) {
+                    val excerpt = snippet(locator)
+                    if (excerpt != row.getString("label")) item.addView(text(excerpt, true))
+                    val metadata = detail(locator)
+                    if (metadata.isNotBlank()) item.addView(text(metadata, true))
+                    item.setOnClickListener { if (!saving) { dialog.dismiss(); jump(locator) } }
+                }
+                val controls = LinearLayout(context).apply { isBaselineAligned = false }
+                controls.addView(action(L("이동")) { if (locator != null) { dialog.dismiss(); jump(locator) } }.apply { tag = "bookmark-open-$id"; isEnabled = locator != null }, LinearLayout.LayoutParams(0, -2, 1f))
+                controls.addView(action(L("이름 변경")) { rename(id) }.apply { tag = "bookmark-rename-$id" }, LinearLayout.LayoutParams(0, -2, 1f))
+                controls.addView(action(L("삭제"), true) { remove(id) }.apply { tag = "bookmark-delete-$id"; contentDescription = L("{0} 책갈피 삭제", row.getString("label")) }, LinearLayout.LayoutParams(0, -2, 1f))
+                item.addView(controls); return item
+            }
+        }
+        list.adapter = adapter
+        refresh = {
+            rows = entries().reversed()
+            title.text = L("책갈피 {0}개", rows.size)
+            val saved = matching(rows, anchor)
+            toggle.text = if (saved == null) L("이곳에 책갈피 추가") else L("이곳의 책갈피 해제")
+            toggle.isEnabled = anchor != null && !isReaderDisplayCover(anchor) && !saving
+            toggle.setOnClickListener {
+                if (!saving && anchor != null) {
+                    val existing = matching(entries(), anchor)
+                    if (existing != null) remove(existing.getString("id"))
+                    else {
+                        val all = entries()
+                        if (all.size >= 100) message(L("책갈피는 책마다 100개까지 저장할 수 있습니다."))
+                        else commit(all + JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("label", ReaderBookmarkIdentity.label(snippet(anchor))).put("locator", anchor.toJSON())) { ok ->
+                            if (!ok) message(L("저장하지 못했습니다. 다시 시도해 주세요."))
+                            else undo?.first?.optJSONObject("locator")?.let { ReaderBookmarkIdentity.decode(it) }?.let { if (ReaderBookmarkIdentity.same(it, anchor)) undo = null }
+                            refresh()
+                        }
+                    }
+                }
+            }
+            undoButton.visibility = if (undo != null) android.view.View.VISIBLE else android.view.View.GONE
+            undoButton.setOnClickListener {
+                if (!saving) undo?.let { (row, index) ->
+                    val all = entries().toMutableList()
+                    if (all.size >= 100) message(L("책갈피는 책마다 100개까지 저장할 수 있습니다."))
+                    else if (all.none { it.getString("id") == row.getString("id") }) {
+                        all.add(index.coerceIn(0, all.size), row)
+                        commit(all) { ok -> if (ok) undo = null else message(L("저장하지 못했습니다. 다시 시도해 주세요.")); refresh() }
+                    }
+                }
+            }
+            adapter.notifyDataSetChanged()
+        }
+        refresh()
+        dialog.show(); dialog.setContentView(panel, android.view.ViewGroup.LayoutParams(-1, -1))
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(palette.background))
+            setLayout(minOf(context.resources.displayMetrics.widthPixels - dp(24), dp(480)), (context.resources.displayMetrics.heightPixels * .82).toInt())
+        }
     }
     private fun tint(dialog: AlertDialog) {
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(palette.background))
+        dialog.listView?.setBackgroundColor(palette.background)
         fun apply(view: android.view.View) {
             if (view is TextView) { view.setTextColor(palette.foreground); view.setHintTextColor(palette.secondary) }
             if (view is android.view.ViewGroup) for (i in 0 until view.childCount) apply(view.getChildAt(i))
@@ -33,49 +162,18 @@ internal class ReaderTools(private val context: Context, private val scope: Coro
         dialog.window?.decorView?.let(::apply)
     }
     private fun message(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-    private fun add() {
+    fun add(selectedOnly: Boolean = false) {
+        if (saving) return
         val locator = current() ?: return
         if (isReaderDisplayCover(locator)) { message(L("책갈피는 본문에서 추가해 주세요.")); return }
-        val rows = JSONArray(bookmarks())
-        if ((0 until rows.length()).any { rows.getJSONObject(it).getJSONObject("locator").toString() == locator.toJSON().toString() }) {
-            message(L("이미 저장한 위치입니다.")); return
-        }
-        if (rows.length() >= 100) { message(L("책갈피는 책마다 100개까지 저장할 수 있습니다.")); return }
-        val label = EditText(context).apply { setSingleLine(); setText(snippet(locator).take(120)) }
-        val dialog = AlertDialog.Builder(context).setTitle(L("책갈피 이름")).setView(label)
-            .setPositiveButton(L("저장"), null).setNegativeButton(L("취소"), null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = label.text.toString().trim().take(300).ifEmpty { L("책갈피") }
-                val next = JSONArray(bookmarks())
-                if (next.length() >= 100) { message(L("책갈피가 가득 찼습니다.")); return@setOnClickListener }
-                next.put(JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("label", name).put("locator", locator.toJSON()))
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                save(next.toString()) { ok ->
-                    if (ok) { dialog.dismiss(); message(L("책갈피를 저장했습니다.")) }
-                    else { dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true; message(L("저장하지 못했습니다. 다시 시도해 주세요.")) }
-                }
-            }
-        }
-        dialog.show()
-        tint(dialog)
+        val rows = entries()
+        if (matching(rows, locator) != null) { show(); return }
+        if (rows.size >= 100) { message(L("책갈피는 책마다 100개까지 저장할 수 있습니다.")); return }
+        val name = if (selectedOnly) locator.text.highlight?.takeIf { it.isNotBlank() } ?: snippet(locator) else snippet(locator)
+        val row = JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("label", ReaderBookmarkIdentity.label(name)).put("locator", locator.toJSON())
+        commit(rows + row) { ok -> if (ok) { message(L("책갈피를 저장했습니다.")); show() } else message(L("저장하지 못했습니다. 다시 시도해 주세요.")) }
     }
-    private fun list() {
-        val rows = JSONArray(bookmarks())
-        if (rows.length() == 0) { message(L("저장한 책갈피가 없습니다.")); return }
-        AlertDialog.Builder(context).setTitle(L("책갈피"))
-            .setItems(Array(rows.length()) { rows.getJSONObject(it).getString("label") }) { _, i ->
-                val row = rows.getJSONObject(i)
-                AlertDialog.Builder(context).setTitle(row.getString("label"))
-                    .setPositiveButton(L("이동")) { _, _ -> Locator.fromJSON(row.getJSONObject("locator"))?.let(jump) }
-                    .setNeutralButton(L("삭제")) { _, _ ->
-                        val all = JSONArray(bookmarks()); val next = JSONArray()
-                        for (n in 0 until all.length()) if (all.getJSONObject(n).getString("id") != row.getString("id")) next.put(all.getJSONObject(n))
-                        save(next.toString()) { ok -> message(if (ok) L("책갈피를 삭제했습니다.") else L("삭제하지 못했습니다.")) }
-                    }.setNegativeButton(L("취소"), null).show().also(::tint)
-            }.setNegativeButton(L("닫기"), null).show().also(::tint)
-    }
-    private fun search() {
+    fun search() {
         val query = EditText(context).apply { hint = L("단어 또는 문장 검색"); setSingleLine(); maxEms = 100 }
         val submit = Button(context).apply { text = L("검색") }
         val more = Button(context).apply { text = L("더 보기"); isEnabled = false }

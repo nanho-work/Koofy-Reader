@@ -50,6 +50,8 @@ class ReaderPreferences {
     this.lineHeight,
     this.paragraphSpacing,
     this.pageMargins,
+    this.footerInfo,
+    this.autoTurnSeconds,
   });
 
   double fontScale;
@@ -73,6 +75,12 @@ class ReaderPreferences {
 
   double? pageMargins;
 
+  /// none, progress, location, both. Null preserves the progress default.
+  String? footerInfo;
+
+  /// Interval only. Automatic turning always starts paused in a new session.
+  int? autoTurnSeconds;
+
   List<Object?> _toList() {
     return <Object?>[
       fontScale,
@@ -84,6 +92,8 @@ class ReaderPreferences {
       lineHeight,
       paragraphSpacing,
       pageMargins,
+      footerInfo,
+      autoTurnSeconds,
     ];
   }
 
@@ -102,6 +112,8 @@ class ReaderPreferences {
       lineHeight: result[6] as double?,
       paragraphSpacing: result[7] as double?,
       pageMargins: result[8] as double?,
+      footerInfo: result[9] as String?,
+      autoTurnSeconds: result[10] as int?,
     );
   }
 

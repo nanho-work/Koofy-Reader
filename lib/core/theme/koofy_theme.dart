@@ -4,9 +4,13 @@ import 'package:koofy_reader/core/theme/reader_palette.dart';
 
 /// The app shell and all routes share the same opaque canvas, including ads.
 abstract final class KoofyTheme {
-  static ThemeData forBrightness(Brightness brightness) {
+  static ThemeData forBrightness(Brightness brightness, {bool paper = false}) {
     final dark = brightness == Brightness.dark;
-    final p = dark ? ReaderPalette.dark : ReaderPalette.light;
+    final p = dark
+        ? ReaderPalette.dark
+        : paper
+        ? ReaderPalette.sepia
+        : ReaderPalette.light;
     final scheme =
         ColorScheme.fromSeed(
           seedColor: p.accent,

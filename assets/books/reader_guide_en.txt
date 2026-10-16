@@ -100,13 +100,18 @@ You can also press an edge and drag to turn the page.
 
 1. Open a book and tap “Reading settings”.
 
-2. Under “Display”, choose the text size and background.
-You can also change the reading mode and page layout.
+2. The settings panel slides in from the right. Tap a heading to expand its controls.
+Tap it again to collapse. Opening another heading closes the previous one.
 
-3. Expand the font and paragraph settings to adjust spacing.
-Change line spacing, paragraph spacing, margins and font.
+3. Choose Text and font, Line and paragraph spacing, or Page margins.
+Page turning contains the reading mode and page layout options.
+Current values appear below each heading. Tap outside the panel or Close to dismiss it.
 
 Appearance settings apply across books.
+
+
+Tap Settings in the library to open the panel from the right. Expand App theme and choose System, Light, Paper, or Dark. The same theme applies to the library, reader, contents, and bookmarks. The exit icon at the top left of the reader returns to your library.
+
 Reading positions are saved separately for each book.
 
 [장] Download and apply fonts
@@ -115,8 +120,8 @@ Reading positions are saved separately for each book.
 
 2. Under “Fonts”, download a font you like.
 
-3. Open a book, then choose “Display” in “Reading settings”.
-Select the downloaded font in the font and paragraph settings.
+3. Open a book, then expand “Text and font” in “Reading settings”.
+Select the downloaded font from the list.
 
 If a new font is missing, return to the library and reopen the book.
 For your own font files, see “Help · Add personal fonts”.
@@ -221,8 +226,8 @@ Tap the search control or magnifying glass at the top of the reading screen.
 Enter a word or phrase in the text search and select a result.
 
 Mark a place
-Add a bookmark at your current position and give it a name.
-Use the bookmark list to return to saved places.
+Tap the bookmark icon, then Bookmark this spot. It saves immediately without asking for a name.
+A saved spot shows Remove bookmark here. Each entry has Go, Rename and Delete actions.
 
 Return to where you were
 Tap the back-to-position arrow at the bottom.
@@ -408,8 +413,8 @@ Up to 500 results are shown at a time. Narrow your query if there are too many.
 Library search finds book titles and authors.
 
 You can save up to 100 bookmarks per book; they are included in library backups.
-On iOS, swipe an item in the list to delete it.
-On Android, tap an item and choose delete.
+Open the bookmark icon to see the list, with Go, Rename and Delete on each entry.
+After deleting, Undo deletion is available in the same panel.
 
 The return history keeps the latest 20 jumps.
 It resets when you close the book.
@@ -417,7 +422,7 @@ Old bookmarks are not automatically applied when the text changes.
 
 [장] Help · Add personal fonts
 
-Open the font and paragraph controls under Reading settings → Display.
+Expand Text and font under Reading settings.
 Choose the personal font management option and select TTF or OTF files.
 
 Each file must be no larger than 10MB; you can keep up to 50 fonts.
@@ -506,3 +511,16 @@ The confirmation may arrive late.
 You cannot accumulate time in advance; you can watch again after it expires.
 
 If no ad appears, check your internet connection and try again later. Ad availability varies.
+
+[장] Read your way · Spacing and auto-turn
+
+Reading settings offers book-default spacing or a line height from 1.00× to 3.00×.
+Release the slider to apply. Small adjustment buttons change it by 0.05×.
+The reading footer can show nothing or progress. Content-position numbers are no longer displayed.
+Contents and bookmarks show progress. Select a sentence and choose Bookmark selection to save it immediately.
+Start automatic page turning in Reading settings, with an interval of 5–300 seconds.
+Use the bottom pause button to stop. Opening settings, selecting text, or leaving the app also pauses it.
+Automatic turning is available in page mode, not continuous scrolling.
+After you start it once, the interval and a resume button remain in the footer. Returning to the app never restarts it automatically.
+Estimated progress is marked “Approx.”. Internal anchors still restore your exact saved reading and bookmark locations.
+If the last-read book is marked finished and the next episode is in its group, choose Read next episode on the library card.

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
@@ -48,6 +50,91 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byType(FilledButton),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'app theme picker saves selection and can follow the device again',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await AppAppearance.instance.initialize();
+      await mount(tester, _Ads(), _Reward());
+      await tester.drag(find.byType(ListView), const Offset(0, 1000));
+      await tester.pumpAndSettle();
+      expect(find.text('앱 테마'), findsOneWidget);
+      await tester.tap(find.text('앱 테마'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('어둡게'));
+      await tester.pumpAndSettle();
+      expect(AppAppearance.instance.mode, ThemeMode.dark);
+      expect(
+        (await SharedPreferences.getInstance()).getString(
+          AppAppearance.preferenceKey,
+        ),
+        'dark',
+      );
+      await tester.tap(find.text('종이색'));
+      await tester.pumpAndSettle();
+      expect(AppAppearance.instance.selection, 'sepia');
+      await tester.tap(find.text('기기 설정 따르기'));
+      await tester.pumpAndSettle();
+      expect(AppAppearance.instance.mode, ThemeMode.system);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  for (final size in [const Size(390, 844), const Size(840, 900)]) {
+    testWidgets('settings slides over library and dismisses at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [adRepositoryProvider.overrideWithValue(_Ads())],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      settingsPanelRoute(
+                        const RouteSettings(name: '/settings'),
+                      ),
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(SettingsPage)).width,
+        settingsPanelWidth(size.width),
+      );
+      expect(tester.getRect(find.byType(SettingsPage)).right, size.width);
+      await tester.tap(find.text('앱 테마'));
+      await tester.pumpAndSettle();
+      expect(find.text('종이색'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tapAt(Offset(10, size.height / 2));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsPage), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('one reward grants two hours and disables another viewing', (

@@ -3,7 +3,6 @@ import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
@@ -116,7 +115,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
         !progressError &&
         !_opening;
     return Theme(
-      data: KoofyTheme.forBrightness(MediaQuery.platformBrightnessOf(context)),
+      data: Theme.of(context),
       child: DisplayFeatureSubScreen(
         anchorPoint: Offset.zero,
         child: Scaffold(

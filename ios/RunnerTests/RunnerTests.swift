@@ -19,6 +19,88 @@ final class RunnerTests: XCTestCase {
         try FileManager.default.removeItem(at: directory)
     }
 
+
+    @MainActor func testSettingsAccordionAndPanelWidth() throws {
+        let settings = ReaderSettingsViewController(preferences: ReaderPreferences(fontScale: 1, columnCount: 1, scroll: false, theme: "light")) { _, completion in completion(.success(())) }
+        let navigation = settings.makePanel()
+        navigation.loadViewIfNeeded(); settings.loadViewIfNeeded()
+        settings.view.frame = CGRect(x: 0, y: 0, width: 260, height: 800)
+        XCTAssertEqual(navigation.modalPresentationStyle, .custom)
+        XCTAssertEqual(settings.numberOfSections(in: settings.tableView), 8)
+        for section in 0..<8 { XCTAssertEqual(settings.tableView(settings.tableView, numberOfRowsInSection: section), 1) }
+        let spacing = IndexPath(row: 0, section: 1)
+        settings.tableView(settings.tableView, didSelectRowAt: spacing)
+        XCTAssertEqual(settings.tableView(settings.tableView, numberOfRowsInSection: 1), 3)
+        let pages = IndexPath(row: 0, section: 3)
+        settings.tableView(settings.tableView, didSelectRowAt: pages)
+        XCTAssertEqual(settings.tableView(settings.tableView, numberOfRowsInSection: 1), 1)
+        XCTAssertEqual(settings.tableView(settings.tableView, numberOfRowsInSection: 3), 4)
+        settings.tableView(settings.tableView, didSelectRowAt: pages)
+        XCTAssertEqual(settings.tableView(settings.tableView, numberOfRowsInSection: 3), 1)
+        XCTAssertEqual(ReaderSettingsPresentation.panelWidth(390), 260, accuracy: 0.1)
+        XCTAssertEqual(ReaderSettingsPresentation.panelWidth(840), 280, accuracy: 0.1)
+        XCTAssertEqual(ReaderSettingsPresentation.panelWidth(320), 240, accuracy: 0.1)
+    }
+
+    @MainActor func testBookmarksExposeDeleteUndoAndPreserveExactAnchor() throws {
+        let current = try Locator(jsonString: "{\"href\":\"chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"totalProgression\":0.42,\"koofyText\":{\"cssSelector\":\"#p1\",\"textNodeIndex\":0,\"charOffset\":17}}}")
+        let reflowed = try Locator(jsonString: "{\"href\":\"chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"title\":\"new title\",\"locations\":{\"totalProgression\":0.6,\"koofyText\":{\"cssSelector\":\"#p1\",\"textNodeIndex\":0,\"charOffset\":17}}}")
+        let nearby = try Locator(jsonString: "{\"href\":\"chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"totalProgression\":0.42,\"koofyText\":{\"cssSelector\":\"#p1\",\"textNodeIndex\":0,\"charOffset\":18}}}")
+        XCTAssertTrue(ReaderBookmark.sameAnchor(current, reflowed))
+        XCTAssertFalse(ReaderBookmark.sameAnchor(current, nearby))
+        var stored: [ReaderBookmark] = []
+        var rejectSave = false
+        let manager = ReaderBookmarksViewController(rows: [], current: current, detail: { ReaderLocationInfo().detail($0) }, save: {
+            if rejectSave { throw NSError(domain: "test", code: 1) }
+            stored = $0
+        }, jump: { _ in })
+        manager.loadViewIfNeeded(); manager.view.frame = CGRect(x: 0, y: 0, width: 390, height: 800)
+        let toggle = IndexPath(row: 0, section: 0)
+        manager.tableView(manager.tableView, didSelectRowAt: toggle)
+        XCTAssertEqual(stored.count, 1)
+        let original = try XCTUnwrap(stored.first)
+        XCTAssertTrue(ReaderBookmark.sameAnchor(original.locator, current))
+        let cell = manager.tableView(manager.tableView, cellForRowAt: IndexPath(row: 0, section: 1))
+        func buttons(_ view: UIView) -> [UIButton] { (view as? UIButton).map { [$0] } ?? view.subviews.flatMap { buttons($0) } }
+        let delete = try XCTUnwrap(buttons(cell).first { $0.accessibilityIdentifier == "bookmark-delete-" + original.id })
+        XCTAssertNotNil(buttons(cell).first { $0.accessibilityIdentifier == "bookmark-open-" + original.id })
+        XCTAssertNotNil(buttons(cell).first { $0.accessibilityIdentifier == "bookmark-rename-" + original.id })
+        rejectSave = true; delete.sendActions(for: .touchUpInside)
+        XCTAssertEqual(stored.count, 1)
+        rejectSave = false; delete.sendActions(for: .touchUpInside)
+        XCTAssertTrue(stored.isEmpty)
+        XCTAssertEqual(manager.tableView(manager.tableView, numberOfRowsInSection: 0), 2)
+        manager.tableView(manager.tableView, didSelectRowAt: IndexPath(row: 1, section: 0))
+        XCTAssertEqual(stored.first?.id, original.id)
+        XCTAssertEqual(try stored.first?.locator.jsonString(), try original.locator.jsonString())
+        manager.tableView(manager.tableView, didSelectRowAt: toggle)
+        XCTAssertTrue(stored.isEmpty)
+    }
+
+    func testReaderUXPreferencesAndPositionLabels() throws {
+        let preferences = ReaderPreferences(fontScale: 1, columnCount: 1, scroll: false, theme: "light", fontId: "nanum-myeongjo", lineHeight: 2.75, footerInfo: "both", autoTurnSeconds: 17)
+        try KoofyReaderViewController.validate(preferences)
+        let journal = try ReaderCheckpointStore(directory: directory)
+        let event = ReaderEvent(protocolVersion: 1, sessionId: "ux", sessionGeneration: 1, publicationId: "book", contentRevision: "v1", sequence: 1, kind: "preferencesChanged", locatorJson: "{\"href\":\"a.xhtml\"}", preferences: preferences)
+        try journal.write(event)
+        let recovered = try XCTUnwrap(journal.pending().first?.preferences)
+        XCTAssertEqual(recovered.lineHeight, 2.75)
+        XCTAssertEqual(recovered.footerInfo, "both")
+        XCTAssertEqual(recovered.autoTurnSeconds, 17)
+        let positions = try ["__koofy_reader_cover_v1__/cover.xhtml", "a.xhtml", "b.xhtml"].enumerated().map { index, href in
+            try Locator(jsonString: "{\"href\":\"\(href)\",\"type\":\"application/xhtml+xml\",\"locations\":{\"position\":\(index + 1)}}")
+        }
+        let info = ReaderLocationInfo(positions)
+        XCTAssertEqual(info.detail(positions[1]), "약 0%")
+        XCTAssertEqual(info.footer(positions[1], mode: "none"), "")
+        XCTAssertEqual(info.detail(positions[1], approximate: true), "약 0%")
+        XCTAssertEqual(info.progress(positions[1], approximate: true), "약 0%")
+        let old = try Locator(jsonString: "{\"href\":\"b.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"position\":2}}")
+        XCTAssertEqual(info.detail(old), "약 50%")
+        XCTAssertEqual(info.footer(old, mode: "location"), info.progress(old))
+        XCTAssertEqual(info.footer(old, mode: "both"), info.progress(old))
+    }
+
     func testSpeechBackupPreservesCurrentSettingsAndSkipsForeignVoice() throws {
         let suite = "speech-backup-test-" + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -822,23 +904,28 @@ final class RunnerTests: XCTestCase {
         func segments(in view: UIView) -> [UISegmentedControl] {
             (view as? UISegmentedControl).map { [$0] } ?? view.subviews.flatMap { segments(in: $0) }
         }
-        let themeControl = try XCTUnwrap(segments(in: settings.view).first { $0.tag == 2 })
-        themeControl.selectedSegmentIndex = 2
-        themeControl.sendActions(for: .valueChanged)
+        let themePath = IndexPath(row: 0, section: 2)
+        settings.tableView(settings.tableView, didSelectRowAt: themePath)
+        settings.tableView.layoutIfNeeded()
+        func buttons(in view: UIView) -> [UIButton] {
+            (view as? UIButton).map { [$0] } ?? view.subviews.flatMap { buttons(in: $0) }
+        }
+        let themeControl = try XCTUnwrap(buttons(in: settings.view).first { $0.accessibilityIdentifier == "reader.setting.8.2" })
+        themeControl.sendActions(for: .touchUpInside)
         for _ in 0..<100 {
-            if settings.navigationItem.prompt == nil { break }
+            if events.last?.preferences?.pageMargins == 1 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertNil(settings.navigationItem.prompt)
         XCTAssertTrue(reader.presentedViewController === settingsNavigation, "Setting changes must keep the panel open")
-        XCTAssertEqual(events.last?.preferences?.theme, "dark")
+        XCTAssertEqual(events.last?.preferences?.pageMargins, 1)
         XCTAssertEqual(events.last?.locatorJson, middleJSON)
         try await Task.sleep(nanoseconds: 400_000_000)
         let panelImage = UIGraphicsImageRenderer(bounds: navigation.view.bounds).image { _ in
             navigation.view.window?.drawHierarchy(in: navigation.view.bounds, afterScreenUpdates: true)
         }
         let panelAttachment = XCTAttachment(image: panelImage)
-        panelAttachment.name = "Reading settings remain open in dark theme"
+        panelAttachment.name = "Reading settings remain open after margin change"
         panelAttachment.lifetime = .keepAlways
         add(panelAttachment)
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in

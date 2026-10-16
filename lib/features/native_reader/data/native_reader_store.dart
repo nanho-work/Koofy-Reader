@@ -41,7 +41,7 @@ ReaderPreferences defaultReaderPreferences() => ReaderPreferences(
   fontScale: 1.0,
   columnCount: 0,
   scroll: false,
-  theme: 'light',
+  theme: 'app',
   pageTurnStyle: 'instant',
   fontId: 'default',
 );
@@ -434,19 +434,29 @@ class NativeReaderStore extends GeneratedDatabase {
 String preferencesToJson(ReaderPreferences value) {
   bool invalid(double? number, double min, double max) =>
       number != null && (!number.isFinite || number < min || number > max);
-  if (invalid(value.lineHeight, 1, 2) ||
+  if (invalid(value.lineHeight, 1, 3) ||
       invalid(value.paragraphSpacing, 0, 2) ||
       invalid(value.pageMargins, 0.5, 2) ||
+      !const [
+        'none',
+        'progress',
+        'location',
+        'both',
+      ].contains(value.footerInfo ?? 'progress') ||
+      (value.autoTurnSeconds != null &&
+          (value.autoTurnSeconds! < 5 || value.autoTurnSeconds! > 300)) ||
       !value.fontScale.isFinite ||
       value.fontScale < 0.5 ||
       value.fontScale > 3 ||
       !const [0, 1, 2].contains(value.columnCount) ||
-      !const ['light', 'sepia', 'dark'].contains(value.theme) ||
+      !const ['app', 'light', 'sepia', 'dark'].contains(value.theme) ||
       !const ['instant', 'curl'].contains(value.pageTurnStyle ?? 'instant') ||
       (!const [
             'default',
             'maplestory',
             'hakgyoansim-siganpyo',
+            'nanum-gothic',
+            'nanum-myeongjo',
           ].contains(value.fontId ?? 'default') &&
           !RegExp(
             r'^(remote|personal)_[a-f0-9]{32}$',
@@ -463,6 +473,8 @@ String preferencesToJson(ReaderPreferences value) {
     'lineHeight': value.lineHeight,
     'paragraphSpacing': value.paragraphSpacing,
     'pageMargins': value.pageMargins,
+    'footerInfo': value.footerInfo ?? 'progress',
+    'autoTurnSeconds': value.autoTurnSeconds ?? 30,
   });
 }
 
@@ -478,6 +490,8 @@ ReaderPreferences preferencesFromJson(String source) {
     lineHeight: (json['lineHeight'] as num?)?.toDouble(),
     paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble(),
     pageMargins: (json['pageMargins'] as num?)?.toDouble(),
+    footerInfo: json['footerInfo'] as String? ?? 'progress',
+    autoTurnSeconds: json['autoTurnSeconds'] as int? ?? 30,
   );
   preferencesToJson(preferences);
   return preferences;
