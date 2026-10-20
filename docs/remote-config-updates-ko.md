@@ -103,7 +103,7 @@ iOS는 `ios_` 키에 같은 순서를 적용한다. Android만 출시됐을 때 
 
 ## 개인정보 및 검증 범위
 
-Remote Config SDK는 Firebase 설치 식별자를 이용한다. 앱의 한국어·영어 개인정보처리방침에 업데이트 확인 목적의 처리 안내를 추가했다. Analytics SDK, 개인화, 실시간 구독, A/B 실험을 활성화하지 않았다. iOS 종속성의 FirebaseABTesting 라이브러리는 Remote Config에 따라 설치되지만 실험을 구성하지 않았다. 외부 웹 방침과 스토어 개인정보 신고는 이번 작업에서 수정하지 않았으므로 다음 제출 전에 업데이트 내용을 맞춰 확인한다.
+Remote Config SDK는 Firebase 설치 식별자를 이용한다. 앱의 한국어·영어 개인정보처리방침에 업데이트 확인 목적의 처리 안내를 추가했다. 당시 Analytics SDK, 개인화, 실시간 구독, A/B 실험을 활성화하지 않았다. 2026-10-21 별도 패치에서 선택적 Analytics 수집을 추가했으며 [analytics.md](analytics.md)를 따른다. Remote Config 개인화·A/B 실험은 여전히 사용하지 않는다. iOS 종속성의 FirebaseABTesting 라이브러리는 Remote Config에 따라 설치되지만 실험을 구성하지 않았다. 외부 웹 방침과 스토어 개인정보 신고는 이번 작업에서 수정하지 않았으므로 다음 제출 전에 업데이트 내용을 맞춰 확인한다.
 
 공식 근거: [Flutter 연동](https://firebase.google.com/docs/remote-config/flutter/get-started), [Firebase 개인정보 안내](https://firebase.google.com/support/privacy).
 

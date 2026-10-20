@@ -169,6 +169,7 @@ void main() {
         'kind': 'book',
         'supportsTxt': '1',
         'seriesId': series.id,
+        'language': 'ko',
       });
       expect(episode.displayTitle, '40화 · 마지막 파도');
       await catalog.install(episode);

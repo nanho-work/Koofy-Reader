@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:flutter/material.dart';
@@ -95,6 +96,12 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
   bool _newest = false;
+  @override
+  void initState() {
+    super.initState();
+    ReaderAnalytics.instance.seriesOpened(widget.series.id);
+  }
+
   String get _key => 'series:${widget.series.id}';
   @override
   void dispose() {

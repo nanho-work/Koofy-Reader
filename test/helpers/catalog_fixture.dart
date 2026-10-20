@@ -62,7 +62,11 @@ class FakeReaderCatalog extends ReaderCatalog {
   final previewRequests = <String>[];
   Completer<void>? downloadGate;
   @override
-  Future<CatalogPage> list(String kind, {String? after}) async {
+  Future<CatalogPage> list(
+    String kind, {
+    String? after,
+    String? language,
+  }) async {
     calls.add('$kind:$after');
     if (fail) throw const CatalogException('연결 실패');
     final filtered = items

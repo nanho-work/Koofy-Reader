@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'messages.g.dart';
@@ -16,8 +17,8 @@ class AppLanguage extends ChangeNotifier with WidgetsBindingObserver {
   Locale get locale => Locale(code);
 
   static String resolve(List<Locale> locales) {
-    for (final locale in locales) {
-      if (supported.contains(locale.languageCode)) return locale.languageCode;
+    if (locales.isNotEmpty && supported.contains(locales.first.languageCode)) {
+      return locales.first.languageCode;
     }
     return 'en';
   }
@@ -89,3 +90,11 @@ String translateMessage(
     return index < arguments.length ? '${arguments[index] ?? ''}' : match[0]!;
   });
 }
+
+final appContentLanguageProvider = Provider<String>((ref) {
+  final language = AppLanguage.instance;
+  void changed() => ref.invalidateSelf();
+  language.addListener(changed);
+  ref.onDispose(() => language.removeListener(changed));
+  return language.code;
+});

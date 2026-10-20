@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:isolate';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
@@ -29,9 +30,10 @@ final bookRepositoryProvider = Provider<BookRepository>(
   ),
 );
 
-final booksProvider = FutureProvider<List<Book>>(
-  (ref) => ref.watch(bookRepositoryProvider).getBooks(),
-);
+final booksProvider = FutureProvider<List<Book>>((ref) {
+  ref.watch(appContentLanguageProvider);
+  return ref.watch(bookRepositoryProvider).getBooks();
+});
 
 abstract class BookRepository {
   Future<List<Book>> getBooks();
@@ -107,8 +109,7 @@ class LocalBookRepository implements BookRepository {
 
   Future<List<Book>> allStoredBooks() async => [
     ...await _loadLocalBooks(),
-    ...BundledBooks.defaults,
-    BundledBooks.legacy,
+    ...BundledBooks.supported,
   ];
 
   Future<void> forgetPermanently(Set<String> ids) =>

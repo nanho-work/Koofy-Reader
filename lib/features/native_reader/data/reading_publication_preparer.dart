@@ -122,7 +122,9 @@ class ReadingPublicationPreparer {
         ? (ReaderGuide.language == 'ko' ? '사용 방법 안내' : ReaderGuide.title)
         : title;
     final continuation = BundledBooks.hasContinuation(book);
-    final guideLanguage = book.isReaderGuide && ReaderGuide.language != 'ko'
+    final guideLanguage = continuation
+        ? BundledBooks.languageOf(book)
+        : book.isReaderGuide && ReaderGuide.language != 'ko'
         ? ReaderGuide.language
         : 'und';
     final prepared = await Isolate.run(
@@ -501,12 +503,18 @@ Uint8List _textToEpub(
   if (continuation) {
     // A separate spine resource always starts after the story, even when font
     // size changes. The supplied TXT and its paragraph mapping remain intact.
-    add('EPUB/continue.xhtml', _sampleContinuationPage);
+    add('EPUB/continue.xhtml', _continuationPage(language));
     manifest.writeln(
       '<item id="continue" href="continue.xhtml" media-type="application/xhtml+xml"/>',
     );
     spine.writeln('<itemref idref="continue"/>');
-    navigation.writeln('<li><a href="continue.xhtml">다음 이야기</a></li>');
+    navigation.writeln(
+      '<li><a href="continue.xhtml">${language == 'en'
+          ? 'Next chapter'
+          : language == 'ja'
+          ? '続きの話'
+          : '다음 이야기'}</a></li>',
+    );
   }
   add(
     'EPUB/nav.xhtml',
@@ -519,6 +527,20 @@ Uint8List _textToEpub(
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:sha256:$sourceHash</dc:identifier><dc:title>${_xml(title)}</dc:title><dc:creator>${_xml(author)}</dc:creator><dc:language>$language</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="style" href="style.css" media-type="text/css"/>$manifest</manifest><spine>$spine</spine></package>''',
   );
   return ZipEncoder().encodeBytes(archive, modified: DateTime.utc(2000));
+}
+
+String _continuationPage(String language) {
+  if (language == 'ko' || language == 'und') return _sampleContinuationPage;
+  final en = language == 'en';
+  final title = en ? 'The story continues' : '物語は続きます';
+  final message = en
+      ? 'Download the next available chapters from the Koofy Reader book catalog.'
+      : 'Koofy Readerのダウンロード一覧で公開中の続きの話をお楽しみください。';
+  final action = en ? 'Find the next chapter →' : '続きの話を探す →';
+  final note = en
+      ? 'An internet connection is required to browse and download. Downloaded books can be read offline.'
+      : '一覧の表示とダウンロードにはインターネット接続が必要です。ダウンロードした本はオフラインでも読めます。';
+  return '<html xmlns="http://www.w3.org/1999/xhtml" lang="$language" xml:lang="$language"><head><title>$title</title></head><body><h1>$title</h1><p>$message</p><p><a href="${BundledBooks.continuationUrl}">$action</a></p><p>$note</p></body></html>';
 }
 
 const _sampleContinuationPage =

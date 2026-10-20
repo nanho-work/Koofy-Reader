@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:koofy_reader/core/theme/app_appearance.dart';
@@ -32,13 +33,16 @@ Future<void> _initialize() async {
   await AppLanguage.instance.initialize();
   await AppAppearance.instance.initialize();
   await StorageMigrationRunner().run();
-  if (!kIsWeb &&
+  final mobile =
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS)) {
+          defaultTargetPlatform == TargetPlatform.iOS);
+  if (mobile) {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: ReaderFirebaseOptions.currentPlatform,
       );
     }
   }
+  await ReaderAnalytics.instance.initialize(mobile: mobile);
 }

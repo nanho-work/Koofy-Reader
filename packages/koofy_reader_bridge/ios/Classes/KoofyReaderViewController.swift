@@ -410,6 +410,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     func apply(_ value: ReaderPreferences, completion: @escaping (Result<Void, Error>) -> Void) throws {
         guard isReady, !isClosing, !turnBusy else { throw failure("reader_not_ready", L("본문 표시가 완료된 뒤 변경해 주세요.")) }
         try Self.validate(value)
+        if value.fontId != preferences.fontId { usage("font_apply") }
         let sameLayout = value.fontScale == preferences.fontScale && value.columnCount == preferences.columnCount &&
             value.scroll == preferences.scroll && value.theme == preferences.theme &&
             (value.fontId ?? "default") == (preferences.fontId ?? "default") &&
@@ -691,6 +692,14 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         }
     }
 
+    private func usage(_ name: String) {
+        guard hasSentReady, !isClosing else { return }
+        sequence += 1
+        sendEvent(ReaderEvent(protocolVersion: request.protocolVersion, sessionId: request.sessionId,
+            sessionGeneration: request.sessionGeneration, publicationId: request.publicationId,
+            contentRevision: request.contentRevision, sequence: sequence, kind: "usage", message: name))
+    }
+
     private func persist(kind: String) throws {
         sendEvent(try checkpoint(kind: kind))
     }
@@ -784,6 +793,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     private func flushBackground() {
+        usage("reading_pause")
         translation.suspend()
         speech?.foreground(false)
         speechFollowTask?.cancel()
@@ -990,6 +1000,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
 
     private func resumeForeground() {
+        usage("reading_resume")
         refreshAppTheme()
         translation.resume()
         speech?.foreground(true)
@@ -1113,7 +1124,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         updateSpeechControls()
         applyChromeTheme()
     }
+    private var analyticsSpeechPlaying = false
     private func updateSpeechControls() {
+        if speech?.playing == true && !analyticsSpeechPlaying { usage("tts_start") }
+        analyticsSpeechPlaying = speech?.playing == true
         if speech?.playing == true { stopAutoTurn() }
         let playing = speech?.playing == true
         if playing || speech?.busy == true { listeningMode = true }
@@ -1379,6 +1393,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         guard isReady, !isClosing, !preferences.scroll, !atBookEnd, !translation.enabled else { return }
         navigator?.clearSelection(); selectionHold = false
         speech?.pause(); listeningMode = false; updateSpeechControls()
+        usage("auto_turn_start")
         autoWasUsed = true; autoRunning = true
         UIApplication.shared.isIdleTimerDisabled = true
         updateNavigationItems(); scheduleAutoTurn()
@@ -1418,6 +1433,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         bookmarksJson = try ReaderBookmark.encode(rows)
         do { try persist(kind: "locationChanged") }
         catch { bookmarksJson = previous; throw error }
+        if rows.count > (try ReaderBookmark.decode(previous)).count { usage("bookmark_add") }
         updateBookmarkItem()
     }
     private func updateBookmarkItem() {

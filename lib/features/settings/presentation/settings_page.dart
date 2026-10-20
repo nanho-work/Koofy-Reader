@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
@@ -253,6 +254,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const DiagnosticsPage()),
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.star_outline_rounded),
+            title: Text(tr("평가 남기기")),
+            subtitle: Text(tr("스토어에서 사용 경험을 들려주세요")),
+            onTap: () async {
+              final opened = await ReaderReviewService.instance.openStore();
+              if (!opened && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(tr("스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요.")),
+                  ),
+                );
+              }
+            },
           ),
           const Divider(height: 24),
           Text(tr("광고 없이 읽기"), style: Theme.of(context).textTheme.titleLarge),

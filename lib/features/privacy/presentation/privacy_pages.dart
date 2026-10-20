@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/presentation/analytics_choice.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'dart:async';
@@ -63,7 +64,7 @@ class _PrivacyGateState extends ConsumerState<PrivacyGate>
         ),
       );
     }
-    return widget.child;
+    return AnalyticsChoice(child: widget.child);
   }
 }
 
@@ -323,6 +324,7 @@ class PrivacySettingsPage extends ConsumerWidget {
                 await service.showConsentOptions();
               },
             ),
+          const AnalyticsSetting(),
           const Divider(height: 32),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),

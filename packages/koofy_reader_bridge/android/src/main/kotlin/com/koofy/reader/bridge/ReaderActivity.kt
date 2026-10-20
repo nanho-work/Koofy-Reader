@@ -535,6 +535,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         check(session.ready && !session.closing) { "The reader is not ready" }
         validatePreferences(preferences)
         val previous = session.preferences
+        if (previous.fontId != preferences.fontId) usage("font_apply")
         session.preferences = preferences
         turnHost.pageMode = !preferences.scroll
         if (previous.copy(pageTurnStyle = preferences.pageTurnStyle, footerInfo = preferences.footerInfo, autoTurnSeconds = preferences.autoTurnSeconds) == preferences) {
@@ -701,7 +702,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     internal fun pauseSpeechForNavigation() { speech?.userNavigation() }
 
+    private var analyticsSpeechPlaying = false
     private fun updateSpeechControls() {
+        val playing = speech?.playing == true
+        if (playing && !analyticsSpeechPlaying) usage("tts_start")
+        analyticsSpeechPlaying = playing
         if (speech?.playing == true) stopAutoTurn()
         if (!::speechButton.isInitialized) return
         if (speech?.playing == true || speech?.busy == true) listeningMode = true
@@ -764,6 +769,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         listeningMode = false
         updateSpeechControls()
         autoWasUsed = true
+        usage("auto_turn_start")
         autoRunning = true
         updateAutoControl()
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -839,6 +845,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     ReaderRuntime.emit(session.event("locationChanged")) { result ->
                         if (result.isFailure) session.bookmarksJson = previous
                         updateBookmarkButton()
+                        if (result.isSuccess && org.json.JSONArray(value).length() > org.json.JSONArray(previous).length()) usage("bookmark_add")
                         done(result.isSuccess)
                     }
                 }
@@ -927,6 +934,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     fun updateAdHiddenUntil(epochMs: Long?) { bannerFooter?.updateHiddenUntil(epochMs) }
 
     override fun onPause() {
+        usage("reading_pause")
         stopAutoTurn()
         translation?.suspend()
         speech?.foreground(false)
@@ -939,6 +947,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     override fun onResume() {
         super.onResume()
+        usage("reading_resume")
         translation?.resume()
         speech?.foreground(true)
         bannerFooter?.resume()
@@ -999,6 +1008,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 }
             }
         }
+    }
+
+    private fun usage(name: String) {
+        if (!::session.isInitialized || !session.ready || session.closing) return
+        ReaderRuntime.events?.onEvent(session.event("usage", message = name)) { }
     }
 
     private fun emit(kind: String) {

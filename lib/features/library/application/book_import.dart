@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 
@@ -43,23 +44,31 @@ Future<BookImportResult> importBooks(
   final failed = <String>[];
   for (var index = 0; index < files.length; index++) {
     final file = files[index];
+    final format = file.name.split('.').last.toLowerCase();
+    final analytics = ReaderAnalytics.instance;
+    analytics.bookImport(format, 'start');
     try {
       final path = file.path;
       final book = path == null || path.isEmpty
           ? null
           : await (importFile ?? repository.importBookFile)(path);
       if (book == null) {
+        analytics.bookImport(format, 'failed');
         failed.add(file.name);
       } else if (knownIds.add(book.id)) {
+        analytics.bookImport(format, 'success');
         added++;
         addedIds.add(book.id);
       } else {
+        analytics.bookImport(format, 'existing');
         existing++;
       }
       if (book != null) importedIds.add(book.id);
     } on BookImportSkipped {
+      analytics.bookImport(format, 'cancelled');
       skipped++;
     } catch (_) {
+      analytics.bookImport(format, 'failed');
       failed.add(file.name);
     }
     onProgress?.call(index + 1, files.length);

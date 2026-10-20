@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/language_button.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
@@ -1026,6 +1027,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       if (mounted) {
         setState(() => _opening = false);
         _refreshProgress();
+        // Let the return transition finish before asking the OS for a review.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await ReaderReviewService.instance.maybeRequest(
+          canShow: () =>
+              mounted &&
+              !_opening &&
+              ModalRoute.of(context)?.isCurrent == true &&
+              WidgetsBinding.instance.lifecycleState ==
+                  AppLifecycleState.resumed,
+        );
       }
     }
   }

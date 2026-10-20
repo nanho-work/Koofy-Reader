@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-29",
+  "updatedAt": "2026-10-21",
   "email": "koofylab@gmail.com",
   "translations": {
     "ko": {
@@ -16,14 +16,14 @@
           "heading": "2. 기기에 보관하는 정보",
           "paragraphs": [
             "계정 생성이나 로그인 없이 이용하며, 앱 내 결제 기능은 없습니다. 이용자가 가져온 책의 본문·표지, 책 묶음, 읽던 위치, 글꼴과 독서 설정, 광고 숨김 만료 시각 및 광고 선택 기록은 앱 전용 기기 저장소에 보관됩니다.",
-            "앱은 이용자가 가져온 책·표지나 독서 기록을 운영자 서버로 업로드하거나 다른 이용자에게 공개하지 않습니다. 운영체제의 기기 백업·복원은 이용자의 OS 설정에 따라 별도로 작동할 수 있습니다."
+            "앱은 이용자가 가져온 책·표지나 독서 기록을 운영자 서버로 업로드하거나 다른 이용자에게 공개하지 않습니다. 운영체제의 기기 백업·복원은 이용자의 OS 설정에 따라 별도로 작동할 수 있습니다.",
+            "평가 요청 시점을 정하기 위한 누적 독서 시간과 마지막 평가 요청 시각은 기기에만 보관하며 운영자 서버로 전송하지 않습니다. 별점이나 리뷰 작성 여부는 앱에서 확인하지 않습니다."
           ]
         },
         {
           "heading": "3. 도서·글꼴 다운로드와 서버 기록",
           "paragraphs": [
             "공개된 도서·표지·글꼴 목록 조회와 파일 다운로드에 Firebase Cloud Functions, Cloud Firestore 및 Cloud Storage를 사용합니다. 이 과정에서 요청한 콘텐츠 식별자, IP 주소, 요청 시각, 응답·오류 등 서버 접속 정보가 서비스 제공·보안·장애 대응을 위해 처리될 수 있습니다.",
-            "현재 앱에는 Firebase Authentication, Analytics 또는 Crashlytics SDK를 이용한 사용자 계정·행동 분석·충돌 수집 기능이 포함되어 있지 않습니다. 광고 SDK 자체의 통계·진단 처리는 별개입니다.",
             "앱 시작 시 업데이트 안내를 확인하기 위해 Firebase Remote Config를 사용합니다. 이 과정에서 Firebase 설치 식별자, 앱 버전과 기기·운영체제 정보 등이 설정 제공을 위해 처리될 수 있습니다. 이 기능에 독서 본문·기록을 전송하지 않으며 Analytics 기반 개인화나 A/B 테스트를 사용하지 않습니다."
           ]
         },
@@ -101,6 +101,20 @@
               "href": "https://developers.google.com/ml-kit/terms"
             }
           ]
+        },
+        {
+          "heading": "선택적 사용 통계",
+          "paragraphs": [
+            "별도의 사용 통계 선택에 동의한 경우 Google Analytics for Firebase가 최초 실행·세션·앱 이용 정보, 독서 화면의 활성 시간, 책 가져오기와 공개 소설·글꼴 다운로드의 성공·실패, 듣기·자동 넘김·책갈피·글꼴 적용 등의 사용 정보를 처리합니다. 앱 인스턴스 식별자, 앱 버전, 기기·운영체제 정보 및 IP 주소에서 파생한 대략적인 지역 정보 등이 함께 처리될 수 있습니다.",
+            "개인이 가져온 책의 제목·본문·파일명·검색어·읽던 위치는 분석 이벤트에 포함하지 않습니다. 공개 다운로드 콘텐츠는 운영자가 발급한 콘텐츠 ID로 구분합니다. Analytics의 광고 식별자 수집과 광고 개인화 신호는 비활성화합니다.",
+            "동의 전에는 Analytics 수집을 꺼 두며, 거절해도 독서 기능을 이용할 수 있습니다. 설정 > 개인정보 및 광고에서 언제든 선택을 변경할 수 있습니다. 철회하면 이후 수집을 중단하고 기기의 Analytics 데이터를 초기화합니다. 이미 서버로 전송한 통계가 즉시 삭제되는 것은 아닙니다. 개인정보 관련 문의는 대표 메일로 접수합니다."
+          ],
+          "links": [
+            {
+              "label": "Google Analytics for Firebase",
+              "href": "https://firebase.google.com/support/privacy"
+            }
+          ]
         }
       ]
     },
@@ -118,14 +132,14 @@
           "heading": "2. Data kept on your device",
           "paragraphs": [
             "No account, login, or in-app purchases are required. Imported books and covers, book groups, reading positions, fonts, reader settings, the ad-free expiry time, and advertising choices are stored in app-private device storage.",
-            "The app does not upload imported books, covers, or reading history to our servers or publish them to other users. Device backup and restoration may operate separately under your operating-system settings."
+            "The app does not upload imported books, covers, or reading history to our servers or publish them to other users. Device backup and restoration may operate separately under your operating-system settings.",
+            "Accumulated reading time and the last rating request time are stored only on your device to determine when to request a rating. They are not sent to our servers. The app cannot determine your rating or whether you submitted a review."
           ]
         },
         {
           "heading": "3. Downloads and infrastructure logs",
           "paragraphs": [
             "Firebase Cloud Functions, Cloud Firestore, and Cloud Storage provide the public catalog and book, cover, and font downloads. Content identifiers, IP addresses, request times, responses, and error information may be processed to deliver and secure these services and diagnose problems.",
-            "The app currently does not include user accounts through Firebase Authentication or user analytics/crash collection through Firebase Analytics or Crashlytics. Advertising SDK statistics and diagnostics are separate.",
             "Firebase Remote Config checks for update notices at app startup. Firebase installation identifiers, app version and device or operating system information may be processed to deliver configuration values. Reading content and history are not sent for this feature. Analytics-based personalization and A/B testing are not used."
           ]
         },
@@ -202,6 +216,20 @@
               "href": "https://developers.google.com/ml-kit/terms"
             }
           ]
+        },
+        {
+          "heading": "Optional usage analytics",
+          "paragraphs": [
+            "With separate consent, Google Analytics for Firebase processes first launches, sessions, app usage, active reader time, book import and public novel/font download outcomes, and use of speech, automatic page turns, bookmarks and font selection. App instance identifiers, app version, device/OS information and approximate location derived from IP addresses may also be processed.",
+            "Personal book titles, text, filenames, search terms and reading positions are not included in analytics events. Public downloads are identified by publisher-assigned content IDs. Analytics advertising identifier collection and ad personalization signals are disabled.",
+            "Analytics collection is disabled until you consent. Declining does not restrict reading. You can change your choice in Settings > Privacy and advertising. Withdrawal stops subsequent collection and resets local Analytics data; it does not instantly delete statistics already sent to the server. Contact our support email for privacy inquiries."
+          ],
+          "links": [
+            {
+              "label": "Google Analytics for Firebase",
+              "href": "https://firebase.google.com/support/privacy"
+            }
+          ]
         }
       ]
     },
@@ -219,14 +247,14 @@
           "heading": "2. 端末に保存する情報",
           "paragraphs": [
             "アカウント作成やログインは不要で、アプリ内購入機能はありません。追加した本の本文・表紙、コレクション、読書位置、フォント、読書設定、広告非表示の有効期限、広告の選択記録は、アプリ専用の端末内ストレージに保存されます。",
-            "追加した本・表紙や読書履歴を運営者のサーバーにアップロードしたり、他の利用者に公開したりすることはありません。OSによる端末のバックアップ・復元は、利用者のOS設定に従って別途動作する場合があります。"
+            "追加した本・表紙や読書履歴を運営者のサーバーにアップロードしたり、他の利用者に公開したりすることはありません。OSによる端末のバックアップ・復元は、利用者のOS設定に従って別途動作する場合があります。",
+            "評価をお願いするタイミングを判断するための累計読書時間と前回の評価リクエスト日時は、端末内にのみ保存し、運営者のサーバーには送信しません。アプリは星の数やレビューの投稿有無を確認できません。"
           ]
         },
         {
           "heading": "3. ダウンロードとサーバー記録",
           "paragraphs": [
             "公開カタログの取得と本・表紙・フォントのダウンロードには、Firebase Cloud Functions、Cloud Firestore、Cloud Storageを使用します。サービスの提供・保護・障害対応のため、コンテンツ識別子、IPアドレス、リクエスト時刻、応答、エラー情報などが処理される場合があります。",
-            "現在、Firebase Authenticationによるアカウント機能や、Firebase Analytics・Crashlyticsによる利用分析・クラッシュ収集は含まれていません。広告SDKの統計・診断情報は別のものです。",
             "起動時にFirebase Remote Configで更新のお知らせを確認します。設定値の配信のため、Firebaseインストール識別子、アプリのバージョン、端末・OS情報などが処理される場合があります。この機能で本文や読書履歴は送信しません。AnalyticsによるパーソナライズやA/Bテストは使用しません。"
           ]
         },
@@ -301,6 +329,20 @@
             {
               "label": "Google ML Kitのプライバシー情報",
               "href": "https://developers.google.com/ml-kit/terms"
+            }
+          ]
+        },
+        {
+          "heading": "任意の利用状況分析",
+          "paragraphs": [
+            "個別に同意した場合、Google Analytics for Firebaseが初回起動、セッション、アプリ利用、読書画面のアクティブ時間、本の取り込み、公開小説・フォントのダウンロード結果、読み上げ・自動ページ送り・しおり・フォント適用の利用情報を処理します。アプリインスタンス識別子、アプリバージョン、端末・OS情報、IPアドレスから推定するおおよその地域なども処理される場合があります。",
+            "個人の本のタイトル・本文・ファイル名・検索語・読書位置は分析イベントに含めません。公開コンテンツは運営者が発行したIDで識別します。Analyticsの広告識別子収集と広告パーソナライズ信号は無効にします。",
+            "同意前は収集を無効にし、拒否しても読書機能を制限しません。設定 > プライバシーと広告で変更できます。撤回すると以降の収集を停止し、端末のAnalyticsデータを初期化します。送信済みの統計が直ちに削除されるわけではありません。個人情報のお問い合わせはサポートメールへご連絡ください。"
+          ],
+          "links": [
+            {
+              "label": "Google Analytics for Firebase",
+              "href": "https://firebase.google.com/support/privacy"
             }
           ]
         }

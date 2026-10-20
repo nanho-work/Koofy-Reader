@@ -276,3 +276,31 @@ test('100 published episodes occupy one catalog entry while pagination and legac
   assert.equal(legacy.filter(item => item.seriesId === parentId).length, 100);
   assert(legacy.some(item => !item.seriesId));
 });
+
+test('language catalog preserves raw cursors across empty pages and legacy Korean defaults', async () => {
+  const {getFirestore}=require('firebase-admin/firestore');
+  const db=getFirestore();
+  const batch=db.batch();
+  const prefix='ef'.repeat(12);
+  const ids=[];
+  for(let n=0;n<85;n++) {
+    const id=prefix+n.toString(16).padStart(8,'0');ids.push(id);
+    const language=n<80?'ko':'en';
+    const fields={title:`Lang ${n}`,author:'fixture',description:'',license:'fixture',language};
+    batch.set(db.collection('readerContent').doc(id),{...fields,id,kind:'book',revision:1,assets:{},published:true,publishedContent:{...fields,assets:{},version:1},updatedAt:'now'});
+  }
+  await batch.commit();
+  async function all(language) {
+    let after;const result=[];const seen=new Set();
+    do {
+      const response=await fetch(base+'readerCatalog?kind=book&supportsTxt=1'+(language===undefined?'':`&language=${language}`)+(after?`&after=${after}`:''));
+      assert.equal(response.status,200);const page=await response.json();result.push(...page.items);after=page.nextCursor;
+      if(after){assert.ok(!seen.has(after));seen.add(after);}
+    } while(after);
+    return result.filter(x=>ids.includes(x.id));
+  }
+  assert.equal((await all('en')).length,5);
+  assert.equal((await all('fr')).length,5);
+  assert.equal((await all('ja')).length,0);
+  assert.equal((await all(undefined)).length,80);
+});

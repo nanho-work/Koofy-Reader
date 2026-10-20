@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
@@ -252,6 +253,10 @@ class _NativeReaderLaunchPageState
     if (!mounted || event.publicationId != _book.id) return;
     switch (event.kind) {
       case 'ready':
+        ReaderAnalytics.instance.bookOpened(
+          bundled: !_book.isLocalFile,
+          guide: _book.isReaderGuide,
+        );
         _initialLocationConsumed = true;
         setState(() => _status = tr("책을 읽고 있습니다."));
       case 'error':
@@ -292,7 +297,7 @@ class _NativeReaderLaunchPageState
       if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute(
-          builder: (_) => const ReaderCatalogPage(
+          builder: (_) => ReaderCatalogPage(
             initialBookQuery: BundledBooks.mermaidSeries,
           ),
         ),

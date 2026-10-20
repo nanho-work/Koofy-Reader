@@ -13,6 +13,7 @@ export function requireValue(value: unknown, message: string): asserts value {
 export type Kind = 'book' | 'font' | 'series';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata {
+  language?: 'ko' | 'en' | 'ja';
   title: string; author: string; description: string; license: string; category?: string; source?: string;
   seriesId?: string; episodeNumber?: number; seriesTitle?: string; seriesStatus?: 'ongoing' | 'completed';
 }
@@ -30,6 +31,17 @@ export function id(value: unknown): string {
   requireValue(typeof value === 'string' && /^[a-f0-9]{32}$/.test(value), '잘못된 콘텐츠 ID입니다.');
   return value;
 }
+export function contentLanguage(value: unknown): 'ko' | 'en' | 'ja' {
+  requireValue(value === undefined || value === 'ko' || value === 'en' || value === 'ja', '콘텐츠 언어를 확인해 주세요.');
+  return value === undefined ? 'ko' : value;
+}
+export function catalogLanguage(value: unknown): 'ko' | 'en' | 'ja' {
+  if (value === undefined) return 'ko'; // Existing clients only know the Korean catalog.
+  return value === 'ko' || value === 'ja' ? value : 'en';
+}
+export function visibleInLanguage(item: Content, language: 'ko' | 'en' | 'ja') {
+  return item.kind === 'font' || contentLanguage(item.publishedContent?.language) === language;
+}
 export function metadata(input: unknown): Metadata {
   requireValue(input && typeof input === 'object', '제목과 제작자 정보를 입력해 주세요.');
   const data = input as Record<string, unknown>;
@@ -40,7 +52,7 @@ export function metadata(input: unknown): Metadata {
   }
   const category = data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
+  return { language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -92,7 +104,7 @@ export function publicItem(item: Content) {
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
   const { preview, ...fields } = snapshot;
   return { id: item.id, kind: item.kind, ...fields,
-    ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.episodeNumber}화 — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
+    ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.language === 'en' ? `Chapter ${snapshot.episodeNumber}` : snapshot.language === 'ja' ? `第${snapshot.episodeNumber}話` : `${snapshot.episodeNumber}화`} — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
     assets, ...(preview ? { preview: { sha256: preview.sha256, size: preview.size, extension: preview.extension } } : {}) };
 }
 export function requireSuperAdmin(claims: { superAdmin?: unknown }) {

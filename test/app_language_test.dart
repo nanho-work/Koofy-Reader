@@ -86,6 +86,7 @@ void main() {
         'en',
       );
       expect(AppLanguage.resolve([const Locale('fr')]), 'en');
+      expect(AppLanguage.resolve([const Locale('fr'), const Locale('ja')]), 'en');
     },
   );
   test(

@@ -7,7 +7,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { ApiError, Content, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { ApiError, Content, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -106,7 +106,7 @@ async function deleteContent(contentId: string, expected: number, uid: string) {
   });
   return { id: contentId, deleted: true };
 }
-async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false) {
+async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false, language: 'ko' | 'en' | 'ja' = 'ko') {
   const selectedKind = kind(contentKind);
   let query = grouped && selectedKind === 'book' && publicOnly
     ? contents.where('kind', 'in', ['book', 'series']) : contents.where('kind', '==', selectedKind);
@@ -125,6 +125,7 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   // Older apps reject unknown asset slots. Keep TXT out of their responses,
   // retaining the raw document cursor even when a page contains only TXT books.
   const visible = docs.slice(0, 40).map(doc => doc.data() as Content).filter(item =>
+    (!publicOnly || visibleInLanguage(item, language)) &&
     (!grouped || selectedKind !== 'book' || !item.seriesId) &&
     (!publicOnly || supportsTxt || !item.publishedContent?.assets.txt));
   // Legacy apps still receive complete individual books. A private parent also
@@ -258,7 +259,12 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     const next = await change(contentId, expected, claims.uid, action, async (item, transaction) => {
       switch (action) {
         case 'save': {
-          if (!item.seriesId) return item.kind === 'series' ? seriesMetadata(data.metadata) : metadata(data.metadata);
+          if (!item.seriesId) {
+            const input = { language: item.language ?? 'ko', ...(data.metadata as Record<string, unknown>) };
+            const fields = item.kind === 'series' ? seriesMetadata(input) : metadata(input);
+            requireValue(!item.publishedContent || fields.language === contentLanguage(item.publishedContent.language), '공개된 콘텐츠의 언어는 변경할 수 없습니다. 번역본은 별도로 등록해 주세요.');
+            return fields;
+          }
           const parent = await seriesInTransaction(transaction, item.seriesId);
           const fields = episodeMetadata(data.metadata, parent, parent.id);
           requireValue(!item.publishedContent || fields.episodeNumber === item.publishedContent.episodeNumber, '공개 이력이 있는 회차의 번호는 변경할 수 없습니다. 제목과 본문은 수정할 수 있습니다.');
@@ -293,6 +299,6 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       const [url] = await bucket.file(asset.path).getSignedUrl({ action: 'read', version: 'v4', expires: Date.now() + 5 * 60 * 1000 });
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }
-    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined));
+    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language)));
   } catch (error) { sendError(error, response); }
 });

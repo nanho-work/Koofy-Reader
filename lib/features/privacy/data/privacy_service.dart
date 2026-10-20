@@ -85,7 +85,7 @@ class PrivacyService extends ChangeNotifier {
        _consent = consent ?? DeviceAdConsentPlatform();
   static final instance = PrivacyService();
   static const policyVersion = '2026-09-21';
-  static const documentUpdatedAt = '2026-09-29';
+  static const documentUpdatedAt = '2026-10-21';
   static const storageKey = 'reader_privacy_choice_v1';
   final LocalStorage _storage;
   final PrivacyPlatform _platform;

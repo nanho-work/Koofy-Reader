@@ -875,6 +875,13 @@ enum ReaderStrings {
         "테마를 저장하지 못했습니다. 다시 시도해 주세요.": "Could not save the theme. Please try again.",
         "서재 검색": "Search library",
         "검색 닫기": "Close search",
+        "사용 통계 (선택)": "Usage analytics (optional)",
+        "사용 통계 허용": "Allow usage analytics",
+        "허용하지 않고 계속": "Continue without allowing",
+        "앱 실행, 독서 시간, 책 가져오기, 소설·글꼴 다운로드와 기능 사용 정보를 Google Analytics로 분석합니다. 앱 인스턴스 식별자와 기기·앱 정보가 함께 처리됩니다. 개인 책 제목·본문·파일명·검색어는 보내지 않습니다. 거절해도 모든 독서 기능을 이용할 수 있으며 설정에서 변경할 수 있습니다.": "Google Analytics helps us understand app launches, reading time, book imports, novel and font downloads, and feature use. App instance identifiers and device/app information are also processed. We do not send personal book titles, text, filenames, or search terms. All reading features remain available if you decline. You can change your choice in Settings.",
+        "평가 남기기": "Rate this app",
+        "스토어에서 사용 경험을 들려주세요": "Share your experience on the store",
+        "스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요.": "Could not open the store. Please try again later.",
     ]
     static let ja: [String: String] = [
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.": "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -1748,6 +1755,13 @@ enum ReaderStrings {
         "테마를 저장하지 못했습니다. 다시 시도해 주세요.": "テーマを保存できませんでした。もう一度お試しください。",
         "서재 검색": "本棚を検索",
         "검색 닫기": "検索を閉じる",
+        "사용 통계 (선택)": "利用状況の分析（任意）",
+        "사용 통계 허용": "利用状況の分析を許可",
+        "허용하지 않고 계속": "許可せずに続ける",
+        "앱 실행, 독서 시간, 책 가져오기, 소설·글꼴 다운로드와 기능 사용 정보를 Google Analytics로 분석합니다. 앱 인스턴스 식별자와 기기·앱 정보가 함께 처리됩니다. 개인 책 제목·본문·파일명·검색어는 보내지 않습니다. 거절해도 모든 독서 기능을 이용할 수 있으며 설정에서 변경할 수 있습니다.": "Google Analyticsで起動、読書時間、本の取り込み、小説・フォントのダウンロード、機能の利用状況を分析します。アプリインスタンス識別子と端末・アプリ情報も処理されます。個人の本のタイトル・本文・ファイル名・検索語は送信しません。拒否してもすべての読書機能を利用でき、設定から変更できます。",
+        "평가 남기기": "アプリを評価",
+        "스토어에서 사용 경험을 들려주세요": "ストアで使った感想をお聞かせください",
+        "스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요.": "ストアを開けませんでした。しばらくしてからもう一度お試しください。",
     ]
 }
 func L(_ key: String, _ arguments: String...) -> String {

@@ -252,3 +252,8 @@ Play Console 업로드·심사·실기기 릴리스 테스트는 아직 하지 �
 - SHA-256: 9ff214daf9c836300e81c968c44d897bae8d49847f72a405926fe06d937aed4c.
 - 패키지 com.koofylab.koofyreader, versionName 1.6.0, versionCode 15. debuggable/testOnly 비활성, 이전 1.5.0(14) 업로드 인증서 동일. jarsigner 무결성, bundletool validate, Readium 서비스 7개 보존, 64비트 ELF 10개 16KB 정렬 및 PAGE_ALIGNMENT_16K 설정 검증 통과.
 - Flutter 전체 306개 및 소스 정적 분석 통과. 릴리즈 노트 KO/EN/JA 파일과 검사 로그를 같은 폴더에 보관. Google Play Console과 Remote Config는 변경하지 않았다.
+
+
+## 2026-10-17 서명키 보관 위치 변경
+
+사용자가 키와 설정을 `~/Downloads/00. 앱/KoofyReader/Android 서명키/`로 이동했다. `android/key.properties`는 외부 설정을 가리키는 Git 제외 심볼릭 링크다. 외부 설정의 storeFile은 새 키 절대 경로(Java Properties Unicode escape)로 갱신했다. 키/암호는 저장소에 복사하지 않는다. 쿠피 이미지는 환경변수 지정이 없으면 이 로컬 설정을 사용한다. 기존 경로를 지정한 환경변수가 있다면 해제하거나 새 경로로 변경한다.

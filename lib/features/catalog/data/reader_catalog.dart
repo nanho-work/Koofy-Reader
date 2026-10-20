@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/localization/app_language.dart';
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -26,12 +28,13 @@ final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
   ref,
   kind,
 ) async {
+  final language = ref.watch(appContentLanguageProvider);
   final repository = ref.watch(readerCatalogProvider);
   final items = <String, CatalogItem>{};
   final visited = <String>{};
   String? cursor;
   do {
-    final page = await repository.list(kind, after: cursor);
+    final page = await repository.list(kind, after: cursor, language: language);
     for (final item in page.items) {
       items[item.id] = item;
     }
@@ -84,6 +87,11 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
     if (state.busy) throw const CatalogException('진행 중인 다운로드를 기다려 주세요.');
     final key = catalogItemKey(item);
     state = CatalogDownloadState(itemKey: key);
+    ReaderAnalytics.instance.download(
+      kind: item.kind,
+      id: item.id,
+      result: 'start',
+    );
     try {
       await ref
           .read(readerCatalogProvider)
@@ -96,11 +104,23 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
               );
             },
           );
+      ReaderAnalytics.instance.download(
+        kind: item.kind,
+        id: item.id,
+        result: 'success',
+      );
       ref.invalidate(booksProvider);
       ref.invalidate(catalogInstalledProvider(item.kind));
       if (item.seriesId != null) {
         ref.invalidate(catalogInstalledProvider('series:${item.seriesId}'));
       }
+    } catch (_) {
+      ReaderAnalytics.instance.download(
+        kind: item.kind,
+        id: item.id,
+        result: 'failed',
+      );
+      rethrow;
     } finally {
       state = const CatalogDownloadState();
     }
@@ -306,12 +326,17 @@ class ReaderCatalog {
     }
   }
 
-  Future<CatalogPage> list(String kind, {String? after}) async {
+  Future<CatalogPage> list(
+    String kind, {
+    String? after,
+    String? language,
+  }) async {
     final seriesId = kind.startsWith('series:') ? kind.substring(7) : null;
     final data = await _json({
       'kind': seriesId != null ? 'book' : kind,
       if (kind == 'book' || seriesId != null) 'supportsTxt': '1',
       if (kind == 'book') 'supportsSeries': '1',
+      if (kind != 'font') 'language': language ?? AppLanguage.instance.code,
       if (seriesId != null) 'seriesId': seriesId,
       if (after != null) 'after': after,
     });

@@ -1,3 +1,5 @@
+import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:async';
 
@@ -18,6 +20,17 @@ class NativeReaderCoordinator {
   Future<void> _queue = Future<void>.value();
   bool _opening = false;
   String? _activeSessionId;
+  final Stopwatch _readingClock = Stopwatch();
+  Timer? _readingTimer;
+  void _flushReadingTime() {
+    final elapsed = _readingClock.elapsed;
+    final seconds = elapsed.inSeconds;
+    _readingClock.reset();
+    if (seconds > 0) ReaderAnalytics.instance.readingTime(seconds);
+    if (elapsed.inMilliseconds > 0) {
+      unawaited(ReaderReviewService.instance.addReadingTime(elapsed));
+    }
+  }
 
   Stream<ReaderEvent> get events => _events.stream;
   Stream<Object> get errors => _errors.stream;
@@ -32,7 +45,31 @@ class NativeReaderCoordinator {
         _errors.add(error);
       }
       if (event.sessionId == _activeSessionId) {
-        if (event.kind == 'closed') _activeSessionId = null;
+        if (event.kind == 'ready' && !_readingClock.isRunning) {
+          _readingTimer?.cancel();
+          _readingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+            if (_readingClock.isRunning) _flushReadingTime();
+          });
+          _readingClock
+            ..reset()
+            ..start();
+        }
+        if (event.kind == 'usage') {
+          if (event.message == 'reading_pause') {
+            _readingClock.stop();
+            _flushReadingTime();
+          } else if (event.message == 'reading_resume') {
+            _readingClock.start();
+          } else {
+            ReaderAnalytics.instance.feature(event.message ?? '');
+          }
+        }
+        if (event.kind == 'closed') {
+          _readingTimer?.cancel();
+          _readingClock.stop();
+          _flushReadingTime();
+          _activeSessionId = null;
+        }
         _events.add(event);
       }
     });
@@ -163,6 +200,9 @@ class NativeReaderCoordinator {
   Future<void> dispose() async {
     await _subscription.cancel();
     await _queue;
+    _readingTimer?.cancel();
+    _readingClock.stop();
+    _flushReadingTime();
     await _events.close();
     await _errors.close();
     await store.close();

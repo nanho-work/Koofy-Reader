@@ -108,7 +108,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('비맞춤형 광고'), findsOneWidget);
-      await tester.ensureVisible(find.text('부적절한 광고 신고'));
+      await tester.scrollUntilVisible(find.text('부적절한 광고 신고'), 200);
       await tester.tap(find.text('부적절한 광고 신고'));
       await tester.pumpAndSettle();
       expect(find.text(readerSupportEmail), findsOneWidget);
@@ -176,10 +176,14 @@ void main() {
       expect(find.text('계속'), findsNothing);
       expect(find.text('광고 선택'), findsNothing);
       expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        tester
+            .widget<SwitchListTile>(
+              find.widgetWithText(SwitchListTile, '비맞춤형 광고만 사용'),
+            )
+            .value,
         true,
       );
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.widgetWithText(SwitchListTile, '비맞춤형 광고만 사용'));
       await tester.pumpAndSettle();
       expect(service.state.choice, AdvertisingChoice.systemTracking);
       expect(find.text('비맞춤형 광고'), findsOneWidget);
