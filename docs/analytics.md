@@ -63,3 +63,7 @@
 - Android debug APK, iOS debug simulator 빌드 성공. 출시용 빌드/스토어 업로드는 하지 않았다.
 - Android JSON과 iOS plist의 프로젝트 `koofy-reader` 및 앱 ID가 Dart Firebase 옵션과 일치함을 확인했다.
 - 실제 GA4 DebugView 수신은 아직 검증하지 않았다. 콘솔 설정·웹 방침·스토어 개인정보 항목도 이 패치로 자동 변경되지 않는다.
+
+## 2026-10-21 Android 제출 상태 갱신
+
+위 최초 패치 시점 기록 이후 Android 1.7.0(16) release 빌드와 Google Play 제출을 완료했다. 공개 웹 방침의 Analytics 및 평가 요청 고지를 확인했고, Play 기존 데이터 보안 선언에 관련 수집 유형과 분석 목적이 포함된 것을 검토했다. 상세 증빙은 `docs/google-play-release-1.7.0.md` 참조. 실제 GA4 DebugView 검증과 iOS 스토어 선언/배포는 아직 완료하지 않았다.
