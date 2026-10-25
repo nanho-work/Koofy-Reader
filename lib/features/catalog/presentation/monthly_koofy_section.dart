@@ -171,20 +171,30 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                         ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => openReaderLink(
-                        context,
-                        Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
-                          'lang': AppLanguage.instance.code,
-                        }),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(tr('글 보내기')),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.north_east, size: 14),
-                        ],
+                    Flexible(
+                      child: TextButton(
+                        onPressed: () => openReaderLink(
+                          context,
+                          Uri.https(
+                            'www.koofy.co.kr',
+                            '/monthly-koofy/submit',
+                            {'lang': AppLanguage.instance.code},
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                tr('글 보내기'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.north_east, size: 14),
+                          ],
+                        ),
                       ),
                     ),
                     IconButton(
@@ -287,24 +297,32 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                                 ),
                               ),
                             ),
-                            TextButton(
-                              onPressed: submit,
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
+                            Flexible(
+                              child: TextButton(
+                                onPressed: submit,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  minimumSize: const Size(48, 48),
+                                  textStyle: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
                                 ),
-                                minimumSize: const Size(48, 48),
-                                textStyle: Theme.of(
-                                  context,
-                                ).textTheme.labelMedium,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(tr('글 보내기')),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.north_east, size: 14),
-                                ],
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        tr('글 보내기'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.north_east, size: 14),
+                                  ],
+                                ),
                               ),
                             ),
                             IconButton(
