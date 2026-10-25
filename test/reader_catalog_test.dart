@@ -172,6 +172,7 @@ void main() {
         'language': 'ko',
       });
       expect(episode.displayTitle, '40화 · 마지막 파도');
+      expect(await catalog.coverPreview(episode), files['cover']);
       await catalog.install(episode);
       expect(
         (await books.getBooks())

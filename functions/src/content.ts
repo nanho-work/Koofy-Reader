@@ -82,6 +82,17 @@ export function compilationReady(series: Content, book: Content | undefined): bo
     target.assets.epub && target.issueMonth === source.issueMonth &&
     contentLanguage(target.language) === contentLanguage(source.language) && isReleased(book));
 }
+export const MONTHLY_LICENSE = '쿠피랩이 제공하는 콘텐츠입니다. 개인적인 독서 목적으로 다운로드하여 이용할 수 있습니다. 무단 복제·재배포 및 상업적 이용은 허용하지 않습니다.';
+export const MONTHLY_DEFAULTS = {
+  ko: { author: '쿠피랩', license: MONTHLY_LICENSE },
+  en: { author: 'Koofy Lab', license: 'This content is provided by Koofy Lab. You may download it for personal reading. Unauthorized copying, redistribution, and commercial use are not permitted.' },
+  ja: { author: 'Koofy Lab', license: 'このコンテンツはKoofy Labが提供しています。個人での読書を目的としてダウンロード・利用できます。無断での複製・再配布および商用利用は禁止されています。' },
+};
+export function monthlyLicense(value: string | undefined, language: 'ko' | 'en' | 'ja') {
+  const text = value?.trim() || '';
+  return !text || Object.values(MONTHLY_DEFAULTS).some(item => item.license === text)
+    ? MONTHLY_DEFAULTS[language].license : text;
+}
 export function metadata(input: unknown): Metadata {
   requireValue(input && typeof input === 'object', '제목과 제작자 정보를 입력해 주세요.');
   const data = input as Record<string, unknown>;
@@ -92,7 +103,7 @@ export function metadata(input: unknown): Metadata {
   }
   const category = data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
+  return { ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: data.issueMonth ? monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) : field('license', 2000, true) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -146,6 +157,7 @@ export function publicItem(item: Content) {
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
   const { preview, sourceTxt: _sourceTxt, autoCompile: _autoCompile, expectedEpisodes: _expectedEpisodes, ...fields } = snapshot;
   return { id: item.id, kind: item.kind, ...fields,
+    ...(snapshot.issueMonth ? { author: snapshot.byline || '' } : {}),
     ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.language === 'en' ? `Chapter ${snapshot.episodeNumber}` : snapshot.language === 'ja' ? `第${snapshot.episodeNumber}話` : `${snapshot.episodeNumber}화`} — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
     assets, ...(preview ? { preview: { sha256: preview.sha256, size: preview.size, extension: preview.extension } } : {}) };
 }

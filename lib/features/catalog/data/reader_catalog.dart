@@ -50,6 +50,53 @@ final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
   });
 });
 
+// Repair old downloaded monthly groups without replacing personal cover choices.
+final monthlyGroupCoverSyncProvider = FutureProvider<void>((ref) async {
+  final groups = await ref.watch(bookGroupsProvider.future);
+  final covers = ref.read(groupCoverStoreProvider);
+  final pending = <String, String>{};
+  for (final group in groups) {
+    if (group.id.startsWith('group_monthly_') &&
+        !await covers.hasSelection(group.id)) {
+      pending[group.id.substring('group_monthly_'.length)] = group.id;
+    }
+  }
+  if (pending.isEmpty) return;
+  final catalog = ref.read(readerCatalogProvider);
+  var changed = false;
+  try {
+    for (final language in ['ko', 'en', 'ja']) {
+      String? cursor;
+      final visited = <String>{};
+      do {
+        final page = await catalog.list(
+          'series',
+          after: cursor,
+          language: language,
+        );
+        for (final issue in page.items) {
+          final groupId = pending[issue.id];
+          if (groupId == null || issue.issueMonth.isEmpty) continue;
+          try {
+            final file = await catalog.coverFile(issue);
+            if (file == null) continue;
+            await covers.setImage(groupId, file.path, onlyIfAbsent: true);
+            pending.remove(issue.id);
+            changed = true;
+          } catch (error) {
+            debugPrint('Monthly cover deferred: $error');
+          }
+        }
+        cursor = page.nextCursor;
+        if (cursor != null && !visited.add(cursor)) break;
+      } while (cursor != null && pending.isNotEmpty);
+      if (pending.isEmpty) break;
+    }
+  } finally {
+    if (changed) ref.invalidate(bookGroupsProvider);
+  }
+});
+
 String catalogItemKey(CatalogItem item) =>
     '${item.kind}_${item.id}_${item.version}';
 final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
@@ -505,16 +552,15 @@ class ReaderCatalog {
     return file.readAsBytes();
   }
 
-  Future<Uint8List?> coverPreview(CatalogItem item) async {
-    if (item.kind != 'series') return null;
+  Future<File?> coverFile(CatalogItem item) async {
+    if (!item.assets.containsKey('cover')) return null;
     final root = await _root();
-    final file = await _download(
-      item,
-      'cover',
-      Directory('${root.path}/previews'),
-      (_) {},
-    );
-    return file.readAsBytes();
+    return _download(item, 'cover', Directory('${root.path}/previews'), (_) {});
+  }
+
+  Future<Uint8List?> coverPreview(CatalogItem item) async {
+    final file = await coverFile(item);
+    return file?.readAsBytes();
   }
 
   Future<void> install(

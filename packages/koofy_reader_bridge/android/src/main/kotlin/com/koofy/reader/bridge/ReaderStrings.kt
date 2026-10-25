@@ -889,6 +889,7 @@ internal object ReaderStrings {
         "합본 읽기" to "Read the collection",
         "확인했어요" to "Got it",
         "새 이야기" to "New story",
+        "내 이야기 보내기" to "Share my story",
     )
     val ja = mapOf(
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요." to "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -1748,8 +1749,8 @@ internal object ReaderStrings {
         "줄·문단 간격" to "行間・段落間隔",
         "하단 정보" to "下部の読書情報",
         "자동 넘김" to "自動ページ送り",
-        "펼치기" to "開く",
-        "접기" to "閉じる",
+        "펼치기" to "展開する",
+        "접기" to "折りたたむ",
         "이곳에 책갈피 추가" to "ここをブックマーク",
         "이곳의 책갈피 해제" to "ここのブックマークを解除",
         "삭제 실행 취소" to "削除を取り消す",
@@ -1776,6 +1777,7 @@ internal object ReaderStrings {
         "합본 읽기" to "合本を読む",
         "확인했어요" to "確認しました",
         "새 이야기" to "新しいお話",
+        "내 이야기 보내기" to "物語を送る",
     )
 }
 internal fun L(key: String, vararg arguments: Any?): String {

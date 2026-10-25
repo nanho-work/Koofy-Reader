@@ -65,7 +65,10 @@ class SeriesCatalogRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${series.author} · ${series.category}',
+                  [
+                    series.author,
+                    series.category,
+                  ].where((value) => value.trim().isNotEmpty).join(' · '),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
@@ -247,7 +250,11 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '${series.author} · ${series.category}',
+                                      [series.author, series.category]
+                                          .where(
+                                            (value) => value.trim().isNotEmpty,
+                                          )
+                                          .join(' · '),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(

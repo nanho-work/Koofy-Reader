@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,8 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
   Set<String> _dismissed = {};
   bool _preferencesLoaded = false;
   bool _opening = false;
+  bool _expanded = true;
+  bool _savingExpansion = false;
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
           _dismissed =
               (prefs.getStringList('monthly_compilations_dismissed_v1') ?? [])
                   .toSet();
+          _expanded = prefs.getBool('monthly_section_expanded_v1') ?? true;
           _preferencesLoaded = true;
         });
       }
@@ -52,6 +56,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
 
   void _refresh() {
     if (!mounted || ref.read(catalogDownloadProvider).busy || _opening) return;
+    ref.invalidate(monthlyGroupCoverSyncProvider);
     ref.invalidate(catalogItemsProvider('monthly'));
     ref.invalidate(catalogItemsProvider('book'));
   }
@@ -85,6 +90,30 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
           context,
         ).showSnackBar(SnackBar(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
       }
+    }
+  }
+
+  Future<void> _toggleExpanded() async {
+    if (_savingExpansion || !_preferencesLoaded) return;
+    final next = !_expanded;
+    setState(() {
+      _expanded = next;
+      _savingExpansion = true;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setBool('monthly_section_expanded_v1', next)) {
+        throw StateError('save');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _expanded = !next);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
+      }
+    } finally {
+      if (mounted) setState(() => _savingExpansion = false);
     }
   }
 
@@ -123,87 +152,136 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (episode != null && issue != null)
+          if (_preferencesLoaded && episode != null && issue != null)
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SeriesCover(series: episode, width: 64),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkWell(
+                    key: const ValueKey('monthly-toggle'),
+                    onTap: _savingExpansion ? null : _toggleExpanded,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            tr('오늘의 쿠피'),
-                            style: Theme.of(context).textTheme.labelLarge,
+                          Expanded(
+                            child: Text(
+                              issue.title,
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
                           ),
-                          if (episode.releaseDate ==
-                              DateTime.now()
-                                  .toUtc()
-                                  .add(const Duration(hours: 9))
-                                  .toIso8601String()
-                                  .substring(0, 10))
-                            Text(
-                              tr('새 이야기'),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+                          if (states?[episode.bookId]?.lastReadAt == null &&
+                              states?[episode.bookId]?.finished != true)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Text(
+                                'NEW',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
                             ),
-                          const SizedBox(height: 6),
-                          Text(
-                            episode.episodeTitle ?? episode.title,
-                            style: Theme.of(context).textTheme.titleMedium,
+                          const SizedBox(width: 8),
+                          Semantics(
+                            label: tr(_expanded ? '접기' : '펼치기'),
+                            child: Icon(
+                              _expanded ? Icons.expand_less : Icons.expand_more,
+                            ),
                           ),
-                          Text(
-                            '${issue.title} · ${episode.releaseDate}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            states?[episode.bookId]?.finished == true
-                                ? tr('완독')
-                                : states?[episode.bookId]?.progressLabel ??
-                                      tr('아직 읽지 않은 이야기'),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              FilledButton(
-                                onPressed: download.busy || _opening
-                                    ? null
-                                    : () => _read(episode),
-                                child: Text(tr('읽기')),
-                              ),
-                              TextButton(
-                                onPressed: download.busy || _opening
-                                    ? null
-                                    : () {
-                                        ref.invalidate(
-                                          catalogItemsProvider(
-                                            'series:${issue.id}',
-                                          ),
-                                        );
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                ReaderSeriesPage(series: issue),
-                                          ),
-                                        );
-                                      },
-                                child: Text(tr('지난 이야기')),
-                              ),
-                            ],
-                          ),
-                          if (download.itemKey == catalogItemKey(episode))
-                            LinearProgressIndicator(value: download.progress),
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                  if (_expanded)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SeriesCover(series: episode, width: 76),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  episode.episodeTitle ?? episode.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 6),
+                                if (episode.releaseDate.isNotEmpty)
+                                  Text(
+                                    episode.releaseDate.replaceAll('-', '.'),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  children: [
+                                    FilledButton(
+                                      onPressed: download.busy || _opening
+                                          ? null
+                                          : () => _read(episode),
+                                      child: Text(tr('읽기')),
+                                    ),
+                                    TextButton(
+                                      onPressed: download.busy || _opening
+                                          ? null
+                                          : () {
+                                              ref.invalidate(
+                                                catalogItemsProvider(
+                                                  'series:${issue.id}',
+                                                ),
+                                              );
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute<void>(
+                                                  builder: (_) =>
+                                                      ReaderSeriesPage(
+                                                        series: issue,
+                                                      ),
+                                                ),
+                                              );
+                                            },
+                                      child: Text(tr('지난 이야기')),
+                                    ),
+                                  ],
+                                ),
+                                if (download.itemKey == catalogItemKey(episode))
+                                  LinearProgressIndicator(
+                                    value: download.progress,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (_expanded)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => openReaderLink(
+                  context,
+                  Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
+                    'lang': AppLanguage.instance.code,
+                  }),
                 ),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: Text(tr('내 이야기 보내기')),
               ),
             ),
           if (_preferencesLoaded)

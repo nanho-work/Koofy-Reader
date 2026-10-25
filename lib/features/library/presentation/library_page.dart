@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/language_button.dart';
@@ -108,6 +109,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(monthlyGroupCoverSyncProvider);
     Localizations.localeOf(
       context,
     ); // Rebuild app-owned labels when language changes.
@@ -320,6 +322,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       nextBook: nextRecentBook,
                       nextState: states[nextRecentBook?.id],
                     )
+                  : (ref
+                            .watch(catalogItemsProvider('monthly'))
+                            .valueOrNull
+                            ?.any((item) => item.seriesId != null) ??
+                        false)
+                  ? const SizedBox.shrink()
                   : _welcome(context, empty: books.isEmpty),
             ],
           ),

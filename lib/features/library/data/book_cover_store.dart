@@ -40,10 +40,15 @@ class BookCoverStore {
     }).toList();
   }
 
+  Future<bool> hasSelection(String bookId) async =>
+      await _storage.getString(_key(bookId)) != null;
+
   Future<void> setImage(
     String bookId,
-    String sourcePath,
-  ) => LibraryMutations.run(() async {
+    String sourcePath, {
+    bool onlyIfAbsent = false,
+  }) => LibraryMutations.run(() async {
+    if (onlyIfAbsent && await hasSelection(bookId)) return;
     final source = File(sourcePath);
     final size = await source.length();
     if (size == 0 || size > maxBytes) {

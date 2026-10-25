@@ -35,6 +35,41 @@ void main() {
       expect((await repository.load()).first.bookIds, ['episode1', 'episode2']);
     },
   );
+  for (final expanded in [false, true]) {
+    testWidgets('monthly expansion restores saved $expanded on launch', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'monthly_section_expanded_v1': expanded,
+      });
+      final series = catalogFixture(100, kind: 'series', title: '10월호');
+      final episode = catalogFixture(
+        101,
+        seriesId: series.id,
+        episodeNumber: 1,
+        title: '첫 이야기',
+      );
+      final catalog = FakeReaderCatalog([series, episode]);
+      addTearDown(catalog.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            readerCatalogProvider.overrideWithValue(catalog),
+            catalogItemsProvider(
+              'monthly',
+            ).overrideWith((ref) async => [series, episode]),
+            libraryReadingStateProvider.overrideWith((ref) async => {}),
+          ],
+          child: const MaterialApp(home: Scaffold(body: MonthlyKoofySection())),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('첫 이야기'), expanded ? findsOneWidget : findsNothing);
+      expect(find.text('10월호'), findsOneWidget);
+      expect(find.text('NEW'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets(
     'monthly card survives narrow layout and compilation dismissal persists',
     (tester) async {
@@ -69,10 +104,29 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('오늘의 쿠피'), findsOneWidget);
+      expect(find.text('10월호'), findsOneWidget);
       expect(find.text('첫 이야기'), findsOneWidget);
       expect(find.text('지난 이야기'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('monthly-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('첫 이야기'), findsNothing);
+      expect(find.text('NEW'), findsOneWidget);
+      expect(
+        (await SharedPreferences.getInstance()).getBool(
+          'monthly_section_expanded_v1',
+        ),
+        false,
+      );
+      await tester.tap(find.byKey(const ValueKey('monthly-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('첫 이야기'), findsOneWidget);
+      expect(
+        (await SharedPreferences.getInstance()).getBool(
+          'monthly_section_expanded_v1',
+        ),
+        true,
+      );
       await tester.tap(find.text('확인했어요'));
       await tester.pumpAndSettle();
       expect(find.text('9월 합본'), findsNothing);

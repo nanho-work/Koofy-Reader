@@ -75,3 +75,31 @@ test('monthly selection uses Korean release boundaries and published snapshots, 
   parent.publishedContent!.expectedEpisodes = 31; // legacy count must not block
   assert.equal(compilationEligibility(parent, all, now), null);
 });
+
+ test('monthly publisher stays internal and optional byline is public', async () => {
+  const { metadata, publicItem, MONTHLY_LICENSE } = await import('../src/content');
+  const fields = metadata({ issueMonth: '2026-10', title: '월간 쿠피', description: '', author: '', license: '' });
+  assert.equal(fields.author, '쿠피랩');
+  assert.equal(fields.license, MONTHLY_LICENSE);
+  const item = { id: 'monthly', kind: 'series', published: true, publishedContent: { ...fields, assets: {}, version: 1 } } as any;
+  assert.equal(publicItem(item).author, '');
+  item.publishedContent.byline = '홍길동';
+  assert.equal(publicItem(item).author, '홍길동');
+  assert.equal(metadata({ ...fields, license: '별도 이용조건' }).license, '별도 이용조건');
+});
+
+test('monthly language defaults localize standard text and preserve custom terms', async () => {
+  const { metadata, episodeMetadata, MONTHLY_DEFAULTS } = await import('../src/content');
+  for (const language of ['ko', 'en', 'ja'] as const) {
+    const base = { language, issueMonth: '2026-10', title: 'Monthly', description: '', author: '' };
+    for (const license of ['', undefined, MONTHLY_DEFAULTS.ko.license, MONTHLY_DEFAULTS.en.license, MONTHLY_DEFAULTS.ja.license]) {
+      const issue = metadata({ ...base, license });
+      assert.equal(issue.author, MONTHLY_DEFAULTS[language].author);
+      assert.equal(issue.license, MONTHLY_DEFAULTS[language].license);
+      const episode = episodeMetadata({ title: 'Story', episodeNumber: 1, releaseDate: '2026-10-01', byline: 'Writer' }, issue, 'a'.repeat(32));
+      assert.equal(episode.license, issue.license);
+      assert.equal(episode.byline, 'Writer');
+    }
+    assert.equal(metadata({ ...base, license: 'Custom permission' }).license, 'Custom permission');
+  }
+});

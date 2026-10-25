@@ -45,7 +45,12 @@ class BookCatalogRow extends StatelessWidget {
             ),
             Text(item.title, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
-            Text('${item.author} · ${tr(item.category)}'),
+            Text(
+              [
+                item.author,
+                tr(item.category),
+              ].where((value) => value.trim().isNotEmpty).join(' · '),
+            ),
             const SizedBox(height: 8),
             Text('${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB'),
             if (item.description.isNotEmpty) ...[
@@ -112,7 +117,10 @@ class BookCatalogRow extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     Text(
-                      '${item.author} · ${tr(item.category)}',
+                      [
+                        item.author,
+                        tr(item.category),
+                      ].where((value) => value.trim().isNotEmpty).join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(

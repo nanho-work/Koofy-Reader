@@ -54,6 +54,38 @@ void main() {
   tearDown(() async => temporary.delete(recursive: true));
 
   test(
+    'automatic cover backfill persists and preserves personal choices',
+    () async {
+      final store = BookCoverStore(
+        storage,
+        directory: () async => coversDirectory,
+      );
+      const id = 'group_monthly_test';
+      final book = Book(
+        id: id,
+        title: '10월호',
+        author: '',
+        description: '',
+        sourceType: BookSourceType.asset,
+      );
+      expect(await store.hasSelection(id), false);
+      await store.setImage(id, source.path, onlyIfAbsent: true);
+      final path = (await store.apply([book])).single.coverPath!;
+      expect(await File(path).exists(), true);
+      final reopened = BookCoverStore(
+        storage,
+        directory: () async => coversDirectory,
+      );
+      expect((await reopened.apply([book])).single.coverPath, path);
+      await reopened.setImage(id, '/does-not-exist.png', onlyIfAbsent: true);
+      expect((await reopened.apply([book])).single.coverPath, path);
+      await reopened.reset(id);
+      await reopened.setImage(id, '/does-not-exist.png', onlyIfAbsent: true);
+      expect((await reopened.apply([book])).single.coverPath, isNull);
+    },
+  );
+
+  test(
     'failed preference writes preserve the old cover and remove the new file',
     () async {
       final failing = _FailingStorage();
