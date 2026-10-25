@@ -39,3 +39,20 @@ test('series retires only with a published same-month same-language EPUB compila
   }
   assert.equal(compilationReady(content('series'), book), false);
 });
+
+test('reserved episodes release at the exact Korean minute and ignore draft changes', () => {
+  const episode = episodeMetadata({ title: '열 번째 이야기', episodeNumber: 10, releaseAt: '2026-02-03T09:30:00+09:00' }, base, 'a'.repeat(32));
+  assert.equal(episode.releaseDate, '2026-02-03');
+  assert.equal(episode.episodeNumber, 10);
+  const item = content('book', { releaseAt: episode.releaseAt });
+  assert.equal(isReleased(item, new Date('2026-02-03T00:29:59.999Z')), false);
+  assert.equal(isReleased(item, new Date('2026-02-03T00:30:00Z')), true);
+  item.releaseAt = '2026-02-01T09:00:00+09:00';
+  assert.equal(isReleased(item, new Date('2026-02-02T00:30:00Z')), false);
+});
+test('schedule rejects invalid times, dates, timezone and dates outside the issue', () => {
+  for (const releaseAt of ['2026-02-30T09:00:00+09:00', '2026-02-03T24:00:00+09:00', '2026-02-03T09:60:00+09:00', '2026-02-03T09:00:00Z', '2026-03-01T09:00:00+09:00', '2026-02-03T09:00']) {
+    assert.throws(() => metadata({ ...base, releaseAt }));
+  }
+  assert.equal(metadata({ ...base, issueMonth: '2028-02', releaseAt: '2028-02-29T23:59:00+09:00' }).releaseDate, '2028-02-29');
+});

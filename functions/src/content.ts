@@ -14,15 +14,15 @@ export type Kind = 'book' | 'font' | 'series';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata {
   language?: 'ko' | 'en' | 'ja';
-  issueMonth?: string; releaseDate?: string; compilationId?: string;
+  autoCompile?: boolean; expectedEpisodes?: number; byline?: string; issueMonth?: string; releaseDate?: string; releaseAt?: string; compilationId?: string;
   title: string; author: string; description: string; license: string; category?: string; source?: string;
   seriesId?: string; episodeNumber?: number; seriesTitle?: string; seriesStatus?: 'ongoing' | 'completed';
 }
-export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number; publishedAt?: string; compilationLinkedAt?: string; preview?: Asset }
+export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number; sourceTxt?: Asset; publishedAt?: string; compilationLinkedAt?: string; preview?: Asset }
 export interface Content extends Metadata {
   id: string; kind: Kind; revision: number; assets: Record<string, Asset>;
   published: boolean; publishedContent: Snapshot | null; updatedAt: string;
-  deleting?: boolean;
+  compilationError?: string; deleting?: boolean;
 }
 export function kind(value: unknown): Kind {
   requireValue(value === 'book' || value === 'font' || value === 'series', '콘텐츠 종류를 확인해 주세요.');
@@ -49,18 +49,30 @@ export function publicationDay(now = new Date()): string {
 }
 function monthlyMetadata(data: Record<string, unknown>) {
   const issueMonth = data.issueMonth ?? '';
-  const releaseDate = data.releaseDate ?? '';
+  const autoCompile = data.autoCompile ?? false;
+  const byline = data.byline ?? '';
+  requireValue(typeof autoCompile === 'boolean', '자동 합본 설정을 확인해 주세요.');
+  requireValue(!autoCompile || !!issueMonth, '자동 합본에는 발행 월이 필요합니다.');
+  requireValue(typeof byline === 'string' && byline.trim().length <= 120, '글쓴이는 120자 이하여야 합니다.');
+  const releaseAt = data.releaseAt ?? '';
+  requireValue(typeof releaseAt === 'string' && (!releaseAt || /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:00\+09:00$/.test(releaseAt)), '공개 일시는 한국 시간으로 입력해 주세요.');
+  if (releaseAt) {
+    const parsed = new Date(releaseAt);
+    requireValue(Number.isFinite(parsed.getTime()) && new Date(parsed.getTime() + 9 * 3600000).toISOString().slice(0, 19) + '+09:00' === releaseAt, '올바른 공개 일시를 입력해 주세요.');
+  }
+  const releaseDate = releaseAt ? releaseAt.slice(0, 10) : data.releaseDate ?? '';
   const compilationId = data.compilationId ?? '';
   requireValue(typeof issueMonth === 'string' && (!issueMonth || /^20\d{2}-(0[1-9]|1[0-2])$/.test(issueMonth)), '월간호 발행 월을 확인해 주세요.');
   requireValue(typeof releaseDate === 'string' && (!releaseDate || (/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate) && Number.isFinite(Date.parse(releaseDate + 'T00:00:00Z')) && new Date(releaseDate + 'T00:00:00Z').toISOString().slice(0, 10) === releaseDate)), '발행일을 확인해 주세요.');
   requireValue(!releaseDate || (issueMonth && releaseDate.startsWith(issueMonth + '-')), '발행일은 월간호의 해당 월이어야 합니다.');
   requireValue(typeof compilationId === 'string' && (!compilationId || /^[a-f0-9]{32}$/.test(compilationId)), '합본 콘텐츠 ID를 확인해 주세요.');
   requireValue(!compilationId || !!issueMonth, '합본은 월간호에만 연결할 수 있습니다.');
-  return { issueMonth, releaseDate, compilationId };
+  return { issueMonth, releaseDate, releaseAt, compilationId, autoCompile, byline: byline.trim() };
 }
 export function isReleased(item: Content, now = new Date()): boolean {
   const snapshot = item.publishedContent;
   return !!snapshot && (!snapshot.issueMonth || snapshot.issueMonth <= publicationDay(now).slice(0, 7)) &&
+    (!snapshot.releaseAt || Date.parse(snapshot.releaseAt) <= now.getTime()) &&
     (!snapshot.releaseDate || snapshot.releaseDate <= publicationDay(now));
 }
 export function compilationReady(series: Content, book: Content | undefined): boolean {
@@ -92,10 +104,10 @@ export function episodeMetadata(input: unknown, series: Metadata, seriesId: stri
   requireValue(input && typeof input === 'object', '회차 정보를 입력해 주세요.');
   const data = input as Record<string, unknown>;
   const number = data.episodeNumber;
-  requireValue(!series.issueMonth || !!data.releaseDate, '월간 회차의 발행일을 입력해 주세요.');
+  requireValue(!series.issueMonth || (!!data.releaseDate || !!data.releaseAt), '월간 회차의 발행일을 입력해 주세요.');
   requireValue(typeof number === 'number' && Number.isSafeInteger(number) && number > 0 && number <= 100000, '회차 번호는 1~100000 사이의 정수로 입력해 주세요.');
   return {
-    ...metadata({ ...series, title: data.title, description: data.description ?? '', compilationId: '', releaseDate: data.releaseDate ?? '' }),
+    ...metadata({ ...series, title: data.title, description: data.description ?? '', compilationId: '', releaseDate: data.releaseDate ?? '', releaseAt: data.releaseAt ?? '', autoCompile: false, byline: data.byline ?? '' }),
     seriesId, seriesTitle: series.title, episodeNumber: number,
   };
 }
@@ -132,7 +144,7 @@ export function publicItem(item: Content) {
   if (item.deleting || !item.published || !item.publishedContent) throw new ApiError(404, '공개된 콘텐츠가 없습니다.');
   const snapshot = item.publishedContent;
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
-  const { preview, ...fields } = snapshot;
+  const { preview, sourceTxt: _sourceTxt, autoCompile: _autoCompile, expectedEpisodes: _expectedEpisodes, ...fields } = snapshot;
   return { id: item.id, kind: item.kind, ...fields,
     ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.language === 'en' ? `Chapter ${snapshot.episodeNumber}` : snapshot.language === 'ja' ? `第${snapshot.episodeNumber}話` : `${snapshot.episodeNumber}화`} — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
     assets, ...(preview ? { preview: { sha256: preview.sha256, size: preview.size, extension: preview.extension } } : {}) };

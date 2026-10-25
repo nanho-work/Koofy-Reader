@@ -34,6 +34,18 @@ void main() {
   tearDown(() async => temp.delete(recursive: true));
   Future<Archive> zip(PreparedReadingPublication value) async =>
       ZipDecoder().decodeBytes(await File(value.filePath).readAsBytes());
+  test('server monthly EPUB keeps illustrations and does not inject a duplicate cover', () async {
+    final source = File('test/fixtures/monthly-generated.epub');
+    final monthly = Book.localFile(id: 'monthly-test', title: '월간 쿠피 테스트', author: '쿠피랩', description: '', localPath: source.absolute.path).withCoverPath(File('assets/branding/app_icon.png').absolute.path);
+    final prepared = await preparer.prepare(book: monthly);
+    final archive = await zip(prepared);
+    expect(archive.findFile(readerCoverHref), isNull);
+    final first = utf8.decode(archive.findFile('EPUB/story-1.xhtml')!.content);
+    expect(first.indexOf('<figure>'), lessThan(first.indexOf('<section>')));
+    expect(first, contains('쿠피랩'));
+    expect(archive.findFile('EPUB/story-2.xhtml'), isNotNull);
+    expect(archive.findFile('EPUB/story-2.jpg'), isNotNull);
+  });
   final imagePath = File('assets/branding/app_icon.png').absolute.path;
 
   test(

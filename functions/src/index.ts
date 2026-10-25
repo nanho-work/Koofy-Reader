@@ -1,3 +1,5 @@
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { monthlyPublisher } from './monthly-publishing';
 import { randomUUID, createHash } from 'node:crypto';
 import { previewFace, renderFontPreview } from './font-preview';
 import { initializeApp } from 'firebase-admin/app';
@@ -15,6 +17,7 @@ const adminIdentity = initializeApp({ projectId: 'slimestrikeforce' }, 'existing
 const db = getFirestore(app);
 const bucket = getStorage(app).bucket();
 const contents = db.collection('readerContent');
+const monthlyPublishing = monthlyPublisher(db, bucket);
 const episodeNumbers = db.collection('readerEpisodeNumbers');
 const categorySettings = db.collection('readerSettings').doc('bookCategories');
 function categoryList(data: FirebaseFirestore.DocumentData | undefined): string[] {
@@ -165,7 +168,7 @@ async function monthly(language: 'ko' | 'en' | 'ja') {
     if (activeFound || snapshot.issueMonth !== activeMonth) continue;
     const episodes = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs
       .map(doc => doc.data() as Content).filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
-      .sort((a, b) => (b.publishedContent!.releaseDate ?? '').localeCompare(a.publishedContent!.releaseDate ?? '') || b.episodeNumber! - a.episodeNumber!);
+      .sort((a, b) => (b.publishedContent!.releaseAt || `${b.publishedContent!.releaseDate || ''}T00:00:00+09:00`).localeCompare(a.publishedContent!.releaseAt || `${a.publishedContent!.releaseDate || ''}T00:00:00+09:00`) || b.episodeNumber! - a.episodeNumber!);
     if (!episodes.length) continue;
     items.push(publicItem(issue), publicItem(episodes[0]));
     activeFound = true;
@@ -246,6 +249,9 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     }
     const contentId = id(data.id), expected = revision(data.revision);
     const action = data.action;
+    if (action === 'compileMonthly') {
+      response.json(await monthlyPublishing.compile(contentId, expected)); return;
+    }
     if (action === 'delete') {
       response.json(await deleteContent(contentId, expected, claims.uid)); return;
     }
@@ -259,6 +265,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
         const compiled = (await contents.doc(snapshot.compilationId).get()).data() as Content | undefined;
         requireValue(compilationReady({ ...item, publishedContent: snapshot }, compiled), '같은 월·언어의 공개된 EPUB 합본을 연결하고 연재 상태를 완결로 선택해 주세요.');
       }
+      const generatedEpub = await monthlyPublishing.episode(item, snapshot);
       let previewFile: ReturnType<typeof bucket.file> | undefined;
       if (item.kind === 'font') {
         const face = previewFace(item);
@@ -287,6 +294,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
           return { published: true, publishedContent: snapshot };
         });
       } catch (error) {
+        if (generatedEpub) await bucket.file(generatedEpub.path).delete().catch(cleanup => logger.error('Orphan monthly EPUB cleanup failed', cleanup));
         await previewFile?.delete().catch(cleanup => logger.error('Orphan preview cleanup failed', cleanup));
         throw error;
       }
@@ -342,4 +350,29 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
     if (request.query.action === 'monthly') { response.json(await monthly(catalogLanguage(request.query.language))); return; }
     response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language)));
   } catch (error) { sendError(error, response); }
+});
+
+
+// No mobile update is needed when a new issue is finalized. Publish both documents atomically.
+export const readerMonthlyCompilation = onSchedule({
+  schedule: 'every 60 minutes', timeZone: 'Asia/Seoul', region: options.region,
+  serviceAccount: options.serviceAccount, memory: '1GiB', timeoutSeconds: 540, maxInstances: 1,
+}, async () => {
+  const month = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7);
+  const series = await contents.where('kind', '==', 'series').where('published', '==', true).get();
+  for (const doc of series.docs) {
+    const item = doc.data() as Content;
+    const snapshot = item.publishedContent;
+    if (!snapshot?.autoCompile || !snapshot.issueMonth || snapshot.issueMonth >= month || snapshot.compilationId || item.deleting) continue;
+    try { await monthlyPublishing.compile(item.id); }
+    catch (error) {
+      logger.error('Monthly compilation deferred', { id: item.id, error });
+      const message = error instanceof ApiError ? error.message : '합본 생성에 실패했습니다. 다음 실행에서 다시 시도합니다.';
+      // Do not overwrite a successful concurrent compilation or edit.
+      await db.runTransaction(async transaction => {
+        const ref = contents.doc(item.id), current = await transaction.get(ref);
+        if (current.exists && current.data()?.revision === item.revision && !current.data()?.publishedContent?.compilationId) transaction.update(ref, { compilationError: message });
+      });
+    }
+  }
 });

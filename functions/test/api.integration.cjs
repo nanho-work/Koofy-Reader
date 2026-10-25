@@ -340,6 +340,16 @@ test('monthly feed, catalog handoff and download access remain consistent', asyn
     const episodes = await catalog(`kind=book&supportsTxt=1&seriesId=${issue.id}`);
     assert.deepEqual(episodes.map(item => item.id), [episode.id]);
     assert.equal((await fetch(base + `readerCatalog?action=download&id=${future.id}&version=${future.publishedContent.version}&slot=epub`)).status, 400);
+    // A future instant must remain private even when its editorial day is today.
+    const futureInstant = new Date(Date.now() + 3600000).toISOString();
+    await db.collection('readerContent').doc(future.id).update({ 'publishedContent.releaseDate': day, 'publishedContent.releaseAt': futureInstant });
+    assert(!(await catalog(`kind=book&supportsTxt=1&seriesId=${issue.id}`)).some(item => item.id === future.id));
+    assert(!(await catalog('action=monthly&language=ko')).some(item => item.id === future.id));
+    assert.equal((await fetch(base + `readerCatalog?action=download&id=${future.id}&version=${future.publishedContent.version}&slot=epub`)).status, 400);
+    await db.collection('readerContent').doc(future.id).update({ 'publishedContent.releaseAt': new Date(Date.now() - 1000).toISOString() });
+    assert((await catalog(`kind=book&supportsTxt=1&seriesId=${issue.id}`)).some(item => item.id === future.id));
+    assert.equal((await fetch(base + `readerCatalog?action=download&id=${future.id}&version=${future.publishedContent.version}&slot=epub`)).status, 200);
+    await db.collection('readerContent').doc(future.id).update({ 'publishedContent.releaseDate': '2099-12-31' });
     let saved = await api('save', { id: issue.id, revision: issue.revision, metadata: { ...fields, seriesStatus: 'completed', compilationId: book.id } });
     assert.equal(saved.status, 200, JSON.stringify(saved.body));
     const linked = await api('publish', { id: issue.id, revision: saved.body.revision });
@@ -359,4 +369,62 @@ test('monthly feed, catalog handoff and download access remain consistent', asyn
     assert((await catalog('action=monthly&language=ko')).some(item => item.id === episode.id));
     assert((await catalog('kind=book&supportsSeries=1&supportsTxt=1&language=ko')).some(item => item.id === issue.id));
   } finally { await Promise.all(ids.map(id => db.collection('readerContent').doc(id).delete())); }
+});
+
+test('monthly TXT publication produces illustrated EPUB and compilation is atomic and retry-safe', async () => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const { getStorage } = require('firebase-admin/storage');
+  const { createHash } = require('node:crypto');
+  const sharp = require('sharp');
+  const { unzipSync, strFromU8 } = require('fflate');
+  const { publish } = require('../lib/src/content');
+  const { monthlyPublisher } = require('../lib/src/monthly-publishing');
+  const db = getFirestore(), bucket = getStorage().bucket('koofy-reader.firebasestorage.app');
+  const seriesId = 'df'.repeat(16), childId = 'de'.repeat(16);
+  const bookId = createHash('sha256').update(`monthly-compilation:${seriesId}`).digest('hex').slice(0, 32);
+  async function asset(path, bytes, extension, contentType) {
+    await bucket.file(path).save(bytes, { resumable: false, contentType });
+    return { path, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), extension, contentType };
+  }
+  const cover = await asset('monthly-fixture/cover.webp', await sharp({ create: { width: 60, height: 40, channels: 3, background: '#eeffee' } }).webp().toBuffer(), 'webp', 'image/webp');
+  const txt = await asset('monthly-fixture/story.txt', Buffer.from('겨울옷\n\n공개된 본문 & 첫 문단\n\n둘째 문단'), 'txt', 'text/plain');
+  const parent = { id: seriesId, kind: 'series', title: '월간 쿠피 1월호', author: '쿠피랩', license: 'fixture', description: '', issueMonth: '2026-01', language: 'ko', autoCompile: true, expectedEpisodes: 1, assets: { cover }, revision: 1, published: true, updatedAt: '', publishedContent: null };
+  parent.publishedContent = publish(parent);
+  const child = { ...parent, id: childId, kind: 'book', title: '겨울옷', autoCompile: false, expectedEpisodes: 0, byline: '홍길동', seriesId, episodeNumber: 1, releaseDate: '2026-01-01', assets: { txt, cover }, published: false, publishedContent: null };
+  await db.collection('readerContent').doc(seriesId).set(parent);
+  await db.collection('readerContent').doc(childId).set(child);
+  try {
+    const blocked = await api('compileMonthly', { id: seriesId, revision: 1 });
+    assert.equal(blocked.status, 400, 'draft episodes cannot disappear into a compilation');
+    const result = await api('publish', { id: childId, revision: 1 });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    const published = result.body;
+    assert(published.assets.txt, 'draft retains source text');
+    assert(published.publishedContent.sourceTxt);
+    assert(!published.publishedContent.assets.txt);
+    const [bytes] = await bucket.file(published.publishedContent.assets.epub.path).download();
+    assert(strFromU8(unzipSync(bytes)['EPUB/story-1.xhtml']).includes('홍길동'));
+    // A later draft must not be included until explicitly published.
+    const saved = await api('save', { id: childId, revision: published.revision, metadata: { title: '아직 비공개인 제목', episodeNumber: 1, releaseDate: '2026-01-01' } });
+    assert.equal(saved.status, 200);
+    const service = monthlyPublisher(db, bucket);
+    const results = await Promise.allSettled([service.compile(seriesId), service.compile(seriesId)]);
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    const current = (await db.collection('readerContent').doc(seriesId).get()).data();
+    assert.equal(current.publishedContent.compilationId, bookId);
+    const book = (await db.collection('readerContent').doc(bookId).get()).data();
+    assert(book.published && book.publishedContent.assets.epub);
+    const [compiled] = await bucket.file(book.assets.epub.path).download();
+    const page = strFromU8(unzipSync(compiled)['EPUB/story-1.xhtml']);
+    assert(page.includes('겨울옷') && !page.includes('아직 비공개인 제목'));
+    const [files] = await bucket.getFiles({ prefix: `readerContent/${bookId}/` });
+    assert.equal(files.length, 1, 'losing concurrent generation removes its orphan file');
+    await assert.rejects(service.compile(seriesId));
+    assert.equal((await db.collection('readerContent').doc(childId).get()).data().published, true);
+  } finally {
+    await Promise.all([seriesId, childId, bookId].map(id => db.collection('readerContent').doc(id).delete()));
+    await bucket.deleteFiles({ prefix: 'monthly-fixture/' });
+    await bucket.deleteFiles({ prefix: `readerContent/${childId}/` });
+    await bucket.deleteFiles({ prefix: `readerContent/${bookId}/` });
+  }
 });
