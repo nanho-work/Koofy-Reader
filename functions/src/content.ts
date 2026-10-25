@@ -14,10 +14,11 @@ export type Kind = 'book' | 'font' | 'series';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata {
   language?: 'ko' | 'en' | 'ja';
+  issueMonth?: string; releaseDate?: string; compilationId?: string;
   title: string; author: string; description: string; license: string; category?: string; source?: string;
   seriesId?: string; episodeNumber?: number; seriesTitle?: string; seriesStatus?: 'ongoing' | 'completed';
 }
-export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number; preview?: Asset }
+export interface Snapshot extends Metadata { assets: Record<string, Asset>; version: number; publishedAt?: string; compilationLinkedAt?: string; preview?: Asset }
 export interface Content extends Metadata {
   id: string; kind: Kind; revision: number; assets: Record<string, Asset>;
   published: boolean; publishedContent: Snapshot | null; updatedAt: string;
@@ -42,6 +43,33 @@ export function catalogLanguage(value: unknown): 'ko' | 'en' | 'ja' {
 export function visibleInLanguage(item: Content, language: 'ko' | 'en' | 'ja') {
   return item.kind === 'font' || contentLanguage(item.publishedContent?.language) === language;
 }
+// Publication dates are editorial dates in Asia/Seoul, independent of device time.
+export function publicationDay(now = new Date()): string {
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function monthlyMetadata(data: Record<string, unknown>) {
+  const issueMonth = data.issueMonth ?? '';
+  const releaseDate = data.releaseDate ?? '';
+  const compilationId = data.compilationId ?? '';
+  requireValue(typeof issueMonth === 'string' && (!issueMonth || /^20\d{2}-(0[1-9]|1[0-2])$/.test(issueMonth)), '월간호 발행 월을 확인해 주세요.');
+  requireValue(typeof releaseDate === 'string' && (!releaseDate || (/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate) && Number.isFinite(Date.parse(releaseDate + 'T00:00:00Z')) && new Date(releaseDate + 'T00:00:00Z').toISOString().slice(0, 10) === releaseDate)), '발행일을 확인해 주세요.');
+  requireValue(!releaseDate || (issueMonth && releaseDate.startsWith(issueMonth + '-')), '발행일은 월간호의 해당 월이어야 합니다.');
+  requireValue(typeof compilationId === 'string' && (!compilationId || /^[a-f0-9]{32}$/.test(compilationId)), '합본 콘텐츠 ID를 확인해 주세요.');
+  requireValue(!compilationId || !!issueMonth, '합본은 월간호에만 연결할 수 있습니다.');
+  return { issueMonth, releaseDate, compilationId };
+}
+export function isReleased(item: Content, now = new Date()): boolean {
+  const snapshot = item.publishedContent;
+  return !!snapshot && (!snapshot.issueMonth || snapshot.issueMonth <= publicationDay(now).slice(0, 7)) &&
+    (!snapshot.releaseDate || snapshot.releaseDate <= publicationDay(now));
+}
+export function compilationReady(series: Content, book: Content | undefined): boolean {
+  const source = series.publishedContent, target = book?.publishedContent;
+  return !!(source?.issueMonth && source.seriesStatus === 'completed' && book && book.id !== series.id &&
+    book.kind === 'book' && book.published && !book.deleting && target && !target.seriesId &&
+    target.assets.epub && target.issueMonth === source.issueMonth &&
+    contentLanguage(target.language) === contentLanguage(source.language) && isReleased(book));
+}
 export function metadata(input: unknown): Metadata {
   requireValue(input && typeof input === 'object', '제목과 제작자 정보를 입력해 주세요.');
   const data = input as Record<string, unknown>;
@@ -52,7 +80,7 @@ export function metadata(input: unknown): Metadata {
   }
   const category = data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
+  return { ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: field('author', 120, true), description: field('description', 2000), license: field('license', 2000, true) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -64,9 +92,10 @@ export function episodeMetadata(input: unknown, series: Metadata, seriesId: stri
   requireValue(input && typeof input === 'object', '회차 정보를 입력해 주세요.');
   const data = input as Record<string, unknown>;
   const number = data.episodeNumber;
+  requireValue(!series.issueMonth || !!data.releaseDate, '월간 회차의 발행일을 입력해 주세요.');
   requireValue(typeof number === 'number' && Number.isSafeInteger(number) && number > 0 && number <= 100000, '회차 번호는 1~100000 사이의 정수로 입력해 주세요.');
   return {
-    ...metadata({ ...series, title: data.title, description: data.description ?? '' }),
+    ...metadata({ ...series, title: data.title, description: data.description ?? '', compilationId: '', releaseDate: data.releaseDate ?? '' }),
     seriesId, seriesTitle: series.title, episodeNumber: number,
   };
 }
@@ -88,6 +117,7 @@ export function assertRevision(item: Content, expected: number) {
 }
 export function publish(item: Content, parent?: Content): Snapshot {
   let fields: Metadata = item.kind === 'series' ? seriesMetadata(item) : metadata(item);
+  requireValue(!item.compilationId || item.kind === 'series', '합본 연결은 연재 작품에만 설정할 수 있습니다.');
   const assets = { ...item.assets };
   if (item.seriesId) {
     requireValue(item.kind === 'book' && parent?.id === item.seriesId && parent.kind === 'series' && !parent.deleting && parent.published && parent.publishedContent, '작품 정보와 대표 표지를 먼저 공개해 주세요.');
@@ -96,7 +126,7 @@ export function publish(item: Content, parent?: Content): Snapshot {
   }
   requireValue(item.kind === 'series' ? assets.cover : item.kind === 'book' ? (Boolean(assets.epub) !== Boolean(assets.txt)) && assets.cover : Object.keys(assets).some(key => /^font[1-9]00$/.test(key)),
     item.kind === 'series' ? '대표 표지를 먼저 업로드해 주세요.' : item.kind === 'book' ? 'EPUB 또는 TXT 한 개와 표지를 먼저 업로드해 주세요.' : '글꼴 파일을 하나 이상 업로드해 주세요.');
-  return { ...fields, assets, version: item.revision + 1 };
+  return { ...fields, assets, version: item.revision + 1, publishedAt: item.publishedContent?.publishedAt ?? new Date().toISOString(), ...(fields.compilationId ? { compilationLinkedAt: item.publishedContent?.compilationId === fields.compilationId ? item.publishedContent.compilationLinkedAt ?? new Date().toISOString() : new Date().toISOString() } : {}) };
 }
 export function publicItem(item: Content) {
   if (item.deleting || !item.published || !item.publishedContent) throw new ApiError(404, '공개된 콘텐츠가 없습니다.');

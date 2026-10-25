@@ -1,3 +1,5 @@
+import 'open_catalog_book.dart';
+import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
@@ -96,10 +98,21 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
   bool _newest = false;
+  bool _opening = false;
   @override
   void initState() {
     super.initState();
     ReaderAnalytics.instance.seriesOpened(widget.series.id);
+  }
+
+  Future<void> _read(CatalogItem item) async {
+    if (_opening) return;
+    setState(() => _opening = true);
+    try {
+      await openCatalogBook(context, ref, item);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
   }
 
   String get _key => 'series:${widget.series.id}';
@@ -160,6 +173,14 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
     final series =
         parents?.where((item) => item.id == widget.series.id).firstOrNull ??
         widget.series;
+    final reading = series.issueMonth.isNotEmpty
+        ? ref.watch(libraryReadingStateProvider).valueOrNull
+        : null;
+    final today = DateTime.now()
+        .toUtc()
+        .add(const Duration(hours: 9))
+        .toIso8601String()
+        .substring(0, 10);
     final query = _search.text.trim().toLowerCase();
     final episodes =
         (catalog.valueOrNull ?? const <CatalogItem>[])
@@ -360,11 +381,25 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                           key: ValueKey(key),
                           item: episode,
                           installed: received,
+                          onOpen:
+                              series.issueMonth.isNotEmpty &&
+                                  !download.busy &&
+                                  !_opening
+                              ? () => _read(episode)
+                              : null,
+                          isNew: episode.releaseDate == today,
+                          readingLabel: series.issueMonth.isEmpty
+                              ? null
+                              : reading?[episode.bookId]?.finished == true
+                              ? tr('완독')
+                              : reading?[episode.bookId]?.progressLabel ??
+                                    tr('아직 읽지 않은 이야기'),
                           progress: download.itemKey == key
                               ? download.progress
                               : null,
                           onDownload:
                               download.busy ||
+                                  _opening ||
                                   installed.isLoading ||
                                   !installed.hasValue ||
                                   installed.hasError ||

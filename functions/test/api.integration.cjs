@@ -304,3 +304,59 @@ test('language catalog preserves raw cursors across empty pages and legacy Korea
   assert.equal((await all('ja')).length,0);
   assert.equal((await all(undefined)).length,80);
 });
+
+test('monthly feed, catalog handoff and download access remain consistent', async () => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const { publish, publicationDay } = require('../lib/src/content');
+  const db = getFirestore();
+  const day = publicationDay(), month = day.slice(0, 7);
+  const prefix = 'ac'.repeat(15);
+  const ids = ['01', '02', '03', '04', '05', '06'].map(n => prefix + n);
+  const cover = { path: 'monthly-test/cover.webp', sha256: 'a'.repeat(64), size: 20, extension: 'webp', contentType: 'image/webp' };
+  const fields = { title: '월간 쿠피 테스트', author: '쿠피랩', description: '', license: 'fixture', language: 'ko', issueMonth: month };
+  const issue = { ...fields, id: ids[0], kind: 'series', revision: 1, assets: { cover }, published: true, publishedContent: null, updatedAt: new Date().toISOString() };
+  issue.publishedContent = publish(issue);
+  const episode = { ...issue, id: ids[1], kind: 'book', seriesId: issue.id, episodeNumber: 1, releaseDate: day, assets: { cover, epub: { ...cover, extension: 'epub' } }, publishedContent: null };
+  episode.publishedContent = publish(episode, issue);
+  const book = { ...issue, id: ids[2], kind: 'book', assets: episode.assets, publishedContent: null };
+  book.publishedContent = publish(book);
+  const future = { ...episode, id: ids[3], episodeNumber: 2, publishedContent: { ...episode.publishedContent, releaseDate: '2099-12-31' } };
+  const previousMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
+  const older = { ...issue, id: ids[4], issueMonth: previousMonth, publishedContent: null }; older.publishedContent = publish(older);
+  const olderEpisode = { ...episode, id: ids[5], seriesId: older.id, issueMonth: previousMonth, releaseDate: previousMonth + '-01', publishedContent: null }; olderEpisode.publishedContent = publish(olderEpisode, older);
+  for (const item of [issue, episode, book, future, older, olderEpisode]) await db.collection('readerContent').doc(item.id).set(item);
+  async function catalog(query) {
+    const items = []; let cursor;
+    do {
+      const response = await fetch(base + 'readerCatalog?' + query + (cursor ? `&after=${cursor}` : ''));
+      assert.equal(response.status, 200);
+      const page = await response.json(); items.push(...page.items); cursor = page.nextCursor;
+    } while (cursor);
+    return items;
+  }
+  try {
+    assert((await catalog('action=monthly&language=ko')).some(item => item.id === episode.id));
+    assert(!(await catalog('action=monthly&language=en')).some(item => ids.includes(item.id)));
+    const episodes = await catalog(`kind=book&supportsTxt=1&seriesId=${issue.id}`);
+    assert.deepEqual(episodes.map(item => item.id), [episode.id]);
+    assert.equal((await fetch(base + `readerCatalog?action=download&id=${future.id}&version=${future.publishedContent.version}&slot=epub`)).status, 400);
+    let saved = await api('save', { id: issue.id, revision: issue.revision, metadata: { ...fields, seriesStatus: 'completed', compilationId: book.id } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    const linked = await api('publish', { id: issue.id, revision: saved.body.revision });
+    assert.equal(linked.status, 200, JSON.stringify(linked.body));
+    const grouped = await catalog('kind=book&supportsSeries=1&supportsTxt=1&language=ko');
+    assert(!grouped.some(item => item.id === issue.id));
+    assert(grouped.some(item => item.id === book.id));
+    const feed = await catalog('action=monthly&language=ko');
+    assert(feed.some(item => item.id === book.id));
+    assert(!feed.some(item => item.id === episode.id));
+    assert(!feed.some(item => item.id === olderEpisode.id), 'finishing the latest issue must not resurrect an older unfinished issue');
+    await db.collection('readerContent').doc(issue.id).update({ 'publishedContent.compilationLinkedAt': '2020-01-01T00:00:00Z' });
+    assert(!(await catalog('action=monthly&language=ko')).some(item => item.id === book.id), 'compilation announcement expires, download does not');
+    assert((await catalog('kind=book&supportsSeries=1&supportsTxt=1&language=ko')).some(item => item.id === book.id));
+    assert.equal((await fetch(base + `readerCatalog?action=download&id=${episode.id}&version=${episode.publishedContent.version}&slot=epub`)).status, 200);
+    await db.collection('readerContent').doc(book.id).update({ published: false });
+    assert((await catalog('action=monthly&language=ko')).some(item => item.id === episode.id));
+    assert((await catalog('kind=book&supportsSeries=1&supportsTxt=1&language=ko')).some(item => item.id === issue.id));
+  } finally { await Promise.all(ids.map(id => db.collection('readerContent').doc(id).delete())); }
+});

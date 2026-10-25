@@ -882,6 +882,13 @@ internal object ReaderStrings {
         "평가 남기기" to "Rate this app",
         "스토어에서 사용 경험을 들려주세요" to "Share your experience on the store",
         "스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요." to "Could not open the store. Please try again later.",
+        "오늘의 쿠피" to "Today’s Koofy",
+        "지난 이야기" to "Past stories",
+        "아직 읽지 않은 이야기" to "Not read yet",
+        "한 달의 이야기가 한 권이 되었어요" to "A month of stories, now in one book",
+        "합본 읽기" to "Read the collection",
+        "확인했어요" to "Got it",
+        "새 이야기" to "New story",
     )
     val ja = mapOf(
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요." to "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -1762,6 +1769,13 @@ internal object ReaderStrings {
         "평가 남기기" to "アプリを評価",
         "스토어에서 사용 경험을 들려주세요" to "ストアで使った感想をお聞かせください",
         "스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요." to "ストアを開けませんでした。しばらくしてからもう一度お試しください。",
+        "오늘의 쿠피" to "今日のクーフィー",
+        "지난 이야기" to "これまでのお話",
+        "아직 읽지 않은 이야기" to "未読のお話",
+        "한 달의 이야기가 한 권이 되었어요" to "ひと月のお話が一冊になりました",
+        "합본 읽기" to "合本を読む",
+        "확인했어요" to "確認しました",
+        "새 이야기" to "新しいお話",
     )
 }
 internal fun L(key: String, vararg arguments: Any?): String {

@@ -7,7 +7,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { ApiError, Content, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -68,6 +68,7 @@ async function requirePublishedSeries(item: Content) {
   const parent = await getItem(item.seriesId);
   if (parent.kind !== 'series') throw new ApiError(404, '공개된 작품이 없습니다.');
   publicItem(parent);
+  requireValue(isReleased(parent), '아직 발행되지 않은 작품입니다.');
 }
 async function deleteContent(contentId: string, expected: number, uid: string) {
   const ref = contents.doc(contentId);
@@ -114,7 +115,7 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
     requireValue(selectedKind === 'book', '도서 회차만 조회할 수 있습니다.');
     const parent = await getItem(id(seriesId));
     requireValue(parent.kind === 'series' && !parent.deleting, '작품을 찾을 수 없습니다.');
-    if (publicOnly) publicItem(parent);
+    if (publicOnly) { publicItem(parent); requireValue(isReleased(parent), '아직 발행되지 않은 작품입니다.'); }
     query = query.where('seriesId', '==', parent.id);
   }
   if (publicOnly) query = query.where('published', '==', true);
@@ -125,22 +126,51 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   // Older apps reject unknown asset slots. Keep TXT out of their responses,
   // retaining the raw document cursor even when a page contains only TXT books.
   const visible = docs.slice(0, 40).map(doc => doc.data() as Content).filter(item =>
-    (!publicOnly || visibleInLanguage(item, language)) &&
+    (!publicOnly || (visibleInLanguage(item, language) && isReleased(item))) &&
     (!grouped || selectedKind !== 'book' || !item.seriesId) &&
     (!publicOnly || supportsTxt || !item.publishedContent?.assets.txt));
   // Legacy apps still receive complete individual books. A private parent also
   // hides its episodes from legacy lists and blocks fresh download links.
   const parents = [...new Set(visible.flatMap(item => publicOnly && item.seriesId ? [item.seriesId] : []))];
   const parentDocs = parents.length ? await db.getAll(...parents.map(value => contents.doc(value))) : [];
-  const available = new Set(parentDocs.filter(doc => doc.data()?.kind === 'series' && doc.data()?.published && !doc.data()?.deleting).map(doc => doc.id));
+  const available = new Set(parentDocs.filter(doc => doc.data()?.kind === 'series' && doc.data()?.published && !doc.data()?.deleting && isReleased(doc.data() as Content)).map(doc => doc.id));
   const items = await Promise.all(visible.filter(item => !publicOnly || !item.seriesId || available.has(item.seriesId)).map(async item => {
     if (!publicOnly) return item;
     const result = publicItem(item);
     if (item.kind !== 'series') return result;
-    const count = await contents.where('seriesId', '==', item.id).where('published', '==', true).count().get();
-    return { ...result, episodeCount: count.data().count };
+    const compilationId = item.publishedContent?.compilationId;
+    if (compilationId && compilationReady(item, (await contents.doc(compilationId).get()).data() as Content | undefined)) return null;
+    const count = await contents.where('seriesId', '==', item.id).where('published', '==', true).get();
+    return { ...result, episodeCount: count.docs.filter(doc => isReleased(doc.data() as Content) && !doc.data().deleting).length };
   }));
-  return { items, nextCursor: docs.length > 40 ? docs[39].id : null };
+  return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null };
+}
+
+async function monthly(language: 'ko' | 'en' | 'ja') {
+  const documents = await contents.where('kind', '==', 'series').where('published', '==', true).get();
+  const issues = documents.docs.map(doc => doc.data() as Content).filter(item =>
+    !item.deleting && item.publishedContent?.issueMonth && visibleInLanguage(item, language) && isReleased(item))
+    .sort((a, b) => b.publishedContent!.issueMonth!.localeCompare(a.publishedContent!.issueMonth!) || a.id.localeCompare(b.id));
+  const items: ReturnType<typeof publicItem>[] = [];
+  let activeFound = false;
+  const activeMonth = issues[0]?.publishedContent?.issueMonth;
+  const noticeStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  for (const issue of issues) {
+    const snapshot = issue.publishedContent!;
+    const compiled = snapshot.compilationId ? (await contents.doc(snapshot.compilationId).get()).data() as Content | undefined : undefined;
+    if (compilationReady(issue, compiled)) {
+      if (Date.parse(snapshot.compilationLinkedAt ?? '') >= noticeStart) items.push(publicItem(compiled!));
+      continue;
+    }
+    if (activeFound || snapshot.issueMonth !== activeMonth) continue;
+    const episodes = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs
+      .map(doc => doc.data() as Content).filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
+      .sort((a, b) => (b.publishedContent!.releaseDate ?? '').localeCompare(a.publishedContent!.releaseDate ?? '') || b.episodeNumber! - a.episodeNumber!);
+    if (!episodes.length) continue;
+    items.push(publicItem(issue), publicItem(episodes[0]));
+    activeFound = true;
+  }
+  return { items, nextCursor: null };
 }
 
 export const readerAdmin = onRequest(options, async (request, response) => {
@@ -225,6 +255,10 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       const item = await getItem(contentId); assertRevision(item, expected);
       const parent = item.seriesId ? await getItem(item.seriesId) : undefined;
       const snapshot = publish(item, parent);
+      if (snapshot.compilationId) {
+        const compiled = (await contents.doc(snapshot.compilationId).get()).data() as Content | undefined;
+        requireValue(compilationReady({ ...item, publishedContent: snapshot }, compiled), '같은 월·언어의 공개된 EPUB 합본을 연결하고 연재 상태를 완결로 선택해 주세요.');
+      }
       let previewFile: ReturnType<typeof bucket.file> | undefined;
       if (item.kind === 'font') {
         const face = previewFace(item);
@@ -246,6 +280,10 @@ export const readerAdmin = onRequest(options, async (request, response) => {
             assertRevision(current, parent.revision);
             publicItem(current);
           }
+          if (snapshot.compilationId) {
+            const compiled = (await transaction.get(contents.doc(snapshot.compilationId))).data() as Content | undefined;
+            requireValue(compilationReady({ ...item, publishedContent: snapshot }, compiled), '합본 공개 상태가 변경되었습니다. 다시 확인해 주세요.');
+          }
           return { published: true, publishedContent: snapshot };
         });
       } catch (error) {
@@ -263,6 +301,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
             const input = { language: item.language ?? 'ko', ...(data.metadata as Record<string, unknown>) };
             const fields = item.kind === 'series' ? seriesMetadata(input) : metadata(input);
             requireValue(!item.publishedContent || fields.language === contentLanguage(item.publishedContent.language), '공개된 콘텐츠의 언어는 변경할 수 없습니다. 번역본은 별도로 등록해 주세요.');
+            requireValue(!item.publishedContent || (fields.issueMonth || '') === (item.publishedContent.issueMonth || ''), '공개된 월간호의 발행 월은 변경할 수 없습니다. 새 작품을 등록해 주세요.');
             return fields;
           }
           const parent = await seriesInTransaction(transaction, item.seriesId);
@@ -289,6 +328,7 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
     if (request.query.action === 'download') {
       const item = await getItem(id(request.query.id));
       publicItem(item); // Never sign draft/unpublished paths supplied by a caller.
+      requireValue(isReleased(item), '아직 발행되지 않은 콘텐츠입니다.');
       await requirePublishedSeries(item);
       const snapshot = item.publishedContent!;
       if (Number(request.query.version) !== snapshot.version) throw new ApiError(409, '새 버전이 공개되었습니다. 목록을 새로고침해 주세요.');
@@ -299,6 +339,7 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       const [url] = await bucket.file(asset.path).getSignedUrl({ action: 'read', version: 'v4', expires: Date.now() + 5 * 60 * 1000 });
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }
+    if (request.query.action === 'monthly') { response.json(await monthly(catalogLanguage(request.query.language))); return; }
     response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language)));
   } catch (error) { sendError(error, response); }
 });

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'dart:async';
@@ -57,7 +58,9 @@ final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
 ) async {
   final repository = ref.watch(readerCatalogProvider);
   // Local deletion must immediately make a downloaded book available again.
-  if (kind == 'book' || kind.startsWith('series:')) ref.watch(booksProvider);
+  if (kind == 'book' || kind == 'monthly' || kind.startsWith('series:')) {
+    ref.watch(booksProvider);
+  }
   final items = await ref.watch(catalogItemsProvider(kind).future);
   final installed = <String>{};
   for (final item in items) {
@@ -104,6 +107,27 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
               );
             },
           );
+      if (item.seriesId != null && item.issueMonth.isNotEmpty) {
+        // Grouping failure must not roll back a successfully verified download.
+        try {
+          final episodes = [
+            ...await ref.read(
+              catalogItemsProvider('series:${item.seriesId}').future,
+            ),
+          ]..sort((a, b) => a.episodeNumber!.compareTo(b.episodeNumber!));
+          await ref
+              .read(bookGroupRepositoryProvider)
+              .addMonthlyEpisode(
+                item.seriesId!,
+                item.seriesTitle.isEmpty ? item.issueMonth : item.seriesTitle,
+                item.bookId,
+                episodes.map((episode) => episode.bookId).toList(),
+              );
+          ref.invalidate(bookGroupsProvider);
+        } catch (error) {
+          debugPrint('Monthly grouping deferred: $error');
+        }
+      }
       ReaderAnalytics.instance.download(
         kind: item.kind,
         id: item.id,
@@ -182,6 +206,10 @@ class CatalogItem {
       license = json['license'] as String,
       category = json['category'] as String? ?? '기타',
       source = json['source'] as String? ?? '',
+      seriesTitle = json['seriesTitle'] as String? ?? '',
+      issueMonth = json['issueMonth'] as String? ?? '',
+      releaseDate = json['releaseDate'] as String? ?? '',
+      compilationId = json['compilationId'] as String? ?? '',
       seriesId = json['seriesId'] as String?,
       episodeNumber = json['episodeNumber'] as int?,
       episodeTitle = json['episodeTitle'] as String?,
@@ -244,6 +272,7 @@ class CatalogItem {
   final int version;
   final Map<String, CatalogAsset> assets;
   final CatalogAsset? preview;
+  final String issueMonth, releaseDate, compilationId, seriesTitle;
   final String? seriesId, episodeTitle;
   final int? episodeNumber;
   final int episodeCount;
@@ -333,7 +362,8 @@ class ReaderCatalog {
   }) async {
     final seriesId = kind.startsWith('series:') ? kind.substring(7) : null;
     final data = await _json({
-      'kind': seriesId != null ? 'book' : kind,
+      'kind': seriesId != null || kind == 'monthly' ? 'book' : kind,
+      if (kind == 'monthly') 'action': 'monthly',
       if (kind == 'book' || seriesId != null) 'supportsTxt': '1',
       if (kind == 'book') 'supportsSeries': '1',
       if (kind != 'font') 'language': language ?? AppLanguage.instance.code,

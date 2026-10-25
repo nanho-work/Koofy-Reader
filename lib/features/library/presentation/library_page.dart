@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/language_button.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
@@ -305,17 +306,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         final gap = hinge == null ? 12.0 : hinge.width;
         final intro = Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-          child: recent.isNotEmpty
-              ? _continueReading(
-                  context,
-                  recent.first,
-                  states[recent.first.id]!,
-                  canOpen,
-                  groupCoverPath: groupCovers[recent.first.id],
-                  nextBook: nextRecentBook,
-                  nextState: states[nextRecentBook?.id],
-                )
-              : _welcome(context, empty: books.isEmpty),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const MonthlyKoofySection(),
+              recent.isNotEmpty
+                  ? _continueReading(
+                      context,
+                      recent.first,
+                      states[recent.first.id]!,
+                      canOpen,
+                      groupCoverPath: groupCovers[recent.first.id],
+                      nextBook: nextRecentBook,
+                      nextState: states[nextRecentBook?.id],
+                    )
+                  : _welcome(context, empty: books.isEmpty),
+            ],
+          ),
         );
         final shelf = _shelf(
           context,

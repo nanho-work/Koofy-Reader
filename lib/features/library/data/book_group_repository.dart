@@ -121,6 +121,43 @@ class BookGroupRepository {
     }
   }
 
+  /// One monthly shelf entry, retaining each episode's independent locator.
+  /// Never move a book out of a group the reader made themselves.
+  Future<GroupChange> addMonthlyEpisode(
+    String seriesId,
+    String title,
+    String bookId,
+    List<String> order,
+  ) => _change((groups) {
+    final id = 'group_monthly_$seriesId';
+    if (groups.any(
+      (group) => group.id != id && group.bookIds.contains(bookId),
+    )) {
+      return;
+    }
+    final index = groups.indexWhere((group) => group.id == id);
+    final old = index < 0 ? null : groups[index];
+    final ids = {...?old?.bookIds, bookId}.toList();
+    ids.sort((a, b) {
+      final ai = order.indexOf(a), bi = order.indexOf(b);
+      if (ai < 0 || bi < 0) return ai < 0 ? (bi < 0 ? a.compareTo(b) : 1) : -1;
+      return ai.compareTo(bi);
+    });
+    final group =
+        old?.copyWith(bookIds: ids) ??
+        BookGroup(
+          id: id,
+          title: title.length > 100 ? title.substring(0, 100) : title,
+          bookIds: ids,
+          showMemberCovers: true,
+        );
+    if (index < 0) {
+      groups.add(group);
+    } else {
+      groups[index] = group;
+    }
+  });
+
   Future<GroupChange> create(String title, List<String> ids) => _change((
     groups,
   ) {

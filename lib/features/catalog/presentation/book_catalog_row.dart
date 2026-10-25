@@ -10,11 +10,16 @@ class BookCatalogRow extends StatelessWidget {
     required this.installed,
     required this.progress,
     required this.onDownload,
+    this.onOpen,
+    this.readingLabel,
+    this.isNew = false,
   });
   final CatalogItem item;
   final bool installed;
   final double? progress;
-  final VoidCallback? onDownload;
+  final VoidCallback? onDownload, onOpen;
+  final String? readingLabel;
+  final bool isNew;
 
   void _details(BuildContext context) {
     showModalBottomSheet<void>(
@@ -84,6 +89,11 @@ class BookCatalogRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (isNew)
+                      Text(
+                        tr('새 이야기'),
+                        style: TextStyle(color: colors.primary),
+                      ),
                     Text(
                       item.seriesId == null
                           ? item.title
@@ -96,6 +106,11 @@ class BookCatalogRow extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 4),
+                    if (readingLabel != null)
+                      Text(
+                        readingLabel!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     Text(
                       '${item.author} · ${tr(item.category)}',
                       maxLines: 2,
@@ -129,9 +144,20 @@ class BookCatalogRow extends StatelessWidget {
           else
             IconButton(
               key: ValueKey('book-download-${item.id}'),
-              tooltip: '${item.title} ${tr(installed ? '다운로드 완료' : '다운로드')}',
-              onPressed: onDownload,
-              icon: Icon(installed ? Icons.check : Icons.download_outlined),
+              tooltip:
+                  '${item.title} ${tr(onOpen != null
+                      ? '읽기'
+                      : installed
+                      ? '다운로드 완료'
+                      : '다운로드')}',
+              onPressed: onOpen ?? onDownload,
+              icon: Icon(
+                onOpen != null
+                    ? Icons.menu_book_outlined
+                    : installed
+                    ? Icons.check
+                    : Icons.download_outlined,
+              ),
               color: colors.primary,
               disabledColor: installed ? colors.primary : null,
             ),
