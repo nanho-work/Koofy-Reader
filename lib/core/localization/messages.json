@@ -3542,5 +3542,29 @@
   "내 이야기 보내기": {
     "en": "Share my story",
     "ja": "物語を送る"
+  },
+  "글 보내기": {
+    "en": "Send a story",
+    "ja": "投稿する"
+  },
+  "월간 쿠피": {
+    "en": "Monthly Koofy",
+    "ja": "月刊Koofy"
+  },
+  "월간 쿠피를 불러오는 중입니다.": {
+    "en": "Loading Monthly Koofy…",
+    "ja": "月刊Koofyを読み込み中です。"
+  },
+  "월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.": {
+    "en": "Could not load Monthly Koofy. Please check again later.",
+    "ja": "月刊Koofyを読み込めませんでした。しばらくしてから再度ご確認ください。"
+  },
+  "이 언어로 공개된 이야기가 아직 없습니다.": {
+    "en": "No stories have been published in this language yet.",
+    "ja": "この言語で公開された物語はまだありません。"
+  },
+  "읽기": {
+    "en": "Read",
+    "ja": "読む"
   }
 }

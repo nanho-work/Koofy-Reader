@@ -890,6 +890,12 @@ enum ReaderStrings {
         "확인했어요": "Got it",
         "새 이야기": "New story",
         "내 이야기 보내기": "Share my story",
+        "글 보내기": "Send a story",
+        "월간 쿠피": "Monthly Koofy",
+        "월간 쿠피를 불러오는 중입니다.": "Loading Monthly Koofy…",
+        "월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.": "Could not load Monthly Koofy. Please check again later.",
+        "이 언어로 공개된 이야기가 아직 없습니다.": "No stories have been published in this language yet.",
+        "읽기": "Read",
     ]
     static let ja: [String: String] = [
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.": "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -1778,6 +1784,12 @@ enum ReaderStrings {
         "확인했어요": "確認しました",
         "새 이야기": "新しいお話",
         "내 이야기 보내기": "物語を送る",
+        "글 보내기": "投稿する",
+        "월간 쿠피": "月刊Koofy",
+        "월간 쿠피를 불러오는 중입니다.": "月刊Koofyを読み込み中です。",
+        "월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.": "月刊Koofyを読み込めませんでした。しばらくしてから再度ご確認ください。",
+        "이 언어로 공개된 이야기가 아직 없습니다.": "この言語で公開された物語はまだありません。",
+        "읽기": "読む",
     ]
 }
 func L(_ key: String, _ arguments: String...) -> String {

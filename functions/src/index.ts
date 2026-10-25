@@ -1,3 +1,4 @@
+import { correctMonthlyLanguage } from './monthly-language';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { monthlyPublisher } from './monthly-publishing';
 import { randomUUID, createHash } from 'node:crypto';
@@ -215,6 +216,22 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       return;
     }
     const data = body(request);
+    if (data.action === 'correctMonthlyLanguage') {
+      const contentId = id(data.id), expected = revision(data.revision);
+      const corrected = await db.runTransaction(async transaction => {
+        const issueDoc = await transaction.get(contents.doc(contentId));
+        requireValue(issueDoc.exists, '월간호를 찾지 못했습니다.');
+        const issue = issueDoc.data() as Content;
+        const children = await transaction.get(contents.where('seriesId', '==', contentId));
+        const at = new Date().toISOString();
+        const updates = correctMonthlyLanguage(issue, children.docs.map(doc => doc.data() as Content), expected, data.language, at);
+        for (const item of updates) transaction.set(contents.doc(item.id), item);
+        transaction.create(db.collection('readerAudit').doc(), { uid: claims.uid, action: 'correctMonthlyLanguage', contentId,
+          from: issue.language || 'ko', to: data.language, count: updates.length - 1, at });
+        return updates[0];
+      });
+      response.json(corrected); return;
+    }
     if (data.action === 'addCategory') {
       const name = categoryName(data.name);
       const categories = await db.runTransaction(async transaction => {

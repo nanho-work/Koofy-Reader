@@ -890,6 +890,12 @@ internal object ReaderStrings {
         "확인했어요" to "Got it",
         "새 이야기" to "New story",
         "내 이야기 보내기" to "Share my story",
+        "글 보내기" to "Send a story",
+        "월간 쿠피" to "Monthly Koofy",
+        "월간 쿠피를 불러오는 중입니다." to "Loading Monthly Koofy…",
+        "월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." to "Could not load Monthly Koofy. Please check again later.",
+        "이 언어로 공개된 이야기가 아직 없습니다." to "No stories have been published in this language yet.",
+        "읽기" to "Read",
     )
     val ja = mapOf(
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요." to "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -1778,6 +1784,12 @@ internal object ReaderStrings {
         "확인했어요" to "確認しました",
         "새 이야기" to "新しいお話",
         "내 이야기 보내기" to "物語を送る",
+        "글 보내기" to "投稿する",
+        "월간 쿠피" to "月刊Koofy",
+        "월간 쿠피를 불러오는 중입니다." to "月刊Koofyを読み込み中です。",
+        "월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." to "月刊Koofyを読み込めませんでした。しばらくしてから再度ご確認ください。",
+        "이 언어로 공개된 이야기가 아직 없습니다." to "この言語で公開された物語はまだありません。",
+        "읽기" to "読む",
     )
 }
 internal fun L(key: String, vararg arguments: Any?): String {

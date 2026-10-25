@@ -145,7 +145,76 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
     final download = ref.watch(catalogDownloadProvider);
     final states = ref.watch(libraryReadingStateProvider).valueOrNull;
     if (episode == null && (!_preferencesLoaded || compilations.isEmpty)) {
-      return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        key: const ValueKey('monthly-toggle'),
+                        onTap: _savingExpansion ? null : _toggleExpanded,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 4,
+                          ),
+                          child: Text(
+                            tr('월간 쿠피'),
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => openReaderLink(
+                        context,
+                        Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
+                          'lang': AppLanguage.instance.code,
+                        }),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(tr('글 보내기')),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.north_east, size: 14),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _savingExpansion ? null : _toggleExpanded,
+                      tooltip: tr(_expanded ? '접기' : '펼치기'),
+                      icon: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_expanded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Text(
+                    tr(
+                      result.isLoading
+                          ? '월간 쿠피를 불러오는 중입니다.'
+                          : result.hasError
+                          ? '월간 쿠피를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.'
+                          : '이 언어로 공개된 이야기가 아직 없습니다.',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
     }
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -157,44 +226,101 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  InkWell(
-                    key: const ValueKey('monthly-toggle'),
-                    onTap: _savingExpansion ? null : _toggleExpanded,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              issue.title,
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        void submit() => openReaderLink(
+                          context,
+                          Uri.https(
+                            'www.koofy.co.kr',
+                            '/monthly-koofy/submit',
+                            {'lang': AppLanguage.instance.code},
                           ),
-                          if (states?[episode.bookId]?.lastReadAt == null &&
-                              states?[episode.bookId]?.finished != true)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Text(
-                                'NEW',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).colorScheme.primary,
+                        );
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                key: const ValueKey('monthly-toggle'),
+                                onTap: _savingExpansion
+                                    ? null
+                                    : _toggleExpanded,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                    horizontal: 4,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          issue.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelLarge,
+                                        ),
+                                      ),
+                                      if (states?[episode.bookId]?.lastReadAt ==
+                                              null &&
+                                          states?[episode.bookId]?.finished !=
+                                              true)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 8,
+                                          ),
+                                          child: Text(
+                                            'NEW',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          const SizedBox(width: 8),
-                          Semantics(
-                            label: tr(_expanded ? '접기' : '펼치기'),
-                            child: Icon(
-                              _expanded ? Icons.expand_less : Icons.expand_more,
+                            TextButton(
+                              onPressed: submit,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                minimumSize: const Size(48, 48),
+                                textStyle: Theme.of(
+                                  context,
+                                ).textTheme.labelMedium,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(tr('글 보내기')),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.north_east, size: 14),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            IconButton(
+                              onPressed: _savingExpansion
+                                  ? null
+                                  : _toggleExpanded,
+                              tooltip: tr(_expanded ? '접기' : '펼치기'),
+                              icon: Icon(
+                                _expanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                   if (_expanded)
@@ -268,20 +394,6 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                       ),
                     ),
                 ],
-              ),
-            ),
-          if (_expanded)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => openReaderLink(
-                  context,
-                  Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
-                    'lang': AppLanguage.instance.code,
-                  }),
-                ),
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: Text(tr('내 이야기 보내기')),
               ),
             ),
           if (_preferencesLoaded)
