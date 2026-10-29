@@ -335,6 +335,18 @@ test('monthly feed, catalog handoff and download access remain consistent', asyn
     return items;
   }
   try {
+    // Prepared published shell and a scheduled-only issue remain invisible.
+    await db.collection('readerContent').doc(issue.id).update({ published: false });
+    const olderRef = db.collection('readerContent').doc(olderEpisode.id);
+    await olderRef.update({ published: false });
+    assert(!(await catalog('kind=series&language=ko')).some(item => item.id === older.id));
+    await olderRef.update({ published: true });
+    await db.collection('readerContent').doc(issue.id).update({ published: true });
+    await db.collection('readerContent').doc(episode.id).update({ published: false });
+    assert(!(await catalog('kind=series&language=ko')).some(item => item.id === issue.id));
+    assert((await catalog('action=monthly&language=ko')).some(item => item.id === olderEpisode.id), 'empty newer issue does not hide readable older issue');
+    await db.collection('readerContent').doc(episode.id).update({ published: true });
+    assert((await catalog('kind=series&language=ko')).some(item => item.id === issue.id));
     assert((await catalog('action=monthly&language=ko')).some(item => item.id === episode.id));
     assert(!(await catalog('action=monthly&language=en')).some(item => ids.includes(item.id)));
     const episodes = await catalog(`kind=book&supportsTxt=1&seriesId=${issue.id}`);
@@ -368,7 +380,7 @@ test('monthly feed, catalog handoff and download access remain consistent', asyn
     await db.collection('readerContent').doc(book.id).update({ published: false });
     assert((await catalog('action=monthly&language=ko')).some(item => item.id === episode.id));
     assert((await catalog('kind=book&supportsSeries=1&supportsTxt=1&language=ko')).some(item => item.id === issue.id));
-  } finally { await Promise.all(ids.map(id => db.collection('readerContent').doc(id).delete())); }
+  } finally { await Promise.all(ids.filter(Boolean).map(id => db.collection('readerContent').doc(id).delete())); }
 });
 
 test('monthly TXT publication produces illustrated EPUB and compilation is atomic and retry-safe', async () => {
@@ -426,5 +438,37 @@ test('monthly TXT publication produces illustrated EPUB and compilation is atomi
     await bucket.deleteFiles({ prefix: 'monthly-fixture/' });
     await bucket.deleteFiles({ prefix: `readerContent/${childId}/` });
     await bucket.deleteFiles({ prefix: `readerContent/${bookId}/` });
+  }
+});
+
+test('multilingual monthly creation retains legacy records and concurrent retries reuse slots', async () => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const db = getFirestore(), month = '2047-03';
+  const created = await api('create', { kind: 'series', metadata: { issueMonth: month, language: 'ko', title: '기존 사용자 제목', description: '보존할 설명' } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const legacy = created.body, ids = [legacy.id];
+  try {
+    const results = await Promise.all([api('ensureMonthlyIssues', { issueMonth: month }), api('ensureMonthlyIssues', { issueMonth: month })]);
+    for (const result of results) assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.deepEqual(results[0].body.items.map(x => x.id), results[1].body.items.map(x => x.id));
+    const issues = results[0].body.items;
+    ids.push(...issues.filter(x => x.id !== legacy.id).map(x => x.id));
+    assert.deepEqual(issues.find(x => x.language === 'ko'), legacy);
+    assert.deepEqual(issues.map(x => x.language), ['ko', 'en', 'ja']);
+    assert(issues.every(x => !x.published && !x.publishedContent));
+    const input = { seriesId: legacy.id, metadata: { title: '기존 회차', episodeNumber: 1, releaseDate: month + '-01', releaseAt: month + '-01T09:00:00+09:00' } };
+    const episodes = await Promise.all([api('ensureMonthlyEpisode', input), api('ensureMonthlyEpisode', input)]);
+    for (const result of episodes) assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(episodes[0].body.id, episodes[1].body.id);
+    ids.push(episodes[0].body.id);
+    assert.deepEqual((await api('ensureMonthlyEpisode', { ...input, metadata: { ...input.metadata, title: '덮어쓰면 안 되는 제목' } })).body, episodes[0].body);
+    const duplicate = (await api('create', { kind: 'series', metadata: { issueMonth: month, language: 'ja', title: '중복 일본어', description: '' } })).body;
+    assert(duplicate.id, JSON.stringify(duplicate));
+    ids.push(duplicate.id);
+    assert.notEqual((await api('ensureMonthlyIssues', { issueMonth: month })).status, 200);
+    assert.deepEqual((await db.collection('readerContent').doc(legacy.id).get()).data(), legacy);
+  } finally {
+    await Promise.all(ids.filter(Boolean).map(id => db.collection('readerContent').doc(id).delete()));
+    await db.collection('readerEpisodeNumbers').doc(`${legacy.id}_1`).delete();
   }
 });

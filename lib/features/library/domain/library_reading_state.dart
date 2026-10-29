@@ -60,14 +60,18 @@ Map<String, LibraryReadingState> mergeLibraryReadingStates({
       final title = locator['title'];
       result[position.publicationId] = LibraryReadingState(
         // Resource progression is NOT whole-book progression.
-        progression: ratio is num && ratio.isFinite && ratio >= 0 && ratio <= 1
+        progression: locations is Map && locations['koofyAtBookEnd'] == true
+            ? 1.0
+            : ratio is num && ratio.isFinite && ratio >= 0 && ratio <= 1
             ? ratio.toDouble()
             : null,
         lastReadAt: position.lastOpenedAt,
         chapterTitle: title is String && title.trim().isNotEmpty
             ? title.trim()
             : null,
-        finished: completion[position.publicationId] ?? false,
+        finished:
+            completion[position.publicationId] ??
+            (locations is Map && locations['koofyBookCompleted'] == true),
       );
     } on FormatException {
       // A damaged presentation field must not hide the rest of the library.

@@ -229,7 +229,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       final group = groups[book.id];
       if (group != null) {
         if (group.bookIds.isNotEmpty &&
-            group.bookIds.every((id) => completion[id] == true)) {
+            group.bookIds.every(
+              (id) => completion[id] ?? states[id]?.finished ?? false,
+            )) {
           return LibraryBookStatus.finished;
         }
         if (group.bookIds.any(
@@ -239,7 +241,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         }
         return LibraryBookStatus.unread;
       }
-      return completion[book.id] == true
+      return (completion[book.id] ?? states[book.id]?.finished ?? false)
           ? LibraryBookStatus.finished
           : states.containsKey(book.id)
           ? LibraryBookStatus.reading

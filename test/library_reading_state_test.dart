@@ -104,4 +104,51 @@ void main() {
       expect((await reader.loadProgress())['book']!.contentOffset, 500);
     },
   );
+  LibraryReadingState checkpointState(
+    String locations, {
+    Map<String, bool> overrides = const {},
+  }) => mergeLibraryReadingStates(
+    legacy: {},
+    native: [
+      NativeLibraryPosition(
+        publicationId: 'end',
+        locatorJson: '{"href":"last.xhtml","locations":$locations}',
+        lastOpenedAt: newDate,
+      ),
+    ],
+    completion: overrides,
+  )['end']!;
+
+  test('final visible screen is 100 percent without changing its start ratio', () {
+    for (final ratio in [0.0, 0.8, 0.96]) {
+      // A one-screen book, two-page spread, and final single page respectively.
+      final value = checkpointState(
+        '{"totalProgression":$ratio,"koofyAtBookEnd":true,"koofyBookCompleted":true}',
+      );
+      expect(value.progression, 1.0);
+      expect(value.progressLabel, '100% 읽음');
+      expect(value.finished, isTrue);
+    }
+  });
+  test('earlier screen remains resumable while completion stays recorded', () {
+    final value = checkpointState(
+      '{"totalProgression":0.3,"koofyAtBookEnd":false,"koofyBookCompleted":true}',
+    );
+    expect(value.progression, 0.3);
+    expect(value.finished, isTrue);
+  });
+  test('near-end progression alone never implies completion', () {
+    final value = checkpointState(
+      '{"totalProgression":0.99,"koofyAtBookEnd":false}',
+    );
+    expect(value.progression, 0.99);
+    expect(value.finished, isFalse);
+  });
+  test('manual completion override remains respected', () {
+    final value = checkpointState(
+      '{"totalProgression":0.3,"koofyBookCompleted":true}',
+      overrides: {'end': false},
+    );
+    expect(value.finished, isFalse);
+  });
 }

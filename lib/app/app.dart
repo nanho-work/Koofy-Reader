@@ -19,6 +19,7 @@ class KoofyReaderApp extends StatefulWidget {
 
 class _KoofyReaderAppState extends State<KoofyReaderApp> {
   final _ads = AppAdRouteObserver();
+  final _navigatorKey = GlobalKey<NavigatorState>();
   @override
   void dispose() {
     _ads.visible.dispose();
@@ -39,6 +40,7 @@ class _KoofyReaderAppState extends State<KoofyReaderApp> {
         title: 'Koofy Reader',
         themeMode: AppAppearance.instance.mode,
         navigatorObservers: [_ads],
+        navigatorKey: _navigatorKey,
         theme: KoofyTheme.forBrightness(
           Brightness.light,
           paper: AppAppearance.instance.selection == 'sepia',
@@ -48,8 +50,9 @@ class _KoofyReaderAppState extends State<KoofyReaderApp> {
         onGenerateRoute: AppRouter.onGenerateRoute,
         builder: (context, child) {
           return StartupSplash(
-            child: PrivacyGate(
-              child: StartupUpdateGate(
+            child: StartupUpdateGate(
+              child: PrivacyGate(
+                navigatorKey: _navigatorKey,
                 child: ValueListenableBuilder<bool>(
                   valueListenable: _ads.visible,
                   child: child ?? const SizedBox.shrink(),

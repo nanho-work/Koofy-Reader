@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
@@ -80,7 +81,11 @@ class PrivacyService extends ChangeNotifier {
     LocalStorage? storage,
     PrivacyPlatform? platform,
     AdConsentPlatform? consent,
-  }) : _storage = storage ?? SharedPrefsLocalStorage(),
+    DateTime Function()? now,
+    bool Function()? isForeground,
+  }) : _now = now ?? DateTime.now,
+       _isForeground = isForeground,
+       _storage = storage ?? SharedPrefsLocalStorage(),
        _platform = platform ?? DevicePrivacyPlatform(),
        _consent = consent ?? DeviceAdConsentPlatform();
   static final instance = PrivacyService();
@@ -90,6 +95,14 @@ class PrivacyService extends ChangeNotifier {
   final LocalStorage _storage;
   final PrivacyPlatform _platform;
   final AdConsentPlatform _consent;
+  final DateTime Function() _now;
+  final bool Function()? _isForeground;
+  DateTime? _retryAfter;
+  int _failures = 0;
+  bool get foreground =>
+      _isForeground?.call() ??
+      (_platform is! DevicePrivacyPlatform ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
   AdConsentResult? _consentResult;
   Future<void>? _optionsTask;
   PrivacyState state = const PrivacyState();
@@ -205,6 +218,8 @@ class PrivacyService extends ChangeNotifier {
 
   Future<void> retryConsent() => _serialize(() async {
     _consentResult = null;
+    _failures = 0;
+    _retryAfter = null;
     await _configure();
   });
 
@@ -241,18 +256,34 @@ class PrivacyService extends ChangeNotifier {
 
   Future<void> _configure() async {
     final choice = state.choice;
-    if (choice == null) return;
+    if (choice == null || !foreground) return;
+    if (_consentResult?.retryableFailure == true) {
+      if (_failures >= 3 ||
+          (_retryAfter != null && _now().isBefore(_retryAfter!))) {
+        return;
+      }
+      _consentResult = null;
+    }
     try {
-      // Once per cold start. Do not present a new form on every banner request
-      // or app resume. Explicit retry is available after a network failure.
+      // Successful decisions are cached. Only transient errors get bounded retries.
       if (_consentResult == null) {
         try {
           _consentResult = await _consent.prepare();
         } catch (_) {
-          _consentResult = const AdConsentResult(canRequestAds: false);
+          _consentResult = const AdConsentResult(
+            canRequestAds: false,
+            retryableFailure: true,
+          );
         }
       }
       final consent = _consentResult!;
+      if (consent.retryableFailure) {
+        _failures++;
+        _retryAfter = _now().add(Duration(seconds: 15 * _failures));
+      } else {
+        _failures = 0;
+        _retryAfter = null;
+      }
       final att = await _platform.trackingStatus();
       final personal =
           (choice == AdvertisingChoice.personalized ||
@@ -310,6 +341,6 @@ final privacyStateProvider = StreamProvider<PrivacyState>((ref) {
     unawaited(stream.close());
   });
   update();
-  unawaited(service.refresh());
+  unawaited(service.load());
   return stream.stream;
 });

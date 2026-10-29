@@ -6,8 +6,10 @@ class AdConsentResult {
     required this.canRequestAds,
     this.privacyOptionsRequired = false,
     this.permitsPersonalization = false,
+    this.retryableFailure = false,
   });
   final bool canRequestAds;
+  final bool retryableFailure;
   final bool privacyOptionsRequired;
   // UMP "obtained" includes refusals. It is never a personalization grant.
   final bool permitsPersonalization;
@@ -30,6 +32,7 @@ class DeviceAdConsentPlatform implements AdConsentPlatform {
     final map = await _channel.invokeMapMethod<String, dynamic>(method);
     return AdConsentResult(
       canRequestAds: map?['canRequestAds'] == true,
+      retryableFailure: map?['retryableFailure'] == true,
       privacyOptionsRequired: map?['privacyOptionsRequired'] == true,
       permitsPersonalization: map?['permitsPersonalization'] == true,
     );

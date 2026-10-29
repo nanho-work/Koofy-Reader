@@ -1,3 +1,5 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,16 @@ import 'privacy_service_test.dart'
     show MemoryPrivacyStorage, FakePrivacyPlatform, FakeAdConsent;
 
 void main() {
+  late ReaderAnalytics analytics;
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+    SharedPreferences.setMockInitialValues({});
+    analytics = ReaderAnalytics(storage: MemoryPrivacyStorage());
+    await analytics.initialize();
+  });
   testWidgets('Android first launch keeps explicit ad choices without ATT', (
     tester,
   ) async {
@@ -19,28 +31,34 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [privacyServiceProvider.overrideWithValue(service)],
-        child: const MaterialApp(
-          home: PrivacyGate(child: Scaffold(body: Text('독서 가능'))),
+        child: MaterialApp(
+          home: PrivacyGate(
+            analytics: analytics,
+            child: Scaffold(body: Text('독서 가능')),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('독서 가능'), findsNothing);
+    expect(find.text('독서 가능'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
     expect(platform.configured, isEmpty);
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNull,
+      isNotNull,
     );
-    await tester.ensureVisible(find.text('비맞춤형 광고 이용'));
-    await tester.tap(find.text('비맞춤형 광고 이용'));
-    await tester.pump();
-    await tester.ensureVisible(find.text('선택하고 시작하기'));
-    await tester.tap(find.text('선택하고 시작하기'));
+    await tester.ensureVisible(find.text('계속'));
+    await tester.tap(find.text('계속'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    });
     await tester.pumpAndSettle();
     expect(find.text('독서 가능'), findsOneWidget);
     expect(platform.requests, 0);
     expect(service.state.canRequestAds, true);
     expect(platform.configured.last, false);
+    expect(analytics.choice, false);
     await tester.pumpWidget(const SizedBox.shrink());
     service.dispose();
   });
@@ -67,10 +85,12 @@ void main() {
               ).copyWith(textScaler: const TextScaler.linear(1.7)),
               child: child!,
             ),
-            home: const PrivacyGate(child: SizedBox.shrink()),
+            home: PrivacyGate(analytics: analytics, child: SizedBox.shrink()),
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('개인정보처리방침 읽기'), 240);
       await tester.tap(find.text('개인정보처리방침 읽기'));
@@ -103,7 +123,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [privacyServiceProvider.overrideWithValue(service)],
-          child: const MaterialApp(home: PrivacySettingsPage()),
+          child: MaterialApp(home: PrivacySettingsPage()),
         ),
       );
       await tester.pumpAndSettle();
@@ -132,11 +152,16 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [privacyServiceProvider.overrideWithValue(service)],
-          child: const MaterialApp(
-            home: PrivacyGate(child: Scaffold(body: Text('독서 가능'))),
+          child: MaterialApp(
+            home: PrivacyGate(
+              analytics: analytics,
+              child: Scaffold(body: Text('독서 가능')),
+            ),
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.text('비맞춤형 광고 이용'), findsNothing);
       expect(find.text('맞춤형 광고 허용 (선택)'), findsNothing);
@@ -145,6 +170,9 @@ void main() {
       expect(platform.configured, isEmpty);
       await tester.ensureVisible(find.text('계속'));
       await tester.tap(find.text('계속'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      });
       await tester.pumpAndSettle();
       expect(platform.requests, 1);
       expect(find.text('독서 가능'), findsOneWidget);
@@ -167,8 +195,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [privacyServiceProvider.overrideWithValue(service)],
-          child: const MaterialApp(
-            home: PrivacyGate(child: PrivacySettingsPage()),
+          child: MaterialApp(
+            home: PrivacyGate(
+              analytics: analytics,
+              child: PrivacySettingsPage(),
+            ),
           ),
         ),
       );
@@ -189,6 +220,41 @@ void main() {
       expect(find.text('비맞춤형 광고'), findsOneWidget);
       expect(service.state.effectivePersonalized, false);
       expect(platform.requests, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      service.dispose();
+    },
+  );
+  testWidgets(
+    'returning reader retains choices and does not see welcome again',
+    (tester) async {
+      await tester.runAsync(() => analytics.choose(false));
+      final service = PrivacyService(
+        storage: MemoryPrivacyStorage(),
+        platform: FakePrivacyPlatform(),
+        consent: FakeAdConsent(),
+      );
+      await service.choose(AdvertisingChoice.standard);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [privacyServiceProvider.overrideWithValue(service)],
+          child: MaterialApp(
+            navigatorKey: navigatorKey,
+            builder: (context, child) => PrivacyGate(
+              navigatorKey: navigatorKey,
+              analytics: analytics,
+              child: child!,
+            ),
+            home: const Scaffold(body: Text('main ready')),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('main ready'), findsOneWidget);
+      expect(find.byType(PrivacyWelcomeDialog), findsNothing);
+      expect(analytics.choice, false);
+      expect(service.state.choice, AdvertisingChoice.standard);
       await tester.pumpWidget(const SizedBox.shrink());
       service.dispose();
     },

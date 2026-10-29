@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/features/analytics/presentation/analytics_choice.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
@@ -24,48 +25,218 @@ Future<void> openReaderLink(BuildContext context, Uri uri) async {
 }
 
 class PrivacyGate extends ConsumerStatefulWidget {
-  const PrivacyGate({super.key, required this.child});
+  const PrivacyGate({
+    super.key,
+    required this.child,
+    this.navigatorKey,
+    this.analytics,
+  });
   final Widget child;
+  final GlobalKey<NavigatorState>? navigatorKey;
+  final ReaderAnalytics? analytics;
   @override
   ConsumerState<PrivacyGate> createState() => _PrivacyGateState();
 }
 
 class _PrivacyGateState extends ConsumerState<PrivacyGate>
     with WidgetsBindingObserver {
+  Timer? _timer;
+  bool _busy = false;
+  bool _mainShown = false;
+  ReaderAnalytics get _analytics =>
+      widget.analytics ?? ReaderAnalytics.instance;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Keep the main route mounted; wait until the startup animation has ended.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _timer = Timer(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        _mainShown = true;
+        unawaited(_advance());
+        _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+          if (mounted &&
+              !ref.read(privacyServiceProvider).state.canRequestAds) {
+            unawaited(_advance());
+          }
+        });
+      });
+    });
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(ref.read(privacyServiceProvider).refresh());
+    if (state == AppLifecycleState.resumed) unawaited(_advance());
+  }
+
+  Future<void> _advance() async {
+    if (!mounted ||
+        !_mainShown ||
+        _busy ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    final nav = widget.navigatorKey?.currentState ?? Navigator.maybeOf(context);
+    if (nav == null) return;
+    _busy = true;
+    final service = ref.read(privacyServiceProvider);
+    try {
+      await service.load();
+      if (!mounted || !_analytics.loaded) return;
+      if (service.state.choice == null || _analytics.choice == null) {
+        await showDialog<void>(
+          context: nav.context,
+          barrierDismissible: false,
+          builder: (_) =>
+              PrivacyWelcomeDialog(service: service, analytics: _analytics),
+        );
+      }
+      if (mounted) await service.refresh();
+    } finally {
+      _busy = false;
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(privacyStateProvider).valueOrNull;
-    if (state == null || !state.loaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// App-owned notice; neither Continue nor the optional analytics switch grants
+/// personalized advertising. iOS still asks ATT; Android defaults to standard.
+class PrivacyWelcomeDialog extends StatefulWidget {
+  const PrivacyWelcomeDialog({
+    super.key,
+    required this.service,
+    required this.analytics,
+  });
+  final PrivacyService service;
+  final ReaderAnalytics analytics;
+  @override
+  State<PrivacyWelcomeDialog> createState() => _PrivacyWelcomeDialogState();
+}
+
+class _PrivacyWelcomeDialogState extends State<PrivacyWelcomeDialog> {
+  bool _statistics = false;
+  bool _personalized = false;
+  bool _saving = false;
+  String? _error;
+  late final bool _needsAds = widget.service.state.choice == null;
+  late final bool _needsAnalytics = widget.analytics.choice == null;
+
+  Future<void> _continue() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      if (_needsAnalytics) await widget.analytics.choose(_statistics);
+      if (_needsAds) {
+        if (widget.service.isIOS) {
+          await widget.service.continueIOSTrackingNotice();
+        } else {
+          await widget.service.choose(
+            _personalized
+                ? AdvertisingChoice.personalized
+                : AdvertisingChoice.standard,
+          );
+        }
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) setState(() => _error = tr('선택을 저장하지 못했습니다. 다시 시도해 주세요.'));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    if (state.choice == null) {
-      return Navigator(
-        onGenerateRoute: (_) => MaterialPageRoute<void>(
-          builder: (_) => const AdvertisingChoicesPage(firstRun: true),
-        ),
-      );
-    }
-    return AnalyticsChoice(child: widget.child);
   }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    child: AlertDialog(
+      title: Text(tr(_needsAds ? '개인정보와 광고' : '사용 통계 (선택)')),
+      scrollable: true,
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_needsAds) ...[
+              Text(
+                tr(
+                  '책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                tr(
+                  '광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (widget.service.isIOS)
+                Text(
+                  tr(
+                    '계속을 누르면 Apple의 추적 권한 요청으로 이동합니다. 허용 여부는 시스템 창에서 직접 선택합니다. 이미 결정했거나 기기에서 요청을 제한한 경우에는 기존 설정을 따릅니다.',
+                  ),
+                )
+              else
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(tr('맞춤형 광고 허용 (선택)')),
+                  subtitle: Text(tr('안내된 광고 개인화와 관련 정보 처리·공유에 동의합니다.')),
+                  value: _personalized,
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _personalized = v ?? false),
+                ),
+            ],
+            if (_needsAnalytics) ...[
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tr('사용 통계 (선택)')),
+                value: _statistics,
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _statistics = v ?? false),
+              ),
+              Text(
+                tr(analyticsExplanation),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            TextButton(
+              onPressed: _saving
+                  ? null
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ReaderPrivacyPolicyPage(),
+                      ),
+                    ),
+              child: Text(tr('개인정보처리방침 읽기')),
+            ),
+            if (_error != null) Text(_error!),
+          ],
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: _saving ? null : _continue,
+          child: Text(tr(_saving ? '적용 중…' : '계속')),
+        ),
+      ],
+    ),
+  );
 }
 
 class AdvertisingChoicesPage extends ConsumerStatefulWidget {

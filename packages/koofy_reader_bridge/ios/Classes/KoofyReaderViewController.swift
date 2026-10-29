@@ -32,6 +32,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     private var appliedTheme: String?
     private var preferences: ReaderPreferences
     private var lastLocator: Locator?
+    private var hasCompletedBook = false
     private var restorationAnchor: Locator?
     private var sequence: Int64 = 0
     private var renderGeneration = 0
@@ -291,6 +292,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 message: { [weak self] in self?.speechMessage($0) })
             speech?.foreground(UIApplication.shared.applicationState == .active)
             let initial = try request.initialLocatorJson.map { try Locator(jsonString: $0) }
+            if let raw = request.initialLocatorJson?.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+               let locations = json["locations"] as? [String: Any] {
+                self.hasCompletedBook = locations["koofyBookCompleted"] as? Bool == true
+            }
             if let initial { try validateLocation(initial) }
             try mountNavigator(at: initial, kind: "ready")
         } catch {
@@ -602,6 +608,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             self.readyTimeout?.cancel()
             self.atBookEnd = snapshot["resourceEnd"] as? Bool == true &&
                 self.publication?.readingOrder.firstIndexWithHREF(fallback.href) == (self.publication?.readingOrder.count ?? 0) - 1
+            self.hasCompletedBook = self.hasCompletedBook || self.atBookEnd
             let offerNext = self.atBookEnd && self.request.nextBookTitle != nil
             self.nextPageItem?.title = offerNext ? L("이어서 읽기") : L("다음") + " ›"
             self.nextPageItem?.accessibilityLabel = offerNext ? L("다음 권 {0} 이어서 읽기", self.request.nextBookTitle ?? "") : L("다음 페이지")
@@ -704,12 +711,23 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         sendEvent(try checkpoint(kind: kind))
     }
 
+    // Completion metadata never changes the exact resume anchor or Readium progression.
+    private func completionCheckpoint() throws -> String? {
+        guard let raw = try lastLocator?.jsonString(), let data = raw.data(using: .utf8),
+              var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        var locations = json["locations"] as? [String: Any] ?? [:]
+        locations["koofyAtBookEnd"] = atBookEnd
+        locations["koofyBookCompleted"] = hasCompletedBook
+        json["locations"] = locations
+        return String(data: try JSONSerialization.data(withJSONObject: json), encoding: .utf8)
+    }
+
     private func checkpoint(kind: String) throws -> ReaderEvent {
         sequence += 1
         let event = ReaderEvent(protocolVersion: request.protocolVersion, sessionId: request.sessionId,
             sessionGeneration: request.sessionGeneration, publicationId: request.publicationId,
             contentRevision: request.contentRevision, sequence: sequence, kind: kind,
-            locatorJson: try lastLocator?.jsonString(), preferences: preferences,
+            locatorJson: try completionCheckpoint(), preferences: preferences,
             errorCode: nil, message: nil, bookmarksJson: bookmarksJson)
         try journal.write(event)
         return event
@@ -1348,6 +1366,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         guard let locator = lastLocator else { return }
         if preferences.footerInfo == "none" { progress.text = "" }
         else if isReaderDisplayCover(locator) { progress.text = L("표지") }
+        else if atBookEnd { progress.text = "100%" }
         else { progress.text = locationInfo.footer(locator, mode: preferences.footerInfo) }
         progress.sizeToFit()
     }

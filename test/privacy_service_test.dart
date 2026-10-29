@@ -391,22 +391,62 @@ void main() {
       reader.dispose();
     },
   );
-  test('native consent failure is cached until explicit retry', () async {
-    final cmp = FakeAdConsent()..failPrepare = true;
+  test(
+    'transient failure retries with backoff without asking ATT again',
+    () async {
+      var now = DateTime(2026, 10, 30);
+      final cmp = FakeAdConsent()..failPrepare = true;
+      final reader = PrivacyService(
+        storage: storage,
+        platform: platform,
+        consent: cmp,
+        now: () => now,
+      );
+      await reader.choose(AdvertisingChoice.standard);
+      await reader.refresh();
+      expect(cmp.prepares, 1);
+      expect(reader.state.canRequestAds, false);
+      now = now.add(const Duration(seconds: 16));
+      cmp.failPrepare = false;
+      await reader.refresh();
+      expect(cmp.prepares, 2);
+      expect(reader.state.canRequestAds, true);
+      expect(platform.requests, 0);
+      reader.dispose();
+    },
+  );
+  test(
+    'inactive startup does not call CMP and foreground refresh recovers',
+    () async {
+      var active = false;
+      final cmp = FakeAdConsent();
+      final reader = PrivacyService(
+        storage: storage,
+        platform: platform,
+        consent: cmp,
+        isForeground: () => active,
+      );
+      await reader.choose(AdvertisingChoice.standard);
+      expect(cmp.prepares, 0);
+      expect(reader.state.canRequestAds, false);
+      active = true;
+      await reader.refresh();
+      expect(cmp.prepares, 1);
+      expect(reader.state.canRequestAds, true);
+      reader.dispose();
+    },
+  );
+  test('CMP refusal is not automatically retried', () async {
+    final cmp = FakeAdConsent()
+      ..result = const AdConsentResult(canRequestAds: false);
     final reader = PrivacyService(
       storage: storage,
       platform: platform,
       consent: cmp,
     );
     await reader.choose(AdvertisingChoice.standard);
-    await reader.prepareAds();
     await reader.refresh();
     expect(cmp.prepares, 1);
-    expect(reader.state.canRequestAds, false);
-    cmp.failPrepare = false;
-    await reader.retryConsent();
-    expect(reader.state.canRequestAds, true);
-    expect(cmp.prepares, 2);
     reader.dispose();
   });
   test(
@@ -431,4 +471,33 @@ void main() {
       reader.dispose();
     },
   );
+  for (final ios in [false, true]) {
+    test('SDK error result retries at most three times on iOS=$ios', () async {
+      var now = DateTime(2026, 10, 30);
+      final consent = FakeAdConsent()
+        ..result = const AdConsentResult(
+          canRequestAds: false,
+          retryableFailure: true,
+        );
+      final reader = PrivacyService(
+        storage: MemoryPrivacyStorage(),
+        platform: FakePrivacyPlatform(isIOS: ios),
+        consent: consent,
+        now: () => now,
+      );
+      await reader.choose(AdvertisingChoice.standard);
+      for (var i = 0; i < 5; i++) {
+        now = now.add(const Duration(minutes: 1));
+        await reader.refresh();
+      }
+      expect(consent.prepares, 3);
+      expect(reader.state.canRequestAds, false);
+      consent.result = const AdConsentResult(canRequestAds: true);
+      await reader.retryConsent();
+      expect(consent.prepares, 4);
+      expect(reader.state.canRequestAds, true);
+      expect(reader.state.choice, AdvertisingChoice.standard);
+      reader.dispose();
+    });
+  }
 }

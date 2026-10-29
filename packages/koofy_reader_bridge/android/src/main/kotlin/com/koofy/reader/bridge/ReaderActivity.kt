@@ -109,6 +109,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private var autoWasUsed = false
     private lateinit var autoButton: Button
     private var atBookEnd = false
+    private var hasCompletedBook = false
     private var nextBookButton: Button? = null
     private var initialTarget: Locator? = null
     private var restoreTarget: Locator? = null
@@ -351,6 +352,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             }
             require(opened.readingOrder.isNotEmpty()) { L("책에 읽을 본문이 없습니다.") }
             val initial = session.locatorJson?.let { parseLocator(it) }
+            hasCompletedBook = session.locatorJson?.let { JSONObject(it).optJSONObject("locations")?.optBoolean("koofyBookCompleted", false) } == true
             if (initial != null) require(opened.linkWithHref(initial.href) != null) { L("저장한 본문 위치를 찾을 수 없습니다.") }
             lastLocator = initial
             initialTarget = initial
@@ -474,12 +476,19 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 restoreTarget = null
                 lastLocator = saved
                 updateSpreadDivider()
-                session.locatorJson = saved.toJSON().toString()
                 val kind = if (!session.ready) "ready" else "locationChanged"
                 session.ready = true
                 openingTimeout?.cancel()
                 atBookEnd = snapshot.optBoolean("resourceEnd", false) &&
                     publication?.readingOrder?.lastOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
+                hasCompletedBook = hasCompletedBook || atBookEnd
+                // Keep the exact resume anchor; only attach presentation/completion metadata.
+                val checkpoint = saved.toJSON()
+                val locations = checkpoint.optJSONObject("locations") ?: JSONObject()
+                locations.put("koofyAtBookEnd", atBookEnd)
+                locations.put("koofyBookCompleted", hasCompletedBook)
+                checkpoint.put("locations", locations)
+                session.locatorJson = checkpoint.toString()
                 updateLocationStatus(saved)
                 nextBookButton?.text = if (atBookEnd) L("이어서 읽기") else L("다음 권")
                 if (atBookEnd) {
@@ -761,6 +770,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         updateBookmarkButton()
         updateAutoControl()
         status.text = if (isReaderDisplayCover(locator) && session.preferences.footerInfo != "none") L("표지")
+            else if (atBookEnd && session.preferences.footerInfo != "none") "100%"
             else locationInfo.footer(locator, session.preferences.footerInfo)
     }
     private fun startAutoTurn() {

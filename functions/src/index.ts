@@ -1,3 +1,4 @@
+import { ensureMonthlyIssues, ensureMonthlyEpisode } from './monthly-groups';
 import { correctMonthlyLanguage } from './monthly-language';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { monthlyPublisher } from './monthly-publishing';
@@ -145,7 +146,9 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
     const compilationId = item.publishedContent?.compilationId;
     if (compilationId && compilationReady(item, (await contents.doc(compilationId).get()).data() as Content | undefined)) return null;
     const count = await contents.where('seriesId', '==', item.id).where('published', '==', true).get();
-    return { ...result, episodeCount: count.docs.filter(doc => isReleased(doc.data() as Content) && !doc.data().deleting).length };
+    const episodeCount = count.docs.filter(doc => isReleased(doc.data() as Content) && !doc.data().deleting && visibleInLanguage(doc.data() as Content, language)).length;
+    if (item.publishedContent?.issueMonth && !episodeCount) return null;
+    return { ...result, episodeCount };
   }));
   return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null };
 }
@@ -157,16 +160,18 @@ async function monthly(language: 'ko' | 'en' | 'ja') {
     .sort((a, b) => b.publishedContent!.issueMonth!.localeCompare(a.publishedContent!.issueMonth!) || a.id.localeCompare(b.id));
   const items: ReturnType<typeof publicItem>[] = [];
   let activeFound = false;
-  const activeMonth = issues[0]?.publishedContent?.issueMonth;
+  // A future/empty prepared issue must not hide the current readable issue.
   const noticeStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
   for (const issue of issues) {
     const snapshot = issue.publishedContent!;
     const compiled = snapshot.compilationId ? (await contents.doc(snapshot.compilationId).get()).data() as Content | undefined : undefined;
     if (compilationReady(issue, compiled)) {
       if (Date.parse(snapshot.compilationLinkedAt ?? '') >= noticeStart) items.push(publicItem(compiled!));
+      // A completed newer issue must not resurrect older unfinished issues.
+      activeFound = true;
       continue;
     }
-    if (activeFound || snapshot.issueMonth !== activeMonth) continue;
+    if (activeFound) continue;
     const episodes = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs
       .map(doc => doc.data() as Content).filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
       .sort((a, b) => (b.publishedContent!.releaseAt || `${b.publishedContent!.releaseDate || ''}T00:00:00+09:00`).localeCompare(a.publishedContent!.releaseAt || `${a.publishedContent!.releaseDate || ''}T00:00:00+09:00`) || b.episodeNumber! - a.episodeNumber!);
@@ -245,6 +250,13 @@ export const readerAdmin = onRequest(options, async (request, response) => {
         return names;
       });
       response.json({ categories }); return;
+    }
+    if (data.action === 'ensureMonthlyIssues') {
+      requireValue(typeof data.issueMonth === 'string', '발행 연·월이 필요합니다.');
+      response.json({ items: await ensureMonthlyIssues(db, data.issueMonth, claims.uid) }); return;
+    }
+    if (data.action === 'ensureMonthlyEpisode') {
+      response.json(await ensureMonthlyEpisode(db, id(data.seriesId), data.metadata, claims.uid)); return;
     }
     if (data.action === 'create') {
       const contentId = randomUUID().replaceAll('-', '');
