@@ -221,6 +221,14 @@ internal class ReaderSettingsDialog(
             choices("", marginLabels, listOf(null, .5, 1.0, 1.5).indexOf(p.pageMargins)) { update(current().copy(pageMargins = listOf(null, .5, 1.0, 1.5)[it])) }
             note(L("기본은 책의 원래 설정입니다. 간격과 여백 변경은 모든 책에 적용됩니다."))
         }
+        val backgrounds = listOf("light", "sepia", "dark")
+        val backgroundLabels = listOf(L("밝게"), L("종이색"), L("어둡게"))
+        val backgroundIndex = backgrounds.indexOf(ReaderTheme.resolve(p.theme)).coerceAtLeast(0)
+        section("background", L("독서 배경"), backgroundLabels[backgroundIndex]) {
+            choices("", backgroundLabels, backgroundIndex) {
+                update(current().copy(theme = backgrounds[it]))
+            }
+        }
         section("page", L("페이지 넘김"), if (p.scroll) L("연속 스크롤") else if (p.pageTurnStyle == "curl") L("책장 넘기기") else L("바로 넘기기")) {
             choices(L("넘김 방식"), listOf(L("페이지 넘김"), L("연속 스크롤")), if (p.scroll) 1 else 0) { update(current().copy(scroll = it == 1)) }
             choices(L("페이지 배치"), listOf(L("자동"), L("한 페이지"), L("두 페이지")), p.columnCount.toInt(), !p.scroll, if (canShowSpread()) emptySet() else setOf(2)) { update(current().copy(columnCount = it.toLong())) }

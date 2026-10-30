@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Saved reading background. Legacy key is retained to preserve existing choices.
+/// The app shell is always light and does not consume this mode.
 class AppAppearance extends ChangeNotifier {
   static final instance = AppAppearance();
   static const preferenceKey = 'app_theme_v1';

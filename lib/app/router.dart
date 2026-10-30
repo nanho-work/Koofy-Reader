@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
-import 'package:koofy_reader/features/library/presentation/library_page.dart';
+import 'package:koofy_reader/features/home/presentation/main_tabs_page.dart';
 import 'package:koofy_reader/features/native_reader/presentation/native_reader_launch_page.dart';
 import 'package:koofy_reader/features/settings/presentation/settings_page.dart';
 
@@ -18,7 +18,7 @@ class AppRouter {
     switch (settings.name) {
       case AppRoutes.library:
         return MaterialPageRoute<void>(
-          builder: (_) => const LibraryPage(),
+          builder: (_) => const MainTabsPage(),
           settings: settings,
         );
       case AppRoutes.reader:
@@ -37,7 +37,10 @@ class AppRouter {
           settings: settings,
         );
       case AppRoutes.settings:
-        return settingsPanelRoute(settings);
+        return MaterialPageRoute<void>(
+          builder: (_) => const SettingsPage(),
+          settings: settings,
+        );
       default:
         return _errorRoute('알 수 없는 화면입니다: ${settings.name}');
     }

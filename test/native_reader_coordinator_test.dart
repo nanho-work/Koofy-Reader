@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'dart:async';
 
 import 'package:drift/native.dart';
@@ -63,6 +65,38 @@ void main() {
     sequence: 0,
     kind: 'recoveryIssue',
     message: 'damaged',
+  );
+
+  test(
+    'viewer background persists globally without a stale event overwriting it',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      await AppAppearance.instance.initialize();
+      await coordinator.open(
+        publicationId: 'book',
+        contentRevision: 'r1',
+        filePath: '/book.epub',
+        title: 'book',
+      );
+      final request = gateway.request!;
+      final session = ReaderSessionIdentity(
+        id: request.sessionId,
+        generation: request.sessionGeneration,
+      );
+      final next = checkpoint(session, sequence: 2)
+        ..kind = 'preferencesChanged'
+        ..preferences = (defaultReaderPreferences()..theme = 'dark');
+      gateway.controller.add(next);
+      await coordinator.flush();
+      expect(AppAppearance.instance.selection, 'dark');
+      gateway.controller.add(
+        checkpoint(session)
+          ..kind = 'preferencesChanged'
+          ..preferences = (defaultReaderPreferences()..theme = 'sepia'),
+      );
+      await coordinator.flush();
+      expect(AppAppearance.instance.selection, 'dark');
+    },
   );
 
   test(

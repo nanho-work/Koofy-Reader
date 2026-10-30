@@ -9,6 +9,7 @@ import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'helpers/catalog_fixture.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_shelf.dart';
 import 'package:koofy_reader/features/catalog/presentation/font_catalog_row.dart';
 
 Future<void> pumpCatalog(
@@ -79,7 +80,7 @@ void main() {
     final list = find.byKey(const PageStorageKey('catalog-list-book'));
     await tester.drag(list, const Offset(0, -600));
     await tester.pumpAndSettle();
-    final controller = tester.widget<ListView>(list).controller!;
+    final controller = tester.widget<CatalogShelfList>(list).controller;
     final offset = controller.offset;
     expect(offset, greaterThan(0));
     await tester.tap(find.text('글꼴'));
@@ -125,6 +126,8 @@ void main() {
       ]);
       await pumpCatalog(tester, catalog);
       catalog.downloadGate = Completer<void>();
+      await tester.tap(find.text('도서 001'));
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('book-download-${catalog.items.first.id}')),
       );
@@ -143,43 +146,66 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('도서'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('도서 001 다운로드 완료'), findsOneWidget);
+      await tester.tap(find.text('도서 001'));
+      await tester.pumpAndSettle();
+      expect(find.text('다운로드 완료'), findsOneWidget);
     },
   );
 
-  testWidgets('books show compact author/category rows and open full details', (
-    tester,
-  ) async {
-    final item = catalogFixture(
-      1,
-      title: '새로운 역사책',
-      author: '김작가',
-      category: '역사',
-    );
-    final catalog = FakeReaderCatalog([
-      item,
-      catalogFixture(2, title: '다른 소설', category: '소설'),
-    ]);
-    await pumpCatalog(tester, catalog);
-    expect(find.text('김작가 · 역사'), findsOneWidget);
-    expect(find.byType(Card), findsNothing);
-    expect(find.text('출처·이용 조건'), findsNothing);
-    await tester.tap(find.text('새로운 역사책'));
-    await tester.pumpAndSettle();
-    expect(find.text('출처·이용 조건'), findsOneWidget);
-    expect(find.text(item.license), findsOneWidget);
-    expect(catalog.installed, isEmpty);
-    await tester.tap(find.byTooltip('닫기'));
-    await tester.pumpAndSettle();
-    final category = find.widgetWithText(ChoiceChip, '역사');
-    await tester.ensureVisible(category);
-    await tester.pumpAndSettle();
-    await tester.tap(category);
-    await tester.pumpAndSettle();
-    expect(tester.widget<ChoiceChip>(category).selected, isTrue);
-    expect(find.text('새로운 역사책'), findsOneWidget);
-    expect(find.text('다른 소설'), findsNothing);
-  });
+  testWidgets(
+    'books show covers and titles with author and category in details',
+    (tester) async {
+      final item = catalogFixture(
+        1,
+        title: '새로운 역사책',
+        author: '김작가',
+        category: '역사',
+      );
+      final catalog = FakeReaderCatalog([
+        item,
+        catalogFixture(2, title: '다른 소설', category: '소설'),
+      ]);
+      await pumpCatalog(tester, catalog);
+      expect(find.text('김작가 · 역사'), findsNothing);
+      expect(find.byType(Card), findsNothing);
+      expect(find.text('출처·이용 조건'), findsNothing);
+      await tester.tap(find.text('새로운 역사책'));
+      await tester.pumpAndSettle();
+      expect(find.text('출처·이용 조건'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text(item.license),
+        150,
+        scrollable: find
+            .descendant(
+              of: find.byType(DraggableScrollableSheet),
+              matching: find.byType(Scrollable),
+            )
+            .last,
+      );
+      expect(find.text(item.license), findsOneWidget);
+      final detailList = tester.widget<ListView>(
+        find
+            .descendant(
+              of: find.byType(DraggableScrollableSheet),
+              matching: find.byType(ListView),
+            )
+            .last,
+      );
+      detailList.controller!.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(catalog.installed, isEmpty);
+      await tester.tap(find.byTooltip('닫기'));
+      await tester.pumpAndSettle();
+      final category = find.widgetWithText(ChoiceChip, '역사');
+      await tester.ensureVisible(category);
+      await tester.pumpAndSettle();
+      await tester.tap(category);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(category).selected, isTrue);
+      expect(find.text('새로운 역사책'), findsOneWidget);
+      expect(find.text('다른 소설'), findsNothing);
+    },
+  );
 
   testWidgets('fonts use compact name and icon rows with details on name tap', (
     tester,
@@ -209,7 +235,27 @@ void main() {
     await tester.tap(find.text('메이플스토리'));
     await tester.pumpAndSettle();
     expect(find.text('출처·이용 조건'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text(item.license),
+      150,
+      scrollable: find
+          .descendant(
+            of: find.byType(DraggableScrollableSheet),
+            matching: find.byType(Scrollable),
+          )
+          .last,
+    );
     expect(find.text(item.license), findsOneWidget);
+    final detailList = tester.widget<ListView>(
+      find
+          .descendant(
+            of: find.byType(DraggableScrollableSheet),
+            matching: find.byType(ListView),
+          )
+          .last,
+    );
+    detailList.controller!.jumpTo(0);
+    await tester.pumpAndSettle();
     expect(find.text(item.source), findsOneWidget);
     expect(catalog.installed, isEmpty);
     await tester.tap(find.byTooltip('닫기'));
@@ -275,6 +321,72 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final size in [
+    const Size(390, 844),
+    const Size(951, 669),
+    const Size(669, 951),
+    const Size(674, 841),
+    const Size(768, 1024),
+    const Size(1024, 768),
+    const Size(1366, 1024),
+  ]) {
+    testWidgets('shelf adapts categories and keeps two title lines at $size', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        FakeReaderCatalog([
+          catalogFixture(1, title: '아주 긴 책 제목이 여러 줄로 길어져도 두 줄까지만 표시되어야 합니다'),
+          catalogFixture(2, title: '짧은 제목'),
+          catalogFixture(3, kind: 'series', title: '연재 작품', episodeCount: 40),
+        ]),
+        size: size,
+      );
+      final titles = find.descendant(
+        of: find.byType(CatalogShelfCard),
+        matching: find.byType(Text),
+      );
+      for (final text in tester.widgetList<Text>(titles)) {
+        if (text.data == '연재 중') continue;
+        expect(text.maxLines, 2);
+        expect(text.overflow, TextOverflow.ellipsis);
+      }
+      final first = tester.getRect(find.byType(CatalogShelfCard).first);
+      final category = tester.getRect(find.widgetWithText(ChoiceChip, '전체'));
+      if (size.width >= 600) {
+        expect(category.right, lessThan(first.left));
+      } else {
+        expect(category.bottom, lessThan(first.top));
+      }
+      expect(find.text('연재 중'), findsOneWidget);
+      expect(find.textContaining('40화'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('shelf geometry follows fold, rotation, tablet and text size', () {
+    int columns(double w, double h, {double scale = 1}) => catalogShelfColumns(
+      window: Size(w, h),
+      shelfWidth: w - (w >= 600 ? 133 : 0) - 32,
+      textScale: scale,
+    );
+    expect(columns(390, 844), 3);
+    expect(columns(280, 700), 2);
+    // Logical viewport examples; physical pixels alone cannot determine layout.
+    expect(columns(951, 669), 5); // Duo simulator, open landscape
+    expect(columns(669, 951), 4); // Rotated Duo
+    expect(columns(816, 616), 5); // Wide Fold8-shaped window
+    expect(columns(752, 835), 4); // Fold8 Ultra-shaped window
+    expect(columns(835, 752), 4); // Same nearly-square window rotated
+    expect(columns(674, 841), 4); // Existing generic fold emulator
+    expect(columns(768, 1024), 4); // Small tablet portrait
+    expect(columns(1024, 768), 5); // Same tablet landscape
+    expect(columns(1024, 1366), 5); // Large tablet portrait
+    expect(columns(1366, 1024), 6); // Large tablet landscape
+    expect(columns(951, 669, scale: 2), lessThan(5));
+    expect(columns(390, 844, scale: 2), lessThan(3));
+  });
 
   test('catalog cache sorts the complete list and deduplicates ids', () async {
     final a = catalogFixture(1, title: '가을');

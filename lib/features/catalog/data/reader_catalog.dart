@@ -256,6 +256,7 @@ class CatalogItem {
       seriesTitle = json['seriesTitle'] as String? ?? '',
       issueMonth = json['issueMonth'] as String? ?? '',
       releaseDate = json['releaseDate'] as String? ?? '',
+      publishedAt = json['publishedAt'] as String? ?? '',
       compilationId = json['compilationId'] as String? ?? '',
       seriesId = json['seriesId'] as String?,
       episodeNumber = json['episodeNumber'] as int?,
@@ -319,7 +320,7 @@ class CatalogItem {
   final int version;
   final Map<String, CatalogAsset> assets;
   final CatalogAsset? preview;
-  final String issueMonth, releaseDate, compilationId, seriesTitle;
+  final String issueMonth, releaseDate, compilationId, seriesTitle, publishedAt;
   final String? seriesId, episodeTitle;
   final int? episodeNumber;
   final int episodeCount;

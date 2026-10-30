@@ -37,14 +37,14 @@ export function monthlyPublisher(db: Firestore, bucket: Bucket) {
     requireValue(bytes.length === asset.size && createHash('sha256').update(bytes).digest('hex') === asset.sha256, '원본 파일이 변경되었거나 손상되었습니다. 다시 올려 주세요.');
     return bytes;
   }
-  async function story(snapshot: Snapshot): Promise<MonthlyStory> {
+  async function story(snapshot: Snapshot, standalone = false): Promise<MonthlyStory> {
     const source = snapshot.sourceTxt || snapshot.assets.txt;
     requireValue(source && snapshot.assets.cover, '회차 TXT와 이미지가 필요합니다.');
     const normalized = normalizeText(await read(source));
-    requireValue(normalized.length <= 1024 * 1024, '월간 회차 본문은 UTF-8 기준 1MB 이하로 등록해 주세요.');
+    requireValue(normalized.length <= (standalone ? 20 : 1) * 1024 * 1024, standalone ? '본문은 UTF-8 기준 20MB 이하로 등록해 주세요.' : '월간 회차 본문은 UTF-8 기준 1MB 이하로 등록해 주세요.');
     const text = normalized.toString('utf8');
     const image = await sharp(await read(snapshot.assets.cover)).rotate().resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: 80 }).toBuffer();
-    return { title: snapshot.title, text, byline: snapshot.byline, image };
+    return { title: snapshot.title, text, byline: standalone ? snapshot.author : snapshot.byline, image, parseChapters: standalone };
   }
   async function store(contentId: string, bytes: Buffer): Promise<Asset> {
     const validated = await validateUpload('book', 'epub', bytes);
@@ -53,9 +53,10 @@ export function monthlyPublisher(db: Firestore, bucket: Bucket) {
     return { ...validated.asset, path };
   }
   async function episode(item: Content, snapshot: Snapshot): Promise<Asset | undefined> {
-    if (!snapshot.issueMonth || !snapshot.seriesId || !snapshot.assets.txt) return;
-    requireValue(item.assets.cover, '월간 회차에는 회차별 이미지를 올려 주세요.');
-    const epub = await store(item.id, buildMonthlyEpub(snapshot.title, snapshot.language || 'ko', [await story(snapshot)]));
+    const standalone = item.kind === 'book' && !snapshot.seriesId && !snapshot.issueMonth;
+    if (!snapshot.assets.txt || (!standalone && !(snapshot.issueMonth && snapshot.seriesId))) return;
+    requireValue(item.assets.cover, 'TXT 본문과 함께 첫 페이지 이미지를 올려 주세요.');
+    const epub = await store(item.id, buildMonthlyEpub(snapshot.title, snapshot.language || 'ko', [await story(snapshot, standalone)]));
     snapshot.sourceTxt = snapshot.assets.txt;
     snapshot.assets = { cover: snapshot.assets.cover, epub };
     return epub;

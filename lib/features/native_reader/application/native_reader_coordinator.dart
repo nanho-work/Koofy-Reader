@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
@@ -86,6 +87,16 @@ class NativeReaderCoordinator {
 
   Future<void> _commit(ReaderEvent event) async {
     await store.acceptCheckpoint(event);
+    // An explicit choice in the active viewer becomes the background for the
+    // next book too. Historical/replayed checkpoints must not change it.
+    if (event.sessionId == _activeSessionId &&
+        event.kind == 'preferencesChanged') {
+      final background = (await store.loadGlobalPreferences()).theme;
+      if (const ['light', 'sepia', 'dark'].contains(background) &&
+          AppAppearance.instance.selection != background) {
+        await AppAppearance.instance.selectBackground(background);
+      }
+    }
     await gateway.acknowledge(event.sessionId, event.sequence);
   }
 

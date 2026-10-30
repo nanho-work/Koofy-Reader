@@ -107,9 +107,9 @@
     "en": "Read without ads",
     "ja": "広告なしで読む"
   },
-  "리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.": {
-    "en": "Watch a rewarded ad to the end to hide banners in the library, settings and reader for 2 hours.",
-    "ja": "リワード広告を最後まで視聴すると、本棚・設定・読書画面のバナーを2時間非表示にできます。"
+  "리워드 광고를 끝까지 시청하면 독서 화면의 배너가 4시간 동안 숨겨집니다.": {
+    "en": "Watch a rewarded ad to the end to hide banners in the reader for 4 hours.",
+    "ja": "リワード広告を最後まで視聴すると、読書画面のバナーを4時間非表示にできます。"
   },
   "LevelPlay 광고 연동 테스트": {
     "en": "Test LevelPlay ad integration",
@@ -127,9 +127,9 @@
     "en": "Ads hidden · {0}",
     "ja": "広告非表示・{0}"
   },
-  "광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다.": {
-    "en": "Watch an ad to hide banners for 2 hours.",
-    "ja": "広告を視聴すると、バナーを2時間非表示にできます。"
+  "광고를 시청하고 4시간 동안 배너를 숨길 수 있습니다.": {
+    "en": "Watch an ad to hide banners for 4 hours.",
+    "ja": "広告を視聴すると、バナーを4時間非表示にできます。"
   },
   "처리 중…": {
     "en": "Processing…",
@@ -139,17 +139,17 @@
     "en": "Ads are currently hidden",
     "ja": "広告を非表示にしています"
   },
-  "광고 보고 2시간 광고 없이 읽기": {
-    "en": "Watch an ad for 2 hours without banners",
-    "ja": "広告を見て2時間バナーを非表示"
+  "광고 보고 4시간 광고 없이 읽기": {
+    "en": "Watch an ad for 4 hours without banners",
+    "ja": "広告を見て4時間バナーを非表示"
   },
   "숨김 시간이 끝나면 다시 시청할 수 있습니다.": {
     "en": "You can watch again when the ad-free period ends.",
     "ja": "非表示期間が終了すると、再び視聴できます。"
   },
-  "2시간 동안 배너 광고를 숨깁니다.": {
-    "en": "Banner ads will be hidden for 2 hours.",
-    "ja": "バナー広告を2時間非表示にします。"
+  "4시간 동안 배너 광고를 숨깁니다.": {
+    "en": "Banner ads will be hidden for 4 hours.",
+    "ja": "バナー広告を4時間非表示にします。"
   },
   "광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.": {
     "en": "The ad closed. Your reward will apply automatically once confirmed.",
@@ -589,7 +589,7 @@
   },
   "도서": {
     "en": "Books",
-    "ja": "本"
+    "ja": "書籍"
   },
   "글꼴": {
     "en": "Fonts",
@@ -2030,6 +2030,42 @@
   "한국어 목소리 선택": {
     "en": "Choose Korean voice",
     "ja": "韓国語の音声を選択"
+  },
+  "앱 정보": {
+    "en": "About",
+    "ja": "アプリ情報"
+  },
+  "표지표시": {
+    "en": "Book covers",
+    "ja": "表紙表示"
+  },
+  "백업·복원": {
+    "en": "Backup / restore",
+    "ja": "バックアップ・復元"
+  },
+  "정보동의": {
+    "en": "Privacy choices",
+    "ja": "同意設定"
+  },
+  "광고제거": {
+    "en": "Hide ads",
+    "ja": "広告非表示"
+  },
+  "진단정보": {
+    "en": "Diagnostics",
+    "ja": "診断情報"
+  },
+  "글꼴추가": {
+    "en": "Add fonts",
+    "ja": "フォント追加"
+  },
+  "읽던 책": {
+    "en": "Continue reading",
+    "ja": "読みかけの本"
+  },
+  "표지를 누르면 이어 읽어요": {
+    "en": "Tap the cover to keep reading",
+    "ja": "表紙をタップして続きを読む"
   },
   "보기": {
     "en": "Display",
@@ -3566,5 +3602,53 @@
   "읽기": {
     "en": "Read",
     "ja": "読む"
+  },
+  "홈": {
+    "en": "Home",
+    "ja": "ホーム"
+  },
+  "문고": {
+    "en": "Books",
+    "ja": "文庫"
+  },
+  "내 서재": {
+    "en": "My library",
+    "ja": "マイライブラリ"
+  },
+  "새로 도착한 이야기": {
+    "en": "New stories",
+    "ja": "新しく届いた物語"
+  },
+  "이야기를 불러오는 중입니다.": {
+    "en": "Loading stories…",
+    "ja": "物語を読み込んでいます。"
+  },
+  "이야기를 불러오지 못했습니다.": {
+    "en": "Could not load stories.",
+    "ja": "物語を読み込めませんでした。"
+  },
+  "새로운 이야기를 준비하고 있어요.": {
+    "en": "New stories are on their way.",
+    "ja": "新しい物語を準備しています。"
+  },
+  "사람을 만나다": {
+    "en": "Meet the people",
+    "ja": "人に出会う"
+  },
+  "독자 코너": {
+    "en": "Readers’ corner",
+    "ja": "読者コーナー"
+  },
+  "당신의 일상이, 누군가의 이야기가 됩니다.": {
+    "en": "Your everyday moments can inspire someone.",
+    "ja": "あなたの日常が、誰かの心に届く物語に。"
+  },
+  "월간 쿠피에 당신의 글을 보내주세요.": {
+    "en": "Share your writing with Koofy Monthly.",
+    "ja": "月刊クーフィーに、あなたの文章をお寄せください。"
+  },
+  "이번 호 전체 보기": {
+    "en": "Explore this issue",
+    "ja": "今月号をすべて見る"
   }
 }

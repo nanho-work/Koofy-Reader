@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/catalog/presentation/book_catalog_row.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +34,7 @@ void main() {
     );
   });
 
-  testWidgets('episode label changes language while the title stays original', (
+  testWidgets('shelf episode title uses a localized numbered prefix', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -57,13 +58,18 @@ void main() {
     for (final lang in ['en', 'ja']) {
       await AppLanguage.instance.select(lang);
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: BookCatalogRow(
-              item: item,
-              installed: false,
-              progress: null,
-              onDownload: () {},
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 120,
+                child: BookCatalogRow(
+                  item: item,
+                  installed: false,
+                  progress: null,
+                  onDownload: () {},
+                ),
+              ),
             ),
           ),
         ),
@@ -86,7 +92,10 @@ void main() {
         'en',
       );
       expect(AppLanguage.resolve([const Locale('fr')]), 'en');
-      expect(AppLanguage.resolve([const Locale('fr'), const Locale('ja')]), 'en');
+      expect(
+        AppLanguage.resolve([const Locale('fr'), const Locale('ja')]),
+        'en',
+      );
     },
   );
   test(

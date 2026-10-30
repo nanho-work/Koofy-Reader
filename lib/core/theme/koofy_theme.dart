@@ -1,8 +1,9 @@
+import 'app_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:koofy_reader/core/theme/reader_palette.dart';
 
-/// The app shell and all routes share the same opaque canvas, including ads.
+/// Shared shell colors; reading backgrounds are handled by the native viewer.
 abstract final class KoofyTheme {
   static ThemeData forBrightness(Brightness brightness, {bool paper = false}) {
     final dark = brightness == Brightness.dark;
@@ -27,7 +28,18 @@ abstract final class KoofyTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: p.background,
+      scaffoldBackgroundColor: Colors.transparent,
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          for (final entry in const PageTransitionsTheme().builders.entries)
+            entry.key: AppBackgroundTransitions(entry.value),
+        },
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: p.background,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
       textTheme: const TextTheme(
         titleLarge: TextStyle(
           fontSize: 20,
@@ -73,7 +85,7 @@ abstract final class KoofyTheme {
         ),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: p.background,
+        backgroundColor: Colors.transparent,
         foregroundColor: p.foreground,
         surfaceTintColor: Colors.transparent,
         elevation: 0,

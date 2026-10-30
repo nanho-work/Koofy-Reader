@@ -68,6 +68,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Opt in only for local debugging over an installed release build.
+            if (System.getenv("KOOFY_DEBUG_RELEASE_SIGNING") == "true") {
+                check(hasReleaseSigning) { "Local debug update requires the existing release signing key." }
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
         }

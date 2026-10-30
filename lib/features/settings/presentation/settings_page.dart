@@ -1,9 +1,14 @@
+import 'package:koofy_reader/core/theme/app_background.dart';
+import 'package:koofy_reader/core/widgets/selection_menu.dart';
+import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart'
+    show catalogSidebarWidth, usesReaderSidebar, FontCatalogPage;
+import 'package:koofy_reader/core/localization/language_button.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/support/presentation/diagnostics_page.dart';
 import 'package:koofy_reader/features/library/presentation/library_trash_page.dart';
-import 'dart:async';
+import 'package:koofy_reader/features/ads/presentation/reward_ad_button.dart';
 import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
@@ -39,7 +44,9 @@ Route<void> settingsPanelRoute(RouteSettings settings) =>
                 width: width,
                 child: Material(
                   elevation: 16,
-                  child: const SafeArea(child: SettingsPage()),
+                  child: const AppBackground(
+                    child: SafeArea(child: SettingsPage()),
+                  ),
                 ),
               ),
             );
@@ -60,30 +67,18 @@ double settingsPanelWidth(double width) {
 }
 
 class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  Timer? _ticker;
   bool _busy = false;
   bool _savingCover = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
+  int _section = 0;
 
   String _themeLabel(String mode) => switch (mode) {
     'light' => '밝게',
@@ -92,237 +87,373 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _ => '기기 설정 따르기',
   };
 
-  String _remaining(DateTime until) {
-    final minutes = (until.difference(DateTime.now()).inSeconds / 60)
-        .ceil()
-        .clamp(1, 1000000);
-    final hours = minutes ~/ 60;
-    final rest = minutes % 60;
-    return hours == 0
-        ? tr("{0}분 남음", [rest])
-        : tr("{0}시간{1} 남음", [
-            hours,
-            rest == 0 ? '' : ' ${tr('{0}분', [rest])}',
-          ]);
-  }
-
   @override
   Widget build(BuildContext context) {
     final adState = ref.watch(adStateProvider);
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(tr("설정")),
-        actions: [
-          IconButton(
-            tooltip: tr("닫기"),
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.maybePop(context),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: AdOverlayInsets.padding(context, const EdgeInsets.all(16)),
+    final languageTile = const LanguageButton(asSettingsTile: true);
+    final themeTile = ListenableBuilder(
+      listenable: AppAppearance.instance,
+      builder: (context, _) => ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        initiallyExpanded: widget.embedded,
+        leading: const Icon(Icons.brightness_6_outlined),
+        title: Text(tr('독서 배경')),
+        subtitle: Text(tr(_themeLabel(AppAppearance.instance.selection))),
         children: [
-          ListenableBuilder(
-            listenable: AppAppearance.instance,
-            builder: (context, _) => ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              leading: const Icon(Icons.brightness_6_outlined),
-              title: Text(tr('앱 테마')),
-              subtitle: Text(tr(_themeLabel(AppAppearance.instance.selection))),
-              children: [
-                for (final mode in ['system', 'light', 'sepia', 'dark'])
-                  ListTile(
-                    title: Text(tr(_themeLabel(mode))),
-                    leading: Icon(
-                      mode == AppAppearance.instance.selection
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_off,
-                    ),
-                    selected: mode == AppAppearance.instance.selection,
-                    onTap: () async {
-                      try {
-                        await AppAppearance.instance.selectBackground(mode);
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(tr('테마를 저장하지 못했습니다. 다시 시도해 주세요.')),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-              ],
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline),
-            title: Text(tr("앱 버전")),
-            subtitle: ref
-                .watch(installedPackageProvider)
-                .when(
-                  data: (info) => Text(
-                    tr("{0} (빌드 {1})", [info.version, info.buildNumber]),
-                  ),
-                  loading: () => Text(tr("확인 중…")),
-                  error: (_, __) => Text(tr("버전 정보를 확인할 수 없습니다.")),
-                ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.backup_outlined),
-            title: Text(tr("서재 백업·복원")),
-            subtitle: Text(tr("책·표지·묶음·읽던 위치를 파일로 보관")),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => const BackupPage())),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.delete_outline),
-            title: Text(tr("휴지통")),
-            subtitle: Text(tr("삭제한 책과 해제한 묶음 복원")),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const LibraryTrashPage()),
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: Text(tr("개인정보 및 광고")),
-            subtitle: Text(tr("광고 선택 · 개인정보처리방침 · 문의 · 광고 신고")),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const PrivacySettingsPage(),
+          for (final mode in ['system', 'light', 'sepia', 'dark'])
+            ListTile(
+              title: Text(tr(_themeLabel(mode))),
+              leading: Icon(
+                mode == AppAppearance.instance.selection
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
               ),
-            ),
-          ),
-          ref
-              .watch(readerCoverEnabledProvider)
-              .when(
-                data: (enabled) => SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(tr("독서 화면에 표지 표시")),
-                  subtitle: Text(
-                    tr(
-                      "각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.",
-                    ),
-                  ),
-                  value: enabled,
-                  onChanged: _savingCover
-                      ? null
-                      : (value) async {
-                          setState(() => _savingCover = true);
-                          try {
-                            await ref
-                                .read(localStorageProvider)
-                                .setInt(readerCoverSettingKey, value ? 1 : 0);
-                            ref.invalidate(readerCoverEnabledProvider);
-                          } catch (_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    tr("표지 설정을 저장하지 못했습니다. 다시 시도해 주세요."),
-                                  ),
-                                ),
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => _savingCover = false);
-                          }
-                        },
-                ),
-                loading: () => ListTile(title: Text(tr("표지 설정을 불러오는 중…"))),
-                error: (_, __) => ListTile(
-                  title: Text(tr("표지 설정 다시 불러오기")),
-                  onTap: () => ref.invalidate(readerCoverEnabledProvider),
-                ),
-              ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.bug_report_outlined),
-            title: Text(tr("문제 신고용 진단 정보")),
-            subtitle: Text(tr("앱 버전과 독서 설정 확인·복사")),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const DiagnosticsPage()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.star_outline_rounded),
-            title: Text(tr("평가 남기기")),
-            subtitle: Text(tr("스토어에서 사용 경험을 들려주세요")),
-            onTap: () async {
-              final opened = await ReaderReviewService.instance.openStore();
-              if (!opened && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(tr("스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요.")),
-                  ),
-                );
-              }
-            },
-          ),
-          const Divider(height: 24),
-          Text(tr("광고 없이 읽기"), style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(tr("리워드 광고를 끝까지 시청하면 서재·설정·독서 화면의 배너가 2시간 동안 숨겨집니다.")),
-          const SizedBox(height: 16),
-          if (LevelPlayIds.testSuite)
-            TextButton(
-              onPressed: () async {
-                if (await LevelPlayService.instance.initialize()) {
-                  await LevelPlay.launchTestSuite();
+              selected: mode == AppAppearance.instance.selection,
+              onTap: () async {
+                try {
+                  await AppAppearance.instance.selectBackground(mode);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(tr('테마를 저장하지 못했습니다. 다시 시도해 주세요.')),
+                      ),
+                    );
+                  }
                 }
               },
-              child: Text(tr("LevelPlay 광고 연동 테스트")),
             ),
-          adState.when(
-            loading: () => Text(tr("광고 상태를 불러오는 중입니다.")),
-            error: (_, __) => TextButton(
-              onPressed: () => ref.invalidate(adStateProvider),
-              child: Text(tr("광고 상태를 불러오지 못했습니다. 다시 시도")),
-            ),
-            data: (state) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  state.isBannerHidden
-                      ? tr("광고 숨김 · {0}", [_remaining(state.hiddenUntil!)])
-                      : tr("광고를 시청하고 2시간 동안 배너를 숨길 수 있습니다."),
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _busy || state.isBannerHidden
-                      ? null
-                      : _runRewardedFlow,
-                  child: Text(
-                    _busy
-                        ? tr("처리 중…")
-                        : state.isBannerHidden
-                        ? tr("광고 숨김 적용 중")
-                        : tr("광고 보고 2시간 광고 없이 읽기"),
-                  ),
-                ),
-                if (state.isBannerHidden)
-                  Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(tr("숨김 시간이 끝나면 다시 시청할 수 있습니다.")),
-                  ),
-              ],
-            ),
-          ),
         ],
       ),
     );
+    final coverTile = ref
+        .watch(readerCoverEnabledProvider)
+        .when(
+          data: (enabled) => SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(tr("독서 화면에 표지 표시")),
+            subtitle: Text(
+              tr(
+                "각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.",
+              ),
+            ),
+            value: enabled,
+            onChanged: _savingCover
+                ? null
+                : (value) async {
+                    setState(() => _savingCover = true);
+                    try {
+                      await ref
+                          .read(localStorageProvider)
+                          .setInt(readerCoverSettingKey, value ? 1 : 0);
+                      ref.invalidate(readerCoverEnabledProvider);
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(tr("표지 설정을 저장하지 못했습니다. 다시 시도해 주세요.")),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _savingCover = false);
+                    }
+                  },
+          ),
+          loading: () => ListTile(title: Text(tr("표지 설정을 불러오는 중…"))),
+          error: (_, __) => ListTile(
+            title: Text(tr("표지 설정 다시 불러오기")),
+            onTap: () => ref.invalidate(readerCoverEnabledProvider),
+          ),
+        );
+    final backupTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.backup_outlined),
+      title: Text(tr("서재 백업·복원")),
+      subtitle: Text(tr("책·표지·묶음·읽던 위치를 파일로 보관")),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const BackupPage())),
+    );
+    final trashTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.delete_outline),
+      title: Text(tr("휴지통")),
+      subtitle: Text(tr("삭제한 책과 해제한 묶음 복원")),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const LibraryTrashPage())),
+    );
+    final privacyTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.privacy_tip_outlined),
+      title: Text(tr("개인정보 및 광고")),
+      subtitle: Text(tr("광고 선택 · 개인정보처리방침 · 문의 · 광고 신고")),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const PrivacySettingsPage()),
+      ),
+    );
+    final versionTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.info_outline),
+      title: Text(tr("앱 버전")),
+      subtitle: ref
+          .watch(installedPackageProvider)
+          .when(
+            data: (info) =>
+                Text(tr("{0} (빌드 {1})", [info.version, info.buildNumber])),
+            loading: () => Text(tr("확인 중…")),
+            error: (_, __) => Text(tr("버전 정보를 확인할 수 없습니다.")),
+          ),
+    );
+    final diagnosticsTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.bug_report_outlined),
+      title: Text(tr("문제 신고용 진단 정보")),
+      subtitle: Text(tr("앱 버전과 독서 설정 확인·복사")),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const DiagnosticsPage())),
+    );
+    final reviewTile = ListTile(
+      leading: const Icon(Icons.star_outline_rounded),
+      title: Text(tr("평가 남기기")),
+      subtitle: Text(tr("스토어에서 사용 경험을 들려주세요")),
+      onTap: () async {
+        final opened = await ReaderReviewService.instance.openStore();
+        if (!opened && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr("스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요."))),
+          );
+        }
+      },
+    );
+    final rewardDetails = <Widget>[
+      const Divider(height: 24),
+      Text(tr("광고 없이 읽기"), style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      Text(tr("리워드 광고를 끝까지 시청하면 독서 화면의 배너가 4시간 동안 숨겨집니다.")),
+      const SizedBox(height: 16),
+      if (LevelPlayIds.testSuite)
+        TextButton(
+          onPressed: () async {
+            if (await LevelPlayService.instance.initialize()) {
+              await LevelPlay.launchTestSuite();
+            }
+          },
+          child: Text(tr("LevelPlay 광고 연동 테스트")),
+        ),
+      adState.when(
+        loading: () => Text(tr("광고 상태를 불러오는 중입니다.")),
+        error: (_, __) => TextButton(
+          onPressed: () => ref.invalidate(adStateProvider),
+          child: Text(tr("광고 상태를 불러오지 못했습니다. 다시 시도")),
+        ),
+        data: (state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              state.isBannerHidden
+                  ? tr("광고 숨김 적용 중")
+                  : tr("광고를 시청하고 4시간 동안 배너를 숨길 수 있습니다."),
+            ),
+            const SizedBox(height: 12),
+            RewardAdButton(
+              hiddenUntil: state.hiddenUntil,
+              busy: _busy,
+              onPressed: _runRewardedFlow,
+            ),
+            if (state.isBannerHidden)
+              Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(tr("숨김 시간이 끝나면 다시 시청할 수 있습니다.")),
+              ),
+          ],
+        ),
+      ),
+    ];
+    final fontTile = ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.font_download_outlined),
+      title: Text(tr('글꼴추가')),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const FontCatalogPage())),
+    );
+    const labels = [
+      '언어',
+      '독서 배경',
+      '표지표시',
+      '백업·복원',
+      '휴지통',
+      '정보동의',
+      '광고제거',
+      '앱 버전',
+      '진단정보',
+      '평가 남기기',
+      '글꼴추가',
+    ];
+    final detailWidgets = <List<Widget>>[
+      [_languageOptions()],
+      [themeTile],
+      [coverTile],
+      [backupTile],
+      [trashTile],
+      [privacyTile],
+      rewardDetails,
+      [versionTile],
+      [diagnosticsTile],
+      [reviewTile],
+      [fontTile],
+    ];
+    final phoneWidgets = <Widget>[
+      languageTile,
+      themeTile,
+      fontTile,
+      versionTile,
+      backupTile,
+      trashTile,
+      privacyTile,
+      coverTile,
+      diagnosticsTile,
+      reviewTile,
+      ...rewardDetails,
+    ];
+    final detailPages = <int, Widget>{
+      3: const BackupPage(),
+      4: const LibraryTrashPage(),
+      5: const PrivacySettingsPage(),
+      8: const DiagnosticsPage(),
+      10: const FontCatalogPage(),
+    };
+    return DisplayFeatureSubScreen(
+      anchorPoint: Offset.zero,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide =
+              widget.embedded && usesReaderSidebar(constraints.maxWidth);
+          final content = wide && detailPages.containsKey(_section)
+              ? Navigator(
+                  key: ValueKey('settings-detail-$_section'),
+                  onGenerateRoute: (_) => MaterialPageRoute<void>(
+                    builder: (_) => detailPages[_section]!,
+                  ),
+                )
+              : ListView(
+                  key: ValueKey(
+                    wide ? 'settings-section-$_section' : 'settings-list',
+                  ),
+                  padding: AdOverlayInsets.padding(
+                    context,
+                    const EdgeInsets.all(16),
+                  ),
+                  children: wide ? detailWidgets[_section] : phoneWidgets,
+                );
+          return Scaffold(
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              titleSpacing: wide ? 0 : null,
+              title: wide
+                  ? SizedBox(
+                      width: catalogSidebarWidth,
+                      child: Center(child: Text(tr('설정'))),
+                    )
+                  : Text(tr('설정')),
+              actions: [
+                if (!widget.embedded)
+                  IconButton(
+                    tooltip: tr('닫기'),
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+              ],
+            ),
+            body: SafeArea(
+              top: false,
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: catalogSidebarWidth,
+                          child: ListView(
+                            key: const ValueKey('settings-sidebar'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 8,
+                            ),
+                            children: [
+                              for (final i in [
+                                0,
+                                1,
+                                10,
+                                2,
+                                3,
+                                4,
+                                5,
+                                6,
+                                7,
+                                8,
+                                9,
+                              ])
+                                SelectionMenuButton(
+                                  key: ValueKey('settings-category-$i'),
+                                  label: tr(labels[i]),
+                                  selected: _section == i,
+                                  onPressed: () => setState(() => _section = i),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(child: content),
+                      ],
+                    )
+                  : content,
+            ),
+          );
+        },
+      ),
+    );
   }
+
+  Widget _languageOptions() => ListenableBuilder(
+    listenable: AppLanguage.instance,
+    builder: (context, _) => Column(
+      children: [
+        for (final entry in {
+          'system': tr('기기 설정 따르기'),
+          'ko': '한국어',
+          'en': 'English',
+          'ja': '日本語',
+        }.entries)
+          ListTile(
+            title: Text(entry.value),
+            leading: Icon(
+              (AppLanguage.instance.selection ?? 'system') == entry.key
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+            ),
+            onTap: () async {
+              try {
+                await AppLanguage.instance.select(
+                  entry.key == 'system' ? null : entry.key,
+                );
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(tr('언어를 저장하지 못했습니다. 다시 시도해 주세요.'))),
+                  );
+                }
+              }
+            },
+          ),
+      ],
+    ),
+  );
 
   Future<void> _runRewardedFlow() async {
     if (_busy) return;
@@ -341,7 +472,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SnackBar(
           content: Text(
             result == true
-                ? tr("2시간 동안 배너 광고를 숨깁니다.")
+                ? tr("4시간 동안 배너 광고를 숨깁니다.")
                 : result == false
                 ? tr("광고가 닫혔습니다. 시청 보상이 확인되면 자동 적용됩니다.")
                 : tr("지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다."),

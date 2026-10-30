@@ -2,7 +2,6 @@ import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/core/theme/koofy_theme.dart';
 import 'package:koofy_reader/features/ads/presentation/app_footer_ad_shell.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -65,6 +64,7 @@ Future<void> pumpLibrary(
   bool realCompletion = false,
   List<CatalogItem> catalog = const [],
   Widget? overlayBanner,
+  Widget? rootPage,
 }) async {
   const captureDirectory = String.fromEnvironment('LIBRARY_CAPTURE_DIR');
   if (captureDirectory.isNotEmpty) {
@@ -93,6 +93,8 @@ Future<void> pumpLibrary(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (rootPage != null)
+          catalogItemsProvider('monthly').overrideWith((ref) async => []),
         catalogItemsProvider('book').overrideWith((ref) async => catalog),
         catalogInstalledProvider('book').overrideWith((ref) async => {}),
         catalogItemsProvider('font').overrideWith((ref) async => []),
@@ -129,7 +131,7 @@ Future<void> pumpLibrary(
                 : AppBannerOverlay(banner: overlayBanner, child: child!),
           ),
         ),
-        home: const LibraryPage(),
+        home: rootPage ?? const LibraryPage(),
         onGenerateRoute: (settings) {
           routes?.add(settings);
           return MaterialPageRoute<void>(
@@ -171,52 +173,45 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   for (final language in ['ko', 'en', 'ja']) {
     for (final width in [320.0, 840.0]) {
-      testWidgets(
-        'finished episode offers next in saved order at $width/$language',
-        (tester) async {
-          await AppLanguage.instance.initialize();
-          await AppLanguage.instance.select(language);
-          addTearDown(() => AppLanguage.instance.select('ko'));
-          final routes = <RouteSettings>[];
-          await pumpLibrary(
-            tester,
-            size: Size(width, 1000),
-            routes: routes,
-            groups: [
-              BookGroup(
-                id: 'group_next',
-                title: '연재',
-                bookIds: ['b0', 'b2', 'b1'],
-              ),
-            ],
-            states: () async => {
-              'b0': LibraryReadingState(
-                finished: true,
-                progression: 1,
-                lastReadAt: DateTime.now(),
-              ),
-            },
-          );
-          await tester.pumpAndSettle();
-          final next = find.byKey(const ValueKey('continue-next-book'));
-          expect(next, findsOneWidget);
-          expect(
-            find.text(tr('다음 회차: {0}', [demoBooks[2].title])),
-            findsOneWidget,
-          );
-          expect(
-            find.widgetWithText(FilledButton, tr('이어 읽기')),
-            findsOneWidget,
-          );
-          expect(tester.takeException(), isNull);
-          await capture(tester, 'next-$width-$language');
-          await tester.ensureVisible(next);
-          await tester.tap(next);
-          await tester.pumpAndSettle();
-          expect(routes.single.name, AppRoutes.nativeReader);
-          expect(identical(routes.single.arguments, demoBooks[2]), isTrue);
-        },
-      );
+      testWidgets('group resumes last read episode at $width/$language', (
+        tester,
+      ) async {
+        await AppLanguage.instance.initialize();
+        await AppLanguage.instance.select(language);
+        addTearDown(() => AppLanguage.instance.select('ko'));
+        final routes = <RouteSettings>[];
+        await pumpLibrary(
+          tester,
+          size: Size(width, 1000),
+          routes: routes,
+          groups: [
+            BookGroup(
+              id: 'group_next',
+              title: '연재',
+              bookIds: ['b0', 'b2', 'b1'],
+            ),
+          ],
+          states: () async => {
+            'b0': LibraryReadingState(
+              finished: true,
+              progression: 1,
+              lastReadAt: DateTime.now(),
+            ),
+          },
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('continue-reading-card')),
+          findsNothing,
+        );
+        final resume = find.byKey(const ValueKey('resume-group-group_next'));
+        expect(resume, findsOneWidget);
+        await tester.ensureVisible(resume);
+        await tester.tap(resume);
+        await tester.pumpAndSettle();
+        expect(routes.single.name, AppRoutes.nativeReader);
+        expect(identical(routes.single.arguments, demoBooks.first), isTrue);
+      });
     }
   }
   for (final scenario in ['unfinished', 'last', 'missing', 'ungrouped']) {
@@ -248,7 +243,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('continue-next-book')), findsNothing);
-      expect(find.widgetWithText(FilledButton, '이어 읽기'), findsOneWidget);
+      expect(find.byType(BookTile), findsWidgets);
       expect(tester.takeException(), isNull);
     });
   }
@@ -261,7 +256,7 @@ void main() {
       addTearDown(() => AppLanguage.instance.select('ko'));
       await pumpLibrary(tester, size: const Size(320, 700));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('language-picker')), findsOneWidget);
+      expect(find.byKey(const ValueKey('language-picker')), findsNothing);
       expect(find.text(tr('나의 책')), findsNothing);
       expect(find.text(tr('표지 일괄 등록')), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -271,12 +266,12 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpAndSettle();
       expect(find.byTooltip(tr('책 추가')), findsOneWidget);
-      expect(find.byTooltip(tr('도서·글꼴 다운로드')), findsOneWidget);
+      expect(find.byTooltip(tr('도서·글꼴 다운로드')), findsNothing);
       expect(find.text(tr('도서·글꼴 다운로드')), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip(tr('검색 닫기')));
       await tester.pumpAndSettle();
-      expect(find.text(tr('도서·글꼴 다운로드')), findsOneWidget);
+      expect(find.text(tr('도서·글꼴 다운로드')), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -286,18 +281,34 @@ void main() {
     const Size(840, 900),
   ]) {
     testWidgets(
-      'download and add share one row and book menu is on cover top at $size',
+      'add sits at the end of shelf filters and book menu is on cover top at $size',
       (tester) async {
         await pumpLibrary(tester, size: size);
         await tester.pumpAndSettle();
         final add = find.byKey(const ValueKey('add-books'));
-        final download = find.byKey(
-          ValueKey(size.width >= 720 ? 'toggle-downloads' : 'open-downloads'),
-        );
+        final filter = find.widgetWithText(ChoiceChip, '전체');
+        final search = find.byKey(const ValueKey('open-library-search'));
         expect(
           tester.getCenter(add).dy,
-          closeTo(tester.getCenter(download).dy, 1),
+          closeTo(tester.getCenter(search).dy, 1),
         );
+        final covers = find.text('표지 일괄 등록');
+        expect(
+          tester.getCenter(add).dy,
+          closeTo(tester.getCenter(covers).dy, 1),
+        );
+        expect(
+          find.descendant(of: add, matching: find.text('책 추가')),
+          findsOneWidget,
+        );
+        if (size.width >= 600) {
+          expect(tester.getRect(filter).right, lessThanOrEqualTo(172));
+        }
+        expect(
+          tester.getCenter(add).dx,
+          greaterThan(tester.getCenter(filter).dx),
+        );
+        expect(find.byTooltip('책 묶음 만들기'), findsNothing);
         expect(find.text('책 가져오기'), findsNothing);
         final tile = find.byKey(const ValueKey('b0'));
         await tester.scrollUntilVisible(
@@ -362,97 +373,42 @@ void main() {
   });
 
   for (final width in [390.0, 840.0]) {
-    testWidgets(
-      'resume uses group cover without changing member book at $width',
-      (tester) async {
-        final directory = Directory.systemTemp.createTempSync('resume-cover-');
-        addTearDown(() => directory.deleteSync(recursive: true));
-        final png = base64Decode(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2h0sAAAAASUVORK5CYII=',
-        );
-        final groupFile = File('${directory.path}/group.png')
-          ..writeAsBytesSync(png);
-        final memberFile = File('${directory.path}/member.png')
-          ..writeAsBytesSync(png);
-        final group = BookGroup(
-          id: 'group_test',
-          title: '묶음 제목',
-          bookIds: ['b0'],
-          coverPath: groupFile.path,
-        );
-        final routes = <RouteSettings>[];
-        await pumpLibrary(
-          tester,
-          size: Size(width, 900),
-          books: [demoBooks.first],
-          groups: [group],
-          routes: routes,
-        );
-        await tester.pumpAndSettle();
-        final card = find.byKey(const ValueKey('continue-reading-card'));
-        final image = tester.widget<Image>(
-          find.descendant(of: card, matching: find.byType(Image)),
-        );
-        expect(
-          (image.image as ResizeImage).imageProvider,
-          FileImage(groupFile),
-        );
-        expect(
-          find.descendant(of: card, matching: find.text(demoBooks.first.title)),
-          findsOneWidget,
-        );
-        final cover = find.descendant(
-          of: card,
-          matching: find.byType(BookCover),
-        );
-        final resume = find.byKey(const ValueKey('continue-reading-button'));
-        final progress = find.descendant(
-          of: card,
-          matching: find.byType(LinearProgressIndicator),
-        );
-        expect(
-          tester.getRect(resume).left,
-          greaterThan(tester.getRect(cover).right),
-        );
-        expect(
-          tester.getRect(progress).left,
-          greaterThan(tester.getRect(cover).right),
-        );
-        expect(
-          tester.getRect(progress).top,
-          greaterThan(tester.getRect(resume).bottom),
-        );
-        final status = find.byKey(const ValueKey('continue-reading-status'));
-        expect(
-          tester.getCenter(status).dy,
-          closeTo(tester.getCenter(resume).dy, .1),
-        );
-        expect(
-          tester.getRect(resume).right,
-          closeTo(tester.getRect(progress).right, .1),
-        );
-        await tester.tap(resume);
-        await tester.pumpAndSettle();
-        expect(routes.single.name, AppRoutes.nativeReader);
-        expect(identical(routes.single.arguments, demoBooks.first), isTrue);
-        await tester.pumpWidget(const SizedBox.shrink());
-        await pumpLibrary(
-          tester,
-          size: Size(width, 900),
-          books: [demoBooks.first.withCoverPath(memberFile.path)],
-          groups: [group],
-        );
-        await tester.pumpAndSettle();
-        final ownImage = tester.widget<Image>(
-          find.descendant(of: card, matching: find.byType(Image)),
-        );
-        expect(
-          (ownImage.image as ResizeImage).imageProvider,
-          FileImage(memberFile),
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
+    testWidgets('group resume opens most recent member at $width', (
+      tester,
+    ) async {
+      final routes = <RouteSettings>[];
+      await pumpLibrary(
+        tester,
+        size: Size(width, 900),
+        routes: routes,
+        groups: [
+          BookGroup(id: 'group_test', title: '묶음 제목', bookIds: ['b0', 'b1']),
+        ],
+        states: () async => {
+          'b0': LibraryReadingState(
+            progression: .2,
+            lastReadAt: DateTime(2026, 1, 1),
+          ),
+          'b1': LibraryReadingState(
+            progression: .6,
+            lastReadAt: DateTime(2026, 1, 2),
+          ),
+        },
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
+      final tile = tester.widget<BookTile>(
+        find.byKey(const ValueKey('group_test')),
+      );
+      expect(tile.onTap, isNotNull);
+      final resume = find.byKey(const ValueKey('resume-group-group_test'));
+      await tester.ensureVisible(resume);
+      await tester.tap(resume);
+      await tester.pumpAndSettle();
+      expect(routes.single.name, AppRoutes.nativeReader);
+      expect(identical(routes.single.arguments, demoBooks[1]), isTrue);
+      expect(tester.takeException(), isNull);
+    });
   }
   testWidgets('phone expands search and restores labeled actions on close', (
     tester,
@@ -465,7 +421,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, '내 서재에서 책 검색'), findsOneWidget);
     expect(find.text('도서·글꼴 다운로드'), findsNothing);
-    expect(find.byTooltip('도서·글꼴 다운로드'), findsOneWidget);
+    expect(find.byTooltip('도서·글꼴 다운로드'), findsNothing);
     expect(find.byTooltip('책 추가'), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('library-search-field')),
@@ -477,155 +433,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('library-search-field')), findsNothing);
     expect(find.text('12권'), findsOneWidget);
-    expect(find.text('책 추가'), findsOneWidget);
-    await tester.ensureVisible(find.text('도서·글꼴 다운로드'));
-    await tester.tap(find.text('도서·글꼴 다운로드'));
-    await tester.pumpAndSettle();
-    expect(routes.single.name, AppRoutes.catalog);
+    expect(find.byTooltip('책 추가'), findsOneWidget);
+    expect(routes, isEmpty);
   });
-  testWidgets(
-    'wide menus are exclusive and preserve catalog tab query and scroll',
-    (tester) async {
-      await pumpLibrary(
-        tester,
-        size: const Size(840, 900),
-        catalog: [for (var i = 0; i < 12; i++) catalogFixture(i)],
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('continue-reading-card')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('catalog-search-book')), findsNothing);
-      expect(find.text('내 서재'), findsNothing);
-      expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('KOOFY')),
-        findsNothing,
-      );
-      expect(find.text('이어 읽기'), findsOneWidget);
-      expect(tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight, 48);
-      await capture(tester, 'reading-expanded');
-      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
-      final header = find.byKey(const ValueKey('expand-reading'));
-      final before = tester.getRect(header);
-      final shelf = tester
-          .widget<CustomScrollView>(
-            find.byKey(const PageStorageKey('library-scroll')),
-          )
-          .controller!;
-      await tester.enterText(
-        find.byKey(const ValueKey('catalog-search-book')),
-        '도서',
-      );
-      await tester.pumpAndSettle();
-      final list = find.byKey(const PageStorageKey('catalog-list-book'));
-      await tester.drag(list, const Offset(0, -350));
-      await tester.pumpAndSettle();
-      final controller = tester.widget<ListView>(list).controller!;
-      final offset = controller.offset;
-      expect(offset, greaterThan(0));
-      expect(shelf.offset, 0);
-      expect(tester.getRect(header), before);
-      await capture(tester, 'downloads-expanded');
-      await tester.tap(find.text('글꼴'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('catalog-search-font')),
-        '학교',
-      );
-      await tester.tap(header);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('continue-reading-card')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('catalog-search-font')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('catalog-search-font')),
-            )
-            .controller!
-            .text,
-        '학교',
-      );
-      await tester.tap(find.text('도서'));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('catalog-search-book')),
-            )
-            .controller!
-            .text,
-        '도서',
-      );
-      expect(tester.widget<ListView>(list).controller, same(controller));
-      expect(controller.offset, closeTo(offset, 1));
-      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('continue-reading-card')),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'long reading card grows with content and sidebar scrolls as a whole',
-    (tester) async {
-      final book = Book.asset(
-        id: 'long',
-        title: '긴 제목을 생략하지 않고 자연스럽게 보여 주는 책입니다 ' * 3,
-        author: '쿠피 작가',
-        description: '',
-        assetPath: 'sample.txt',
-      );
-      final chapter = '장 이름도 내용에 맞게 자연스럽게 표시합니다 ' * 3;
-      await pumpLibrary(
-        tester,
-        size: const Size(840, 450),
-        scale: 2,
-        books: [book],
-        states: () async => {
-          'long': LibraryReadingState(
-            progression: .3,
-            lastReadAt: DateTime.now(),
-            chapterTitle: chapter,
-          ),
-        },
-      );
-      await tester.pumpAndSettle();
-      final card = find.byKey(const ValueKey('continue-reading-card'));
-      final title = find.descendant(of: card, matching: find.text(book.title));
-      expect(tester.widget<Text>(title.last).maxLines, isNull);
-      expect(find.text(chapter), findsNothing);
-      final button = find.widgetWithText(FilledButton, '이어 읽기');
-      expect(
-        tester.getRect(button).bottom,
-        lessThan(tester.getRect(card).bottom),
-      );
-      expect(tester.getSize(card).height, greaterThan(450));
-      await tester.ensureVisible(button);
-      await tester.pumpAndSettle();
-      expect(button.hitTestable(), findsOneWidget);
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('toggle-downloads')),
-      );
-      await tester.tap(find.byKey(const ValueKey('toggle-downloads')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('catalog-search-book')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('expand-reading')).hitTestable(),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('wide library uses shelf only and omits the download catalog', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      size: const Size(840, 900),
+      catalog: [for (var i = 0; i < 12; i++) catalogFixture(i)],
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
+    expect(find.byKey(const ValueKey('catalog-search-book')), findsNothing);
+    expect(find.text('내 서재'), findsNothing);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('KOOFY')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('continue-reading-button')), findsNothing);
+    expect(tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight, 48);
+    await capture(tester, 'reading-expanded');
+    expect(find.byKey(const ValueKey('toggle-downloads')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('returning from reader refreshes committed native progress', (
     tester,
   ) async {
@@ -642,14 +474,24 @@ void main() {
       ],
     );
     await tester.pumpAndSettle();
-    final status = find.byKey(const ValueKey('continue-reading-status'));
-    expect(tester.widget<Text>(status).data, '42%');
-    await tester.tap(find.widgetWithText(FilledButton, '이어 읽기'));
+    expect(
+      tester.widget<BookTile>(find.byKey(const ValueKey('b0'))).statusLabel,
+      contains('42'),
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('b0')),
+        matching: find.byType(BookCover),
+      ),
+    );
     await tester.pumpAndSettle();
     ratio = .63;
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    expect(tester.widget<Text>(status).data, '63%');
+    expect(
+      tester.widget<BookTile>(find.byKey(const ValueKey('b0'))).statusLabel,
+      contains('63'),
+    );
   });
   testWidgets(
     'completion menu persists and can be undone without deleting book',
@@ -662,10 +504,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('완독으로 표시'));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('continue-reading-card')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, '완독'));
       await tester.tap(find.widgetWithText(ChoiceChip, '완독'));
       await tester.pumpAndSettle();
       expect(find.byType(BookTile), findsOneWidget);
@@ -676,10 +516,7 @@ void main() {
       await tester.tap(find.text('완독 표시 해제'));
       await tester.pumpAndSettle();
       expect(find.text('0권'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('continue-reading-card')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
     },
   );
   testWidgets('book menu exposes archived records and has no engine chooser', (
@@ -712,15 +549,20 @@ void main() {
     expect(find.text('표지 이미지 등록'), findsNothing);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('phone shows continuation and opens the matching native route', (
+  testWidgets('phone resumes from shelf cover without a duplicate card', (
     tester,
   ) async {
     final routes = <RouteSettings>[];
     await pumpLibrary(tester, routes: routes);
-    expect(find.byKey(const ValueKey('continue-reading-card')), findsOneWidget);
+    expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
     expect(find.byTooltip('새 리더로 읽기 (미리 보기)'), findsNothing);
     await capture(tester, 'phone');
-    await tester.tap(find.widgetWithText(FilledButton, '이어 읽기'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('b0')),
+        matching: find.byType(BookCover),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(routes.single.name, AppRoutes.nativeReader);
     expect((routes.single.arguments as Book).id, 'b0');
@@ -734,7 +576,12 @@ void main() {
       routes: routes,
       states: () async => {'b1': demoState['b1']!},
     );
-    await tester.tap(find.widgetWithText(FilledButton, '이어 읽기'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('b1')),
+        matching: find.byType(BookCover),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(routes.single.name, AppRoutes.nativeReader);
   });
@@ -772,6 +619,7 @@ void main() {
       await tester.enterText(find.byType(TextField), '김작가');
       await tester.pumpAndSettle();
       expect(find.text('1권'), findsOneWidget);
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, '읽을 책'));
       await tester.tap(find.widgetWithText(ChoiceChip, '읽을 책'));
       await tester.pumpAndSettle();
       expect(find.text('0권'), findsOneWidget);
@@ -793,9 +641,7 @@ void main() {
     pending.complete(demoState);
     await tester.pumpAndSettle();
     expect(
-      tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '이어 읽기'))
-          .onPressed,
+      tester.widget<BookTile>(find.byKey(const ValueKey('b0'))).onTap,
       isNotNull,
     );
   });
@@ -833,71 +679,68 @@ void main() {
     const Size(390, 844),
     const Size(840, 900),
   ]) {
-    testWidgets('six books occupy two rows of three at $size', (tester) async {
-      await pumpLibrary(tester, size: size, books: demoBooks.take(6).toList());
-      await tester.pumpAndSettle();
-      // A permanently visible search field can put the grid beyond the lazy
-      // viewport on small phones; scroll until its first row is built.
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('b0')),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const PageStorageKey('library-scroll')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.pumpAndSettle();
-      final tiles = find.byType(BookTile);
-      expect(tiles, findsNWidgets(6));
-      final rects = [for (var i = 0; i < 6; i++) tester.getRect(tiles.at(i))];
-      for (var i = 1; i < 3; i++) {
-        expect(rects[i].top, closeTo(rects[0].top, .1));
-        expect(rects[i].left, greaterThan(rects[i - 1].right));
-        expect(rects[i + 3].top, closeTo(rects[3].top, .1));
-      }
-      final coverRects = [
-        for (var i = 0; i < 3; i++)
-          tester.getRect(
-            find.descendant(of: tiles.at(i), matching: find.byType(BookCover)),
-          ),
-      ];
-      expect(coverRects[1].height, closeTo(coverRects[0].height, .1));
-      expect(coverRects[2].height, closeTo(coverRects[0].height, .1));
-      expect(rects[3].top, greaterThan(rects[0].bottom));
-      for (var i = 0; i < 3; i++) {
-        expect(rects[i + 3].left, closeTo(rects[i].left, .1));
-      }
-      expect(tester.takeException(), isNull);
-      await capture(tester, 'three-columns-${size.width.toInt()}');
-    });
-  }
-  testWidgets(
-    'wide screen puts continuation beside books and respects vertical hinge',
-    (tester) async {
-      const hinge = ui.DisplayFeature(
-        bounds: Rect.fromLTWH(390, 0, 28, 900),
-        type: ui.DisplayFeatureType.hinge,
-        state: ui.DisplayFeatureState.postureFlat,
-      );
-      await pumpLibrary(tester, size: const Size(840, 900), features: [hinge]);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('library-two-pane')), findsOneWidget);
-      final card = tester.getRect(
-        find.byKey(const ValueKey('continue-reading-card')),
-      );
-      expect(card.right, lessThanOrEqualTo(hinge.bounds.left));
-      for (final element in find.byType(BookTile).evaluate()) {
-        expect(
-          tester.getRect(find.byWidget(element.widget)).left,
-          greaterThanOrEqualTo(hinge.bounds.right),
+    testWidgets(
+      'library uses the same responsive shelf columns as books at $size',
+      (tester) async {
+        await pumpLibrary(
+          tester,
+          size: size,
+          books: demoBooks.take(6).toList(),
         );
-      }
-      expect(tester.takeException(), isNull);
-      await capture(tester, 'foldable');
-    },
-  );
+        await tester.pumpAndSettle();
+        // A permanently visible search field can put the grid beyond the lazy
+        // viewport on small phones; scroll until its first row is built.
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('b0')),
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('library-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final tiles = find.byType(BookTile);
+        expect(tiles, findsNWidgets(6));
+        final rects = [for (var i = 0; i < 6; i++) tester.getRect(tiles.at(i))];
+        final columns = size.width == 320
+            ? 2
+            : size.width == 390
+            ? 3
+            : 4;
+        for (var i = 1; i < columns; i++) {
+          expect(rects[i].top, closeTo(rects[0].top, .1));
+          expect(rects[i].left, greaterThan(rects[i - 1].right));
+        }
+        expect(rects[columns].top, greaterThan(rects[0].bottom));
+        expect(rects[columns].left, closeTo(rects[0].left, .1));
+        expect(tester.takeException(), isNull);
+        await capture(tester, 'three-columns-${size.width.toInt()}');
+      },
+    );
+  }
+  testWidgets('physical hinge keeps library content in the usable pane', (
+    tester,
+  ) async {
+    const hinge = ui.DisplayFeature(
+      bounds: Rect.fromLTWH(390, 0, 28, 900),
+      type: ui.DisplayFeatureType.hinge,
+      state: ui.DisplayFeatureState.postureFlat,
+    );
+    await pumpLibrary(tester, size: const Size(840, 900), features: [hinge]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('library-two-pane')), findsNothing);
+    expect(find.byKey(const ValueKey('continue-reading-card')), findsNothing);
+    for (final element in find.byType(BookTile).evaluate()) {
+      expect(
+        tester.getRect(find.byWidget(element.widget)).right,
+        lessThanOrEqualTo(hinge.bounds.left),
+      );
+    }
+    expect(tester.takeException(), isNull);
+    await capture(tester, 'foldable');
+  });
   testWidgets('horizontal hinge keeps controls on the upper safe screen', (
     tester,
   ) async {

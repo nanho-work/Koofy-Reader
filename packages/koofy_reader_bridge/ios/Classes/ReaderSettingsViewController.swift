@@ -21,7 +21,7 @@ final class ReaderSettingsViewController: UITableViewController {
     private var errorMessage: String?
     private var autoDraft: String?
     private let panelTransition = ReaderSettingsTransition()
-    private let titles = ["글자·글꼴", "줄·문단 간격", "페이지 여백", "페이지 넘김", "자동 넘김", "하단 정보", "듣기", "번역"]
+    private let titles = ["글자·글꼴", "줄·문단 간격", "페이지 여백", "독서 배경", "페이지 넘김", "자동 넘김", "하단 정보", "듣기", "번역"]
 
     init(preferences: ReaderPreferences,
          fontIds: [String] = ReaderFonts.ids, fontLabels: [String] = ReaderFonts.labels,
@@ -60,6 +60,7 @@ final class ReaderSettingsViewController: UITableViewController {
             return String(format: "%.0f%%", p.fontScale * 100) + " · " + (fontLabels.indices.contains(index) ? fontLabels[index] : L("기본"))
         case 1: return L("줄간격") + " · " + (p.lineHeight.map { String(format: "%.2f×", $0) } ?? L("책 기본값"))
         case 2: return [L("기본"), L("좁게"), L("보통"), L("넓게")][[nil, 0.5, 1, 1.5].firstIndex(of: p.pageMargins) ?? 0]
+        case 3: return L(["밝게", "종이색", "어둡게"][["light", "sepia", "dark"].firstIndex(of: ReaderTheme.resolve(p.theme)) ?? 0])
         case 4: return p.scroll ? L("연속 스크롤") : p.pageTurnStyle == "curl" ? L("책장 넘기기") : L("바로 넘기기")
         case 5: return L("넘김 간격: {0}초", String(p.autoTurnSeconds ?? 30))
         case 6: return p.footerInfo == "none" ? L("없음") : L("진행률")
@@ -126,7 +127,7 @@ final class ReaderSettingsViewController: UITableViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.refresh() }
     }
-    private func settingSection(_ index: Int) -> Int { index < 3 ? index : index + 1 }
+    private func settingSection(_ index: Int) -> Int { index }
 
     override func numberOfSections(in tableView: UITableView) -> Int { titles.count }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -288,6 +289,7 @@ final class ReaderSettingsViewController: UITableViewController {
             control = stack
         case 1: control = choices(L("문단 간격"), [L("기본"), L("없음"), L("보통"), L("넓게")], selected: [nil, 0, 0.5, 1].firstIndex(of: preferences.paragraphSpacing) ?? 0, setting: 7)
         case 2: control = choices(nil, [L("기본"), L("좁게"), L("보통"), L("넓게")], selected: [nil, 0.5, 1, 1.5].firstIndex(of: preferences.pageMargins) ?? 0, setting: 8)
+        case 3: control = choices(nil, [L("밝게"), L("종이색"), L("어둡게")], selected: ["light", "sepia", "dark"].firstIndex(of: ReaderTheme.resolve(preferences.theme)) ?? 0, setting: 10)
         case 4 where row == 0: control = choices(L("넘김 방식"), [L("페이지 넘김"), L("연속 스크롤")], selected: preferences.scroll ? 1 : 0, setting: 2)
         case 4 where row == 1: control = choices(L("페이지 배치"), [L("자동"), L("한 페이지"), L("두 페이지")], selected: Int(preferences.columnCount), setting: 3, enabled: !preferences.scroll, unavailable: canShowSpread() ? [] : [2])
         case 4: control = choices(L("페이지 전환 효과"), [L("바로 넘기기"), L("책장 넘기기")], selected: preferences.pageTurnStyle == "curl" ? 1 : 0, setting: 4, enabled: !preferences.scroll)
@@ -333,6 +335,7 @@ final class ReaderSettingsViewController: UITableViewController {
         guard !(preferences.scroll && (setting == 3 || setting == 4)), !(setting == 3 && index == 2 && !canShowSpread()) else { return }
         update {
             switch setting {
+            case 10: $0.theme = ["light", "sepia", "dark"][index]
             case 2: $0.scroll = index == 1
             case 3: $0.columnCount = Int64(index)
             case 4: $0.pageTurnStyle = index == 1 ? "curl" : "instant"

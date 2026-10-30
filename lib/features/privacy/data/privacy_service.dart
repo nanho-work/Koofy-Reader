@@ -206,6 +206,18 @@ class PrivacyService extends ChangeNotifier {
     );
   }
 
+  /// Missing preferences mean non-personalized ads, never implied consent.
+  /// UMP still determines whether requests are allowed and presents required forms.
+  Future<void> startWithRequiredConsent() async {
+    await load();
+    await _serialize(() async {
+      if (state.choice == null) {
+        await _saveChoice(AdvertisingChoice.standard);
+      }
+      await _configure();
+    });
+  }
+
   Future<void> refresh() async {
     await load();
     await _serialize(() => _configure());

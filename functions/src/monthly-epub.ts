@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { strToU8, zipSync, Zippable } from 'fflate';
 import { requireValue, limits } from './content';
 
-export interface MonthlyStory { title: string; text: string; byline?: string; image: Buffer }
+export interface MonthlyStory { title: string; text: string; byline?: string; image: Buffer; parseChapters?: boolean }
 const xml = (s: string) => s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 const page = (title: string, language: string, body: string) => `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${language}" xml:lang="${language}"><head><title>${xml(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${body}</body></html>`;
 /** Fixed illustrations, reflowable prose. The first illustration occupies one reader column. */
@@ -21,12 +21,28 @@ export function buildMonthlyEpub(title: string, language: 'ko' | 'en' | 'ja', st
     let text = story.text.replace(/\r\n?/g, '\n').trim();
     if (text.split('\n')[0].normalize('NFC').trim() === story.title.normalize('NFC').trim()) text = text.includes('\n') ? text.slice(text.indexOf('\n') + 1).trim() : '';
     requireValue(text, '제목 외에 본문을 입력해 주세요.');
-    const paragraphs = text.split(/\n\s*\n/).map(p => `<p>${xml(p.trim()).replace(/\n/g, '<br/>')}</p>`).join('');
+    const chapterLinks: string[] = [];
+    const prose = (value: string) => value.trim() ? value.trim().split(/\n\s*\n/).map(p => `<p>${xml(p.trim()).replace(/\n/g, '<br/>')}</p>`).join('') : '';
+    let paragraphs = prose(text);
+    if (story.parseChapters) {
+      const chunks: string[] = [];
+      let pending: string[] = [];
+      for (const line of text.split('\n')) {
+        const chapter = /^\[장\]\s+(.+)$/.exec(line);
+        if (!chapter) { pending.push(line); continue; }
+        chunks.push(prose(pending.join('\n'))); pending = [];
+        const anchor = `chapter-${chapterLinks.length + 1}`;
+        chunks.push(`<h2 id="${anchor}" style="break-before:column;page-break-before:always">${xml(chapter[1])}</h2>`);
+        chapterLinks.push(`<li><a href="${name}.xhtml#${anchor}">${xml(chapter[1])}</a></li>`);
+      }
+      chunks.push(prose(pending.join('\n')));
+      paragraphs = chunks.join('');
+    }
     const byline = story.byline ? `<figcaption>${xml(({ ko: '글쓴이: ', en: 'By ', ja: '文：' })[language] + story.byline)}</figcaption>` : '';
     put(`EPUB/${name}.xhtml`, page(story.title, language, `<figure>${byline}<img src="${name}.jpg" alt="${xml(story.title)}"/></figure><section><h1>${xml(story.title)}</h1>${paragraphs}</section>`));
     manifest.push(`<item id="${name}" href="${name}.xhtml" media-type="application/xhtml+xml"/><item id="image-${i}" href="${name}.jpg" media-type="image/jpeg"${i === 0 ? ' properties="cover-image"' : ''}/>`);
     spine.push(`<itemref idref="${name}"/>`);
-    nav.push(`<li><a href="${name}.xhtml">${xml(story.title)}</a></li>`);
+    nav.push(`<li><a href="${name}.xhtml">${xml(story.title)}</a>${chapterLinks.length ? `<ol>${chapterLinks.join('')}</ol>` : ''}</li>`);
   });
   put('EPUB/nav.xhtml', page(title, language, `<nav epub:type="toc" id="toc"><h1>${xml(title)}</h1><ol>${nav.join('')}</ol></nav>`));
   const identifier = createHash('sha256').update(title).update(language).update(stories.map(s => s.title + s.text + s.byline).join('\n')).digest('hex');

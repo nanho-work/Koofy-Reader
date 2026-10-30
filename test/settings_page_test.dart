@@ -40,7 +40,7 @@ void main() {
           adRepositoryProvider.overrideWithValue(ads),
           rewardedAdServiceProvider.overrideWith((ref) {
             reward.grant = () async {
-              await ads.hideBannerForHours(2);
+              await ads.hideBannerForHours(4);
               ref.invalidate(adStateProvider);
             };
             return reward;
@@ -59,15 +59,15 @@ void main() {
   }
 
   testWidgets(
-    'app theme picker saves selection and can follow the device again',
+    'reading background picker saves selection and can follow the device again',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       await AppAppearance.instance.initialize();
       await mount(tester, _Ads(), _Reward());
       await tester.drag(find.byType(ListView), const Offset(0, 1000));
       await tester.pumpAndSettle();
-      expect(find.text('앱 테마'), findsOneWidget);
-      await tester.tap(find.text('앱 테마'));
+      expect(find.text('독서 배경'), findsOneWidget);
+      await tester.tap(find.text('독서 배경'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('어둡게'));
       await tester.pumpAndSettle();
@@ -125,7 +125,7 @@ void main() {
         settingsPanelWidth(size.width),
       );
       expect(tester.getRect(find.byType(SettingsPage)).right, size.width);
-      await tester.tap(find.text('앱 테마'));
+      await tester.tap(find.text('독서 배경'));
       await tester.pumpAndSettle();
       expect(find.text('종이색'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -137,24 +137,24 @@ void main() {
     });
   }
 
-  testWidgets('one reward grants two hours and disables another viewing', (
+  testWidgets('one reward grants four hours and disables another viewing', (
     tester,
   ) async {
     final ads = _Ads();
     final reward = _Reward();
     await mount(tester, ads, reward);
     expect(find.byType(FilledButton), findsOneWidget);
-    await tester.ensureVisible(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.ensureVisible(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.tap(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
-    expect(ads.hours, 2);
+    expect(ads.hours, 4);
     expect(reward.calls, 1);
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNull,
     );
-    expect(find.textContaining('광고 숨김 ·'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ad-reward-countdown')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -179,9 +179,9 @@ void main() {
     final ads = _Ads();
     final reward = _Reward()..result = false;
     await mount(tester, ads, reward);
-    await tester.ensureVisible(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.ensureVisible(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('광고 보고 2시간 광고 없이 읽기'));
+    await tester.tap(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
     expect(ads.hours, isNull);
     expect(

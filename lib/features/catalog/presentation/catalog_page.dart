@@ -1,6 +1,9 @@
+export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
+import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'book_catalog_row.dart';
+import 'catalog_shelf.dart';
 import 'series_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,10 +24,29 @@ class ReaderCatalogPage extends StatelessWidget {
   );
 }
 
+/// Settings-only font downloads, without book tabs.
+class FontCatalogPage extends StatelessWidget {
+  const FontCatalogPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(tr('글꼴추가'))),
+    body: const SafeArea(child: ReaderCatalogBrowser(fontsOnly: true)),
+  );
+}
+
 /// The same catalog is used in the wide library sidebar and the phone route.
 /// Both tabs retain their own query, category and scroll position.
 class ReaderCatalogBrowser extends ConsumerStatefulWidget {
-  const ReaderCatalogBrowser({super.key, this.initialBookQuery = ''});
+  const ReaderCatalogBrowser({
+    super.key,
+    this.initialBookQuery = '',
+    this.booksOnly = false,
+    this.fontsOnly = false,
+    this.searchController,
+  });
+  final bool booksOnly;
+  final bool fontsOnly;
+  final TextEditingController? searchController;
   final String initialBookQuery;
   @override
   ConsumerState<ReaderCatalogBrowser> createState() =>
@@ -48,62 +70,75 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
           );
         }
       },
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
+      child: widget.fontsOnly
+          ? const _CatalogList(kind: 'font')
+          : widget.booksOnly
+          ? _CatalogList(
+              kind: 'book',
+              initialQuery: widget.initialBookQuery,
+              externalSearch: widget.searchController,
+            )
+          : Column(
               children: [
-                Expanded(
-                  child: SegmentedButton<int>(
-                    segments: [
-                      ButtonSegment(value: 0, label: Text(tr("도서"))),
-                      ButtonSegment(value: 1, label: Text(tr("글꼴"))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SegmentedButton<int>(
+                          segments: [
+                            ButtonSegment(value: 0, label: Text(tr("도서"))),
+                            ButtonSegment(value: 1, label: Text(tr("글꼴"))),
+                          ],
+                          selected: {_tab},
+                          onSelectionChanged: (values) => setState(() {
+                            _tab = values.first;
+                            if (_tab == 1) _fontsVisited = true;
+                          }),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: tr("다운로드 목록 새로고침"),
+                        onPressed: busy
+                            ? null
+                            : () {
+                                final kind = _tab == 0 ? 'book' : 'font';
+                                ref.invalidate(catalogItemsProvider(kind));
+                                ref.invalidate(catalogInstalledProvider(kind));
+                              },
+                        icon: const Icon(Icons.refresh),
+                      ),
                     ],
-                    selected: {_tab},
-                    onSelectionChanged: (values) => setState(() {
-                      _tab = values.first;
-                      if (_tab == 1) _fontsVisited = true;
-                    }),
                   ),
                 ),
-                IconButton(
-                  tooltip: tr("다운로드 목록 새로고침"),
-                  onPressed: busy
-                      ? null
-                      : () {
-                          final kind = _tab == 0 ? 'book' : 'font';
-                          ref.invalidate(catalogItemsProvider(kind));
-                          ref.invalidate(catalogInstalledProvider(kind));
-                        },
-                  icon: const Icon(Icons.refresh),
+                Expanded(
+                  child: IndexedStack(
+                    index: _tab,
+                    children: [
+                      _CatalogList(
+                        kind: 'book',
+                        initialQuery: widget.initialBookQuery,
+                      ),
+                      if (_fontsVisited)
+                        const _CatalogList(kind: 'font')
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: IndexedStack(
-              index: _tab,
-              children: [
-                _CatalogList(
-                  kind: 'book',
-                  initialQuery: widget.initialBookQuery,
-                ),
-                if (_fontsVisited)
-                  const _CatalogList(kind: 'font')
-                else
-                  const SizedBox.shrink(),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
 class _CatalogList extends ConsumerStatefulWidget {
-  const _CatalogList({required this.kind, this.initialQuery = ''});
+  const _CatalogList({
+    required this.kind,
+    this.initialQuery = '',
+    this.externalSearch,
+  });
+  final TextEditingController? externalSearch;
   final String initialQuery;
   final String kind;
   @override
@@ -111,7 +146,15 @@ class _CatalogList extends ConsumerStatefulWidget {
 }
 
 class _CatalogListState extends ConsumerState<_CatalogList> {
-  late final _search = TextEditingController(text: widget.initialQuery);
+  late final _search =
+      widget.externalSearch ?? TextEditingController(text: widget.initialQuery);
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(_changed);
+  }
+
   final _scroll = ScrollController();
   String? _category;
   bool _openedInitialSeries = false;
@@ -125,7 +168,8 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
 
   @override
   void dispose() {
-    _search.dispose();
+    _search.removeListener(_changed);
+    if (widget.externalSearch == null) _search.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -212,160 +256,168 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
       ...?catalog.valueOrNull?.map((item) => item.category),
     };
     return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        children: [
-          // This header scrolls when text scaling or a short foldable pane leaves
-          // too little room, while normal layouts keep the search above the list.
-          Flexible(
-            flex: 0,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: constraints.maxHeight * .55,
-              ),
-              child: SingleChildScrollView(
-                primary: false,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      key: ValueKey('catalog-search-${widget.kind}'),
-                      controller: _search,
-                      onChanged: (_) => _changed(),
-                      decoration: InputDecoration(
-                        hintText: _books ? tr("제목·작가로 검색") : tr("글꼴 이름으로 검색"),
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _search.text.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: tr("검색어 지우기"),
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _search.clear();
-                                  _changed();
-                                },
-                              ),
-                      ),
-                    ),
-                    if (_books)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final category in <String?>[
-                              null,
-                              ...categories,
-                            ])
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  right: 6,
-                                  top: 8,
-                                ),
-                                child: ChoiceChip(
-                                  label: Text(tr(category ?? "전체")),
-                                  selected: _category == category,
-                                  onSelected: (_) {
-                                    _category = category;
-                                    _changed();
-                                  },
-                                ),
-                              ),
-                          ],
+      builder: (context, constraints) {
+        final wide = _books && usesReaderSidebar(constraints.maxWidth);
+        Widget categoryMenu() => SingleChildScrollView(
+          scrollDirection: wide ? Axis.vertical : Axis.horizontal,
+          child: Flex(
+            direction: wide ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment: wide
+                ? CrossAxisAlignment.stretch
+                : CrossAxisAlignment.center,
+            children: [
+              for (final category in <String?>[null, ...categories])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6, top: 8),
+                  child: SelectionMenuChip(
+                    label: tr(category ?? '전체'),
+                    selected: _category == category,
+                    onSelected: (_) {
+                      _category = category;
+                      _changed();
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+        final content = Column(
+          children: [
+            // This header scrolls when text scaling or a short foldable pane leaves
+            // too little room, while normal layouts keep the search above the list.
+            Flexible(
+              flex: 0,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * .55,
+                ),
+                child: SingleChildScrollView(
+                  primary: false,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.externalSearch == null)
+                        CatalogSearchField(
+                          controller: _search,
+                          kind: widget.kind,
+                        ),
+                      if (_books && !wide) categoryMenu(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          catalog.isLoading
+                              ? tr("전체 목록 불러오는 중…")
+                              : tr("{0}개 · 가나다순", [items.length]),
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        catalog.isLoading
-                            ? tr("전체 목록 불러오는 중…")
-                            : tr("{0}개 · 가나다순", [items.length]),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.builder(
-                key: PageStorageKey('catalog-list-${widget.kind}'),
-                controller: _scroll,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: AdOverlayInsets.padding(
-                  context,
-                  const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                ),
-                itemCount: 1 + items.length,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Column(
-                      children: [
-                        if (catalog.isLoading)
-                          const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: LinearProgressIndicator(),
-                          ),
-                        if (catalog.hasError || installed.hasError)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Column(
-                              children: [
-                                Text(
-                                  catalog.hasError
-                                      ? _message(catalog.error!)
-                                      : tr("다운로드 상태를 확인하지 못했습니다."),
-                                ),
-                                TextButton(
-                                  onPressed: download.busy ? null : _refresh,
-                                  child: Text(tr("다시 시도")),
-                                ),
-                              ],
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: CatalogShelfList(
+                  grid: _books,
+                  key: PageStorageKey('catalog-list-${widget.kind}'),
+                  controller: _scroll,
+                  padding: AdOverlayInsets.padding(
+                    context,
+                    const EdgeInsets.fromLTRB(
+                      bookShelfHorizontalPadding,
+                      0,
+                      bookShelfHorizontalPadding,
+                      24,
+                    ),
+                  ),
+                  itemCount: 1 + items.length,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        children: [
+                          if (catalog.isLoading)
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: LinearProgressIndicator(),
                             ),
-                          ),
-                        if (!catalog.isLoading &&
-                            !catalog.hasError &&
-                            items.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: Text(
-                              widget.initialQuery.isNotEmpty &&
-                                      query ==
-                                          widget.initialQuery
-                                              .trim()
-                                              .toLowerCase() &&
-                                      _category == null
-                                  ? tr(
-                                      "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.",
-                                    )
-                                  : query.isNotEmpty || _category != null
-                                  ? tr("검색 조건에 맞는 {0} 없습니다.", [
-                                      tr(_books ? '도서가' : '글꼴이'),
-                                    ])
-                                  : tr("아직 공개된 {0} 없습니다.", [
-                                      tr(_books ? '도서가' : '글꼴이'),
-                                    ]),
-                              textAlign: TextAlign.center,
+                          if (catalog.hasError || installed.hasError)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    catalog.hasError
+                                        ? _message(catalog.error!)
+                                        : tr("다운로드 상태를 확인하지 못했습니다."),
+                                  ),
+                                  TextButton(
+                                    onPressed: download.busy ? null : _refresh,
+                                    child: Text(tr("다시 시도")),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                      ],
-                    );
-                  }
-                  final item = items[index - 1];
-                  if (item.kind == 'series') {
-                    return SeriesCatalogRow(
-                      key: ValueKey('series-${item.id}'),
-                      series: item,
-                      onOpen: () => _openSeries(item),
-                    );
-                  }
-                  final key = catalogItemKey(item);
-                  final downloaded =
-                      installed.valueOrNull?.contains(key) ?? false;
-                  if (!_books) {
-                    return FontCatalogRow(
+                          if (!catalog.isLoading &&
+                              !catalog.hasError &&
+                              items.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Text(
+                                widget.initialQuery.isNotEmpty &&
+                                        query ==
+                                            widget.initialQuery
+                                                .trim()
+                                                .toLowerCase() &&
+                                        _category == null
+                                    ? tr(
+                                        "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.",
+                                      )
+                                    : query.isNotEmpty || _category != null
+                                    ? tr("검색 조건에 맞는 {0} 없습니다.", [
+                                        tr(_books ? '도서가' : '글꼴이'),
+                                      ])
+                                    : tr("아직 공개된 {0} 없습니다.", [
+                                        tr(_books ? '도서가' : '글꼴이'),
+                                      ]),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                        ],
+                      );
+                    }
+                    final item = items[index - 1];
+                    if (item.kind == 'series') {
+                      return SeriesCatalogRow(
+                        key: ValueKey('series-${item.id}'),
+                        series: item,
+                        onOpen: () => _openSeries(item),
+                      );
+                    }
+                    final key = catalogItemKey(item);
+                    final downloaded =
+                        installed.valueOrNull?.contains(key) ?? false;
+                    if (!_books) {
+                      return FontCatalogRow(
+                        key: ValueKey(key),
+                        item: item,
+                        installed: downloaded,
+                        progress: download.itemKey == key
+                            ? download.progress
+                            : null,
+                        onDownload:
+                            download.busy ||
+                                !installed.hasValue ||
+                                installed.isLoading ||
+                                installed.hasError ||
+                                downloaded
+                            ? null
+                            : () => _download(item),
+                      );
+                    }
+                    return BookCatalogRow(
                       key: ValueKey(key),
                       item: item,
                       installed: downloaded,
@@ -381,29 +433,86 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                           ? null
                           : () => _download(item),
                     );
-                  }
-                  return BookCatalogRow(
-                    key: ValueKey(key),
-                    item: item,
-                    installed: downloaded,
-                    progress: download.itemKey == key
-                        ? download.progress
-                        : null,
-                    onDownload:
-                        download.busy ||
-                            !installed.hasValue ||
-                            installed.isLoading ||
-                            installed.hasError ||
-                            downloaded
-                        ? null
-                        : () => _download(item),
-                  );
-                },
+                  },
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+        if (!wide) return content;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: catalogSidebarWidth,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                child: categoryMenu(),
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: content),
+          ],
+        );
+      },
     );
   }
+}
+
+/// Same search behavior in the app header and the standalone download page.
+class CatalogSearchField extends StatelessWidget {
+  const CatalogSearchField({
+    super.key,
+    required this.controller,
+    this.kind = 'book',
+    this.compact = false,
+  });
+  final TextEditingController controller;
+  final String kind;
+  final bool compact;
+  @override
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => TextField(
+          key: ValueKey('catalog-search-$kind'),
+          controller: controller,
+          style: compact ? Theme.of(context).textTheme.bodyMedium : null,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+          decoration: InputDecoration(
+            isDense: compact,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(28),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(28),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(28),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(28),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: compact
+                ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
+                : null,
+            hintText: kind == 'book' ? tr('제목·작가로 검색') : tr('글꼴 이름으로 검색'),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: value.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: tr('검색어 지우기'),
+                    icon: const Icon(Icons.clear),
+                    onPressed: controller.clear,
+                  ),
+          ),
+        ),
+      );
 }

@@ -1,7 +1,7 @@
+import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
+import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
-import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
-import 'package:koofy_reader/core/localization/language_button.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/application/cover_matching.dart';
@@ -15,10 +15,8 @@ import 'dart:ui' show DisplayFeatureType, DisplayFeatureState;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
-import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
 import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
@@ -48,8 +46,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   bool _searchExpanded = false;
   final _scroll = ScrollController();
   final _sidebarScroll = ScrollController();
-  bool _downloadsExpanded = false;
-  bool _catalogVisited = false;
   LibraryBookStatus? _filter;
   bool _titleSort = false;
   bool _importing = false;
@@ -125,6 +121,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       feature.state ==
                           DisplayFeatureState.postureHalfOpened)) &&
               (feature.bounds.width > feature.bounds.height ||
+                  feature.bounds.width > 0 ||
                   feature.bounds.left < 280 ||
                   media.size.width - feature.bounds.right < 300),
         )
@@ -137,24 +134,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           anchorPoint: Offset.zero,
           child: Builder(
             builder: (context) => Scaffold(
-              appBar: AppBar(
-                toolbarHeight: 48,
-                actions: [
-                  const LanguageButton(),
-                  IconButton(
-                    tooltip: tr("책 묶음 만들기"),
-                    icon: const Icon(Icons.create_new_folder_outlined),
-                    onPressed: _groupBusy ? null : () => _createGroup(),
-                  ),
-                  IconButton(
-                    tooltip: tr("설정"),
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.settings),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
+              appBar: AppBar(toolbarHeight: 48, title: Text(tr("서재"))),
               body: SafeArea(
                 top: false,
                 child: _body(
@@ -201,11 +181,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       for (final group in groupsAsync.requireValue) group.id: group,
     };
     final groupedIds = groups.values.expand((g) => g.bookIds).toSet();
-    final groupCovers = {
-      for (final group in groups.values)
-        if (group.coverPath != null)
-          for (final bookId in group.bookIds) bookId: group.coverPath!,
-    };
+    final groupResumeBooks = <String, Book>{};
     for (final group in groups.values) {
       final memberStates =
           group.bookIds
@@ -218,6 +194,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ),
             );
       if (memberStates.isNotEmpty) states[group.id] = memberStates.first;
+      final members =
+          books
+              .where(
+                (b) => group.bookIds.contains(b.id) && states.containsKey(b.id),
+              )
+              .toList()
+            ..sort((a, b) => _compareRecent(a, b, states));
+      if (members.isNotEmpty) groupResumeBooks[group.id] = members.first;
     }
     // Never open a book at a guessed position while its saved state is unknown.
     final canOpen =
@@ -250,19 +234,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
     final recent = books.where((b) => states.containsKey(b.id)).toList()
       ..sort((a, b) => _compareRecent(a, b, states));
-    Book? nextRecentBook;
-    if (recent.isNotEmpty &&
-        (states[recent.first.id]!.finished ||
-            completion[recent.first.id] == true)) {
-      for (final group in groups.values) {
-        final index = group.bookIds.indexOf(recent.first.id);
-        if (index >= 0 && index + 1 < group.bookIds.length) {
-          final nextId = group.bookIds[index + 1];
-          nextRecentBook = books.where((book) => book.id == nextId).firstOrNull;
-          break;
-        }
-      }
-    }
     final query = _search.text.trim().toLowerCase();
     final visible =
         [
@@ -294,45 +265,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final hinges = media.displayFeatures.where(
-          (f) =>
-              (f.type == DisplayFeatureType.hinge ||
-                  f.type == DisplayFeatureType.fold) &&
-              f.bounds.height > f.bounds.width &&
-              f.bounds.left >= 280 &&
-              media.size.width - f.bounds.right >= 300,
-        );
-        final hinge = hinges.isEmpty ? null : hinges.first.bounds;
-        final wide = width >= 720 || hinge != null;
-        final leftWidth = hinge == null
-            ? math.min(340.0, width * .4)
-            : hinge.left - media.padding.left;
-        final gap = hinge == null ? 12.0 : hinge.width;
+        final wide = usesReaderSidebar(width);
         final intro = Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const MonthlyKoofySection(),
-              recent.isNotEmpty
-                  ? _continueReading(
-                      context,
-                      recent.first,
-                      states[recent.first.id]!,
-                      canOpen,
-                      groupCoverPath: groupCovers[recent.first.id],
-                      nextBook: nextRecentBook,
-                      nextState: states[nextRecentBook?.id],
-                    )
-                  : (ref
-                            .watch(catalogItemsProvider('monthly'))
-                            .valueOrNull
-                            ?.any((item) => item.seriesId != null) ??
-                        false)
-                  ? const SizedBox.shrink()
-                  : _welcome(context, empty: books.isEmpty),
-            ],
-          ),
+          child: _welcome(context, empty: books.isEmpty),
         );
         final shelf = _shelf(
           context,
@@ -343,6 +279,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           progressLoading: readingAsync.isLoading,
           progressError: readingAsync.hasError,
           groups: groups,
+          groupResumeBooks: groupResumeBooks,
+          sidebar: wide,
+          resumeHintId: recent
+              .where((book) => status(book) == LibraryBookStatus.reading)
+              .firstOrNull
+              ?.id,
         );
         final shelfScroll = RefreshIndicator(
           onRefresh: _refresh,
@@ -358,7 +300,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: SizedBox(
-                      width: wide ? leftWidth : null,
+                      width: null,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
@@ -379,18 +321,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                   ),
                 ),
-              if (!wide) ...[
-                SliverToBoxAdapter(child: intro),
+              if (recent.isEmpty) SliverToBoxAdapter(child: intro),
+              if (_importing)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
-                      vertical: 6,
+                      vertical: 8,
                     ),
-                    child: _libraryActions(context, wide: false),
+                    child: Text(_importProgress),
                   ),
                 ),
-              ],
               if (books.isNotEmpty || groups.isNotEmpty) shelf,
               SliverToBoxAdapter(
                 child: SizedBox(height: 28 + AdOverlayInsets.bottomOf(context)),
@@ -404,67 +345,31 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: leftWidth,
-              child: CustomScrollView(
-                key: const PageStorageKey('library-sidebar-scroll'),
-                controller: _sidebarScroll,
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _downloadsExpanded
-                        ? Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-                            child: OutlinedButton.icon(
-                              key: const ValueKey('expand-reading'),
-                              onPressed: () => _showDownloads(false),
-                              icon: const Icon(Icons.expand_more),
-                              label: Text(
-                                recent.isNotEmpty
-                                    ? tr("읽던 책: {0}", [recent.first.title])
-                                    : tr("책 읽기"),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                        : intro,
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 8,
-                      ),
-                      child: _libraryActions(context, wide: true),
+              width: catalogSidebarWidth,
+              child: LayoutBuilder(
+                builder: (context, pane) => SingleChildScrollView(
+                  key: const PageStorageKey('library-sidebar-scroll'),
+                  controller: _sidebarScroll,
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: math.max(0, pane.maxHeight - 24),
                     ),
-                  ),
-                  SliverLayoutBuilder(
-                    builder: (context, constraints) => SliverToBoxAdapter(
-                      child: Visibility(
-                        visible: _downloadsExpanded,
-                        maintainState: true,
-                        child: SizedBox(
-                          // Use the space below the actual menu heights. On very
-                          // short screens, the entire sidebar can scroll instead
-                          // of clipping the reader card or squeezing the catalog.
-                          height: math.max(
-                            280,
-                            constraints.viewportMainAxisExtent -
-                                constraints.precedingScrollExtent,
-                          ),
-                          child: _catalogVisited
-                              ? const ReaderCatalogBrowser()
-                              : const SizedBox.shrink(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: _statusFilters(),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: AdOverlayInsets.bottomOf(context)),
-                  ),
-                ],
+                ),
               ),
             ),
-            SizedBox(width: gap),
+            const VerticalDivider(width: 1),
             Expanded(child: shelfScroll),
           ],
         );
@@ -486,139 +391,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
   }
 
-  Widget _libraryActions(BuildContext context, {required bool wide}) {
-    void download() => wide
-        ? _showDownloads(!_downloadsExpanded)
-        : Navigator.pushNamed(context, AppRoutes.catalog);
-    final downloadKey = ValueKey(wide ? 'toggle-downloads' : 'open-downloads');
-    final addEnabled = !_importing && !_updatingCover;
-    const duration = Duration(milliseconds: 240);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        LayoutBuilder(
-          builder: (context, box) {
-            final space = math.max(0.0, box.maxWidth - 64);
-            final searchWidth = math.max(48.0, box.maxWidth - 112);
-            return TweenAnimationBuilder<double>(
-              tween: Tween(end: _searchExpanded ? 1 : 0),
-              duration: duration,
-              curve: Curves.easeOutCubic,
-              builder: (context, progress, _) {
-                final compact = _searchExpanded || progress > .01;
-                return Row(
-                  children: [
-                    SizedBox(
-                      width: 48 + (searchWidth - 48) * progress,
-                      child: ClipRect(
-                        child: OverflowBox(
-                          fit: OverflowBoxFit.deferToChild,
-                          alignment: Alignment.centerLeft,
-                          minWidth: _searchExpanded ? searchWidth : 48,
-                          maxWidth: _searchExpanded ? searchWidth : 48,
-                          child: _searchExpanded
-                              ? TextField(
-                                  key: const ValueKey('library-search-field'),
-                                  controller: _search,
-                                  focusNode: _searchFocus,
-                                  onChanged: (_) => setState(() {}),
-                                  textInputAction: TextInputAction.search,
-                                  onSubmitted: (_) => _searchFocus.unfocus(),
-                                  decoration: InputDecoration(
-                                    hintText: tr('내 서재에서 책 검색'),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    suffixIcon: IconButton(
-                                      tooltip: tr('검색 닫기'),
-                                      icon: const Icon(Icons.close),
-                                      onPressed: _toggleSearch,
-                                    ),
-                                  ),
-                                )
-                              : IconButton(
-                                  key: const ValueKey('open-library-search'),
-                                  tooltip: tr('서재 검색'),
-                                  icon: const Icon(Icons.search),
-                                  onPressed: _toggleSearch,
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: space * .65 + (48 - space * .65) * progress,
-                      child: compact
-                          ? IconButton.outlined(
-                              key: downloadKey,
-                              tooltip: tr('도서·글꼴 다운로드'),
-                              icon: const Icon(Icons.download_outlined),
-                              onPressed: download,
-                            )
-                          : OutlinedButton.icon(
-                              key: downloadKey,
-                              onPressed: download,
-                              icon: const Icon(
-                                Icons.download_outlined,
-                                size: 18,
-                              ),
-                              label: Text(tr('도서·글꼴 다운로드')),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: space * .35 + (48 - space * .35) * progress,
-                      child: compact
-                          ? IconButton.outlined(
-                              key: const ValueKey('add-books'),
-                              tooltip: tr('책 추가'),
-                              icon: const Icon(Icons.library_add_outlined),
-                              onPressed: addEnabled ? _importBook : null,
-                            )
-                          : OutlinedButton.icon(
-                              key: const ValueKey('add-books'),
-                              onPressed: addEnabled ? _importBook : null,
-                              icon: const Icon(
-                                Icons.library_add_outlined,
-                                size: 18,
-                              ),
-                              label: Text(tr('책 추가')),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        ),
-        if (_importing)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_importProgress),
-          ),
-      ],
-    );
-  }
-
-  void _showDownloads(bool expanded) {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (_sidebarScroll.hasClients) _sidebarScroll.jumpTo(0);
-    setState(() {
-      _downloadsExpanded = expanded;
-      if (expanded) _catalogVisited = true;
-    });
-  }
+  Widget _searchField() => TextField(
+    key: const ValueKey('library-search-field'),
+    controller: _search,
+    focusNode: _searchFocus,
+    onChanged: (_) => setState(() {}),
+    textInputAction: TextInputAction.search,
+    onSubmitted: (_) => _searchFocus.unfocus(),
+    decoration: InputDecoration(
+      hintText: tr('내 서재에서 책 검색'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      suffixIcon: IconButton(
+        tooltip: tr('검색 닫기'),
+        icon: const Icon(Icons.close),
+        onPressed: _toggleSearch,
+      ),
+    ),
+  );
 
   int _compareRecent(Book a, Book b, Map<String, LibraryReadingState> states) {
     final aState = states[a.id];
@@ -658,125 +447,22 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     ],
   );
 
-  Widget _continueReading(
-    BuildContext context,
-    Book book,
-    LibraryReadingState state,
-    bool canOpen, {
-    String? groupCoverPath,
-    Book? nextBook,
-    LibraryReadingState? nextState,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      key: const ValueKey('continue-reading-card'),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        border: Border(
-          bottom: BorderSide(color: colors.outlineVariant, width: .7),
+  List<Widget> _statusFilters() => [
+    for (final entry in <LibraryBookStatus?, String>{
+      null: tr('전체'),
+      LibraryBookStatus.reading: tr('읽는 중'),
+      LibraryBookStatus.unread: tr('읽을 책'),
+      LibraryBookStatus.finished: tr('완독'),
+    }.entries)
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+        child: SelectionMenuChip(
+          label: entry.value,
+          selected: _filter == entry.key,
+          onSelected: (_) => setState(() => _filter = entry.key),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 72,
-                height: 108,
-                child: BookCover(
-                  // The displayed group cover never changes the book opened.
-                  book: book.coverPath == null && groupCoverPath != null
-                      ? book.withCoverPath(groupCoverPath)
-                      : book,
-                  compact: true,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      book.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            state.finished
-                                ? tr("완독")
-                                : state.progression != null &&
-                                      !state.needsMigration
-                                ? '${(state.progression! * 100).floor()}%'
-                                : state.progressLabel,
-                            key: const ValueKey('continue-reading-status'),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: FilledButton(
-                              key: const ValueKey('continue-reading-button'),
-                              onPressed: canOpen
-                                  ? () => _openReader(book, state)
-                                  : null,
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 40),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                              ),
-                              child: Text(tr("이어 읽기")),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (state.progression != null) ...[
-                      LinearProgressIndicator(
-                        value: state.progression,
-                        minHeight: 2,
-                        semanticsLabel: tr("{0} 읽은 비율", [book.title]),
-                        semanticsValue: state.progressLabel,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (nextBook != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              tr("다음 회차: {0}", [nextBook.title]),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              key: const ValueKey('continue-next-book'),
-              onPressed: canOpen
-                  ? () => _openReader(nextBook, nextState)
-                  : null,
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              child: Text(tr("다음 회차 읽기")),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  ];
 
   Widget _shelf(
     BuildContext context,
@@ -787,9 +473,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     required bool progressLoading,
     required bool progressError,
     required Map<String, BookGroup> groups,
+    required Map<String, Book> groupResumeBooks,
+    required bool sidebar,
+    String? resumeHintId,
   }) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.fromLTRB(
+        bookShelfHorizontalPadding,
+        12,
+        bookShelfHorizontalPadding,
+        0,
+      ),
       sliver: SliverMainAxisGroup(
         slivers: [
           SliverToBoxAdapter(
@@ -797,83 +491,100 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                if (!sidebar)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: _statusFilters()),
+                  ),
+                Row(
+                  key: const ValueKey('library-toolbar'),
                   children: [
-                    for (final entry in <LibraryBookStatus?, String>{
-                      null: tr("전체"),
-                      LibraryBookStatus.reading: tr("읽는 중"),
-                      LibraryBookStatus.unread: tr("읽을 책"),
-                      LibraryBookStatus.finished: tr("완독"),
-                    }.entries)
-                      ChoiceChip(
-                        label: Text(entry.value),
-                        selected: _filter == entry.key,
-                        onSelected: (_) => setState(() => _filter = entry.key),
+                    Expanded(
+                      child: _searchExpanded
+                          ? _searchField()
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: _importing || _updatingCover
+                                        ? null
+                                        : _batchCovers,
+                                    icon: const Icon(
+                                      Icons.collections_outlined,
+                                      size: 18,
+                                    ),
+                                    label: Text(tr("표지 일괄 등록")),
+                                  ),
+                                  PopupMenuButton<bool>(
+                                    tooltip: tr("책 정렬"),
+                                    initialValue: _titleSort,
+                                    onSelected: (value) =>
+                                        setState(() => _titleSort = value),
+                                    itemBuilder: (_) => [
+                                      PopupMenuItem(
+                                        value: false,
+                                        child: Text(tr("최근 읽은 순")),
+                                      ),
+                                      PopupMenuItem(
+                                        value: true,
+                                        child: Text(tr("제목순")),
+                                      ),
+                                    ],
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 12,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _titleSort
+                                                ? tr('제목순')
+                                                : tr('최근 읽은 순'),
+                                          ),
+                                          const Icon(
+                                            Icons.expand_more,
+                                            size: 18,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                    if (!_searchExpanded)
+                      IconButton(
+                        key: const ValueKey('open-library-search'),
+                        tooltip: tr('서재 검색'),
+                        icon: const Icon(Icons.search),
+                        onPressed: _toggleSearch,
                       ),
+                    Tooltip(
+                      message: tr('책 추가'),
+                      child: TextButton.icon(
+                        key: const ValueKey('add-books'),
+                        icon: const Icon(Icons.library_add_outlined),
+                        label: Text(tr('책 추가')),
+                        onPressed: _importing || _updatingCover
+                            ? null
+                            : _importBook,
+                      ),
+                    ),
                   ],
                 ),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      books.any((b) => groups.containsKey(b.id))
-                          ? tr("{0}권 · {1}묶음", [
-                              books
-                                  .where((b) => !groups.containsKey(b.id))
-                                  .length,
-                              books
-                                  .where((b) => groups.containsKey(b.id))
-                                  .length,
-                            ])
-                          : tr("{0}권", [books.length]),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _importing || _updatingCover
-                              ? null
-                              : _batchCovers,
-                          icon: const Icon(
-                            Icons.collections_outlined,
-                            size: 18,
-                          ),
-                          label: Text(tr("표지 일괄 등록")),
-                        ),
-                        PopupMenuButton<bool>(
-                          tooltip: tr("책 정렬"),
-                          initialValue: _titleSort,
-                          onSelected: (value) =>
-                              setState(() => _titleSort = value),
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: false,
-                              child: Text(tr("최근 읽은 순")),
-                            ),
-                            PopupMenuItem(value: true, child: Text(tr("제목순"))),
-                          ],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(_titleSort ? tr("제목순") : tr("최근 읽은 순")),
-                                const Icon(Icons.expand_more, size: 18),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Text(
+                  books.any((b) => groups.containsKey(b.id))
+                      ? tr("{0}권 · {1}묶음", [
+                          books.where((b) => !groups.containsKey(b.id)).length,
+                          books.where((b) => groups.containsKey(b.id)).length,
+                        ])
+                      : tr("{0}권", [books.length]),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (progressLoading)
                   Padding(
@@ -906,8 +617,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
               // Keep the user's shelf density stable on both foldable panels
               // and the cover screen. Card content adapts to the column width.
-              const count = 3;
-              const spacing = 12.0;
+              final count = catalogShelfColumns(
+                window: MediaQuery.sizeOf(context),
+                shelfWidth: constraints.crossAxisExtent,
+                textScale: scale,
+              );
+              const spacing = bookShelfSpacing;
               final tileWidth =
                   (constraints.crossAxisExtent - (count - 1) * spacing) / count;
               final extent = math.min(tileWidth * 1.4, 270) + 92 * scale;
@@ -963,6 +678,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       key: ValueKey(book.id),
                       book: book,
                       enableLongPress: false,
+                      showResumeHint:
+                          canOpen && book.id == resumeHintId && group == null,
+                      onResume: canOpen && groupResumeBooks.containsKey(book.id)
+                          ? () {
+                              final member = groupResumeBooks[book.id]!;
+                              _openReader(member, states[member.id]);
+                            }
+                          : null,
                       badge: group == null
                           ? null
                           : tr("{0}권 묶음", [group.bookIds.length]),
@@ -1076,7 +799,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(title: Text(book.title), subtitle: Text(book.author)),
+              ListTile(title: Text(book.title)),
               if (membership.isEmpty) ...[
                 ListTile(
                   leading: const Icon(Icons.create_new_folder_outlined),

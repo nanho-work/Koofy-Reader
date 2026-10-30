@@ -500,4 +500,22 @@ void main() {
       reader.dispose();
     });
   }
+  test(
+    'required-only startup preserves choices and cannot bypass UMP',
+    () async {
+      final consent = FakeAdConsent()
+        ..result = const AdConsentResult(canRequestAds: false);
+      final reader = PrivacyService(
+        storage: MemoryPrivacyStorage(),
+        platform: platform,
+        consent: consent,
+      );
+      await reader.choose(AdvertisingChoice.personalized);
+      await reader.startWithRequiredConsent();
+      expect(reader.state.choice, AdvertisingChoice.personalized);
+      expect(reader.state.canRequestAds, false);
+      expect(platform.requests, 0);
+      reader.dispose();
+    },
+  );
 }

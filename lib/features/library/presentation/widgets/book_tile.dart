@@ -1,6 +1,7 @@
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:math' as math;
 import 'dart:io';
+import 'resume_touch_target.dart';
 
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/library/domain/book.dart';
@@ -161,6 +162,8 @@ class BookTile extends StatelessWidget {
     required this.statusLabel,
     this.enableLongPress = true,
     this.badge,
+    this.showResumeHint = false,
+    this.onResume,
   });
   final Book book;
   final VoidCallback? onTap;
@@ -168,6 +171,8 @@ class BookTile extends StatelessWidget {
   final String statusLabel;
   final bool enableLongPress;
   final String? badge;
+  final bool showResumeHint;
+  final VoidCallback? onResume;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -259,25 +264,49 @@ class BookTile extends StatelessWidget {
                   child: Semantics(
                     label: [
                       book.title,
-                      book.author,
                       statusLabel,
                       if (badge != null) badge!,
                     ].where((label) => label.trim().isNotEmpty).join(', '),
                     button: true,
-                    child: InkWell(
-                      onTap: onTap,
-                      onLongPress: enableLongPress ? onMore : null,
-                      child: ExcludeSemantics(
-                        child: BookCover(
-                          book: book,
-                          compact: compact,
-                          bottomInset: 0,
-                          topInset: badge == null
-                              ? 48
-                              : math.max(48, scaler.scale(11) + 12),
-                        ),
-                      ),
-                    ),
+                    child: showResumeHint
+                        ? ResumeTouchTarget(
+                            key: ValueKey('resume-hint-${book.id}'),
+                            onTap: onTap,
+                            builder: (context, open, pulse, _) => InkWell(
+                              onTap: open,
+                              onLongPress: enableLongPress ? onMore : null,
+                              child: ExcludeSemantics(
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    BookCover(
+                                      book: book,
+                                      compact: compact,
+                                      bottomInset: 0,
+                                      topInset: badge == null
+                                          ? 48
+                                          : math.max(48, scaler.scale(11) + 12),
+                                    ),
+                                    pulse,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : InkWell(
+                            onTap: onTap,
+                            onLongPress: enableLongPress ? onMore : null,
+                            child: ExcludeSemantics(
+                              child: BookCover(
+                                book: book,
+                                compact: compact,
+                                bottomInset: 0,
+                                topInset: badge == null
+                                    ? 48
+                                    : math.max(48, scaler.scale(11) + 12),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 if (badge != null)
@@ -318,6 +347,31 @@ class BookTile extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (onResume != null)
+                  Positioned(
+                    left: 4,
+                    right: badge == null ? 4 : 12,
+                    bottom: 4,
+                    child: TextButton(
+                      key: ValueKey('resume-group-${book.id}'),
+                      onPressed: onResume,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: .94),
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurface,
+                      ),
+                      child: Text(
+                        tr('이어 읽기'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
                 if (badge == null)
                   Positioned(right: badge == null ? 0 : 8, top: 0, child: more),
               ],
@@ -332,9 +386,7 @@ class BookTile extends StatelessWidget {
           SizedBox(
             height: statusHeight,
             child: Text(
-              book.author.trim().isEmpty
-                  ? statusLabel
-                  : '${book.author} · $statusLabel',
+              statusLabel,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: statusStyle,
