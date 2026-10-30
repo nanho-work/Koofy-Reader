@@ -35,11 +35,11 @@ void main() {
           ],
         );
         await tester.pumpAndSettle();
-        expect(find.text('독자 코너'), findsOneWidget);
-        expect(find.text('사람을 만나다'), findsOneWidget);
-        expect(find.text('Newest story'), findsOneWidget);
-        final newest = tester.getTopLeft(find.text('Newest story'));
-        final older = tester.getTopLeft(find.text('Older story'));
+        expect(find.text('당신의 이야기를 들려주세요'), findsOneWidget);
+        expect(find.text('사람을 만나다'), findsWidgets);
+        expect(find.text('Newest story'), findsWidgets);
+        final newest = tester.getTopLeft(find.text('Newest story').last);
+        final older = tester.getTopLeft(find.text('Older story').last);
         expect(
           newest.dy < older.dy ||
               (newest.dy == older.dy && newest.dx < older.dx),

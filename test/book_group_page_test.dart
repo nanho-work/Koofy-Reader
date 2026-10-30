@@ -90,10 +90,14 @@ void main() {
         states: () async => {},
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('책 묶음 만들기'));
+      await tester.tap(
+        find.byTooltip('${shelf_test.demoBooks.first.title} 더보기'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('책 묶음 만들기'));
       await tester.pumpAndSettle();
       await tester.enterText(find.widgetWithText(TextField, '묶음 이름'), '소설 묶음');
-      await tester.tap(find.byKey(const ValueKey('select-b0')));
+      // The book whose menu was opened is already selected.
       await tester.tap(find.byKey(const ValueKey('select-b1')));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, '2권 묶기'));

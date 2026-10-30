@@ -93,7 +93,7 @@ internal class ReaderSettingsDialog(
         val bounds = readerBounds()
         val right = bounds?.right?.minus(origin[0])?.coerceIn(0, root.width) ?: root.width
         val paneWidth = bounds?.width()?.coerceAtMost(root.width) ?: root.width
-        val baseWidth = if (canShowSpread() && paneWidth >= dp(700)) paneWidth / 2 else paneWidth
+        val baseWidth = if (canShowSpread() && paneWidth >= dp(600)) paneWidth / 2 else paneWidth
         val width = panelWidth(baseWidth, dp(240))
         val top = bounds?.top?.minus(origin[1])?.coerceIn(0, root.height) ?: 0
         val height = bounds?.height()?.coerceAtMost(root.height - top) ?: root.height

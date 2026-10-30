@@ -104,7 +104,7 @@ class ReaderRenderingTest {
             assertTrue("Overlay must cover the complete reader height", view("root").height >= viewport.height)
             assertTrue("Panel must reach the reader bottom", view("shell").height >= viewport.height)
             val density = activity.resources.displayMetrics.density
-            val base = if (viewport.width / density >= 700) viewport.width / 2 else viewport.width
+            val base = if (viewport.width / density >= 600) viewport.width / 2 else viewport.width
             assertEquals(ReaderSettingsDialog.panelWidth(base, (240 * density).toInt()), view("shell").width)
             assertEquals(8, all(view("root")).count { it.tag?.toString()?.startsWith("reader.settings.section.") == true })
             section("spacing")
@@ -383,7 +383,7 @@ class ReaderRenderingTest {
             ready
         }
         scenario!!.onActivity { assertEquals(0, it.pageTurns!!.fallbackCount) }
-        if (cover.getInt("width") >= 700) {
+        if (cover.getInt("width") >= 600) {
             scenario!!.onActivity { it.applyReaderPreferences(ReaderRuntime.session!!.preferences.copy(columnCount = 2, pageTurnStyle = "instant")) }
             awaitCondition("Spread did not settle") { snapshot("JSON.stringify({columns:getComputedStyle(document.documentElement).columnCount})").optString("columns") == "2" }
             scenario!!.onActivity { it.goToLocator("""{"href":"EPUB/section-00000.xhtml","type":"application/xhtml+xml","locations":{"progression":0,"koofyCover":1}}""") }
@@ -937,12 +937,12 @@ class ReaderRenderingTest {
         launch()
         // Android 16 ignores app orientation requests on large displays. They
         // already have enough width for a spread, including portrait tablets.
-        if (snapshot().getInt("width") < 700) {
+        if (snapshot().getInt("width") < 600) {
             scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-            awaitCondition("Wide viewport was not applied") { snapshot().getInt("width") >= 700 }
+            awaitCondition("Wide viewport was not applied") { snapshot().getInt("width") >= 600 }
         }
         val first = snapshot()
-        assumeTrue("Requires a viewport at least 700 CSS px wide", first.getInt("width") >= 700)
+        assumeTrue("Requires a viewport at least 600 CSS px wide", first.getInt("width") >= 600)
         scenario!!.onActivity { it.applyReaderPreferences(ReaderPreferences(1.0, 2, false, "light")) }
         awaitCondition("The renderer did not apply two real CSS columns") {
             val state = snapshot()
@@ -967,7 +967,7 @@ class ReaderRenderingTest {
             scenario!!.onActivity { it.applyReaderPreferences(ReaderPreferences(1.0 + cycle * 0.1, columns, false, "light")) }
             awaitCondition("Column reflow did not settle") {
                 val state = snapshot()
-                state.getString("columns") == (if (state.getInt("width") < 700) "1" else columns.toString())
+                state.getString("columns") == (if (state.getInt("width") < 600) "1" else columns.toString())
             }
             Thread.sleep(1200) // Include duplicate/late pagination notifications.
             assertEquals("Reflow rewrote the reading anchor", canonical, ReaderRuntime.session?.locatorJson)

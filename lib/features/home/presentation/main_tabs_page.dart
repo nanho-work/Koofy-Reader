@@ -196,11 +196,32 @@ class _DiscoveryPage extends StatelessWidget {
       child: SingleChildScrollView(
         key: const PageStorageKey('home-feed'),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1040),
-            child: const DiscoveryFeed(),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(
+              label: 'Koofy Reader',
+              header: true,
+              image: true,
+              child: SizedBox(
+                width: 132,
+                height: 24,
+                child: ClipRect(
+                  child: OverflowBox(
+                    maxHeight: 48,
+                    child: Image.asset(
+                      'assets/images/promotions/koofy_reader_wordmark.png',
+                      width: 132,
+                      fit: BoxFit.fitWidth,
+                      excludeFromSemantics: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const DiscoveryFeed(),
+          ],
         ),
       ),
     ),

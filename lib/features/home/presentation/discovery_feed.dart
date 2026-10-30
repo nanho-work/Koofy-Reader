@@ -56,7 +56,25 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const MonthlyKoofySection(editorial: true),
+        MonthlyKoofySection(
+          editorial: true,
+          promotions: [
+            for (final item in [...interviews.take(2), ...newBooks.take(3)])
+              EditorialStory(
+                key: ValueKey('promotion-${item.id}'),
+                overlayTitle: true,
+                eyebrow: tr(
+                  item.category == '사람을 만나다' ? '사람을 만나다' : '새로 도착한 이야기',
+                ),
+                item: item,
+                onTap: busy ? null : () => _open(item),
+                overlayActions: TextButton(
+                  onPressed: busy ? null : () => _open(item),
+                  child: Text(tr(item.kind == 'series' ? '전체 보기' : '읽기')),
+                ),
+              ),
+          ],
+        ),
         const SizedBox(height: 24),
         const ReaderInvitationBanner(),
         const SizedBox(height: 36),
@@ -145,52 +163,104 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
 class ReaderInvitationBanner extends StatelessWidget {
   const ReaderInvitationBanner({super.key});
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: const Color(0xFFE9EEDC),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(22),
-      child: Row(
-        children: [
-          const ExcludeSemantics(
-            child: Icon(
-              Icons.mark_email_unread_outlined,
-              size: 48,
-              color: Color(0xFF61765C),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 480;
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
               children: [
-                Text(
-                  tr('독자 코너'),
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  tr('당신의 일상이, 누군가의 이야기가 됩니다.'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(tr('월간 쿠피에 당신의 글을 보내주세요.')),
-                TextButton.icon(
-                  onPressed: () => openReaderLink(
-                    context,
-                    Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
-                      'lang': AppLanguage.instance.code,
-                    }),
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/promotions/readers_corner_background.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.centerRight,
+                    excludeFromSemantics: true,
                   ),
-                  label: Text(tr('글 보내기')),
-                  icon: const Icon(Icons.north_east, size: 16),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(
+                            0xFFFAF9F5,
+                          ).withValues(alpha: narrow ? .94 : .25),
+                          const Color(
+                            0xFFFAF9F5,
+                          ).withValues(alpha: narrow ? .80 : .08),
+                          const Color(0xFFFAF9F5).withValues(alpha: 0),
+                        ],
+                        stops: const [0, .55, 1],
+                      ),
+                    ),
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => openReaderLink(
+                      context,
+                      Uri.https('www.koofy.co.kr', '/monthly-koofy/submit', {
+                        'lang': AppLanguage.instance.code,
+                      }),
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: (constraints.maxWidth / 4).clamp(140, 180),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(narrow ? 20 : 28),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width:
+                                (constraints.maxWidth - (narrow ? 40 : 56)) *
+                                (narrow ? .84 : .62),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tr('당신의 이야기를 들려주세요'),
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        tr('사연 보내기'),
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.north_east, size: 16),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     ),
   );

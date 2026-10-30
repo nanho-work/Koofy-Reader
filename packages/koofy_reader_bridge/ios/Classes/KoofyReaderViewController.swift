@@ -193,19 +193,19 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         body.addSubview(statusLabel)
         NSLayoutConstraint.activate([
             body.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            body.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            body.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            body.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            body.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             bodyBottom!,
             translation.view.bottomAnchor.constraint(equalTo: toolbar.topAnchor),
-            translation.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            translation.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            translation.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            translation.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             translationHeight!,
             spreadDivider.centerXAnchor.constraint(equalTo: body.centerXAnchor),
             spreadDivider.widthAnchor.constraint(equalToConstant: 1),
             spreadDivider.topAnchor.constraint(equalTo: body.topAnchor, constant: 24),
             spreadDivider.bottomAnchor.constraint(equalTo: body.bottomAnchor, constant: -24),
-            toolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            toolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            toolbar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             toolbar.bottomAnchor.constraint(equalTo: footer.topAnchor),
             footer.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             footer.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
@@ -388,7 +388,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
 
     private var canShowSpread: Bool {
         let width = body.bounds.width > 0 ? body.bounds.width : view.bounds.width
-        return width >= 700
+        return width >= 600
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {

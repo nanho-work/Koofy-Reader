@@ -359,7 +359,7 @@ private final class ReaderSettingsTransition: NSObject, UIViewControllerTransiti
 final class ReaderSettingsPresentation: UIPresentationController {
     private let backdrop = UIControl()
     static func panelWidth(_ available: CGFloat) -> CGFloat {
-        let pane = available >= 700 ? available / 2 : available
+        let pane = available >= 600 ? available / 2 : available
         return min(pane, max(min(240, pane), pane * 2 / 3))
     }
     override var frameOfPresentedViewInContainerView: CGRect {

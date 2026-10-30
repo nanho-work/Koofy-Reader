@@ -11,6 +11,35 @@ import 'package:koofy_reader/core/localization/messages.g.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('recent home and native reader labels do not fall back to Korean', () {
+    for (final language in ['en', 'ja']) {
+      for (final key in [
+        '전체 보기',
+        '{0}초',
+        '사연 보내기',
+        '당신의 이야기를 들려주세요',
+        '도서',
+        '서재',
+        '정보동의',
+        '광고제거',
+        '진단정보',
+        '글꼴추가',
+        '책 목록이 바뀌었습니다. 다시 시도해 주세요.',
+        '읽는 책을 먼저 닫아 주세요.',
+      ]) {
+        final value = translateMessage(language, key, ['5']);
+        expect(
+          RegExp(r'[가-힣]').hasMatch(value),
+          isFalse,
+          reason: '$language: $key',
+        );
+        expect(value.contains('{0}'), isFalse);
+      }
+    }
+    expect(translateMessage('en', '{0}초', ['5']), '5s');
+    expect(translateMessage('ja', '{0}초', ['5']), '5秒');
+  });
+
   test('known errors translate without altering unknown diagnostics', () async {
     SharedPreferences.setMockInitialValues({});
     await AppLanguage.instance.select('en');

@@ -11,10 +11,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/app.dart';
-import 'package:koofy_reader/features/library/presentation/library_page.dart';
+import 'package:koofy_reader/features/home/presentation/main_tabs_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('Library screen renders smoke test', (WidgetTester tester) async {
+  testWidgets('App opens the home tabs without a legacy header', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -40,13 +44,14 @@ void main() {
     );
     for (int i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.byType(LibraryPage).evaluate().isNotEmpty) {
+      if (find.byType(MainTabsPage).evaluate().isNotEmpty) {
         break;
       }
     }
 
-    expect(find.byType(LibraryPage), findsOneWidget);
+    expect(find.byType(MainTabsPage), findsOneWidget);
     expect(find.text('내 서재'), findsNothing);
-    expect(find.byType(AppBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
   });
 }

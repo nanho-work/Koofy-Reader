@@ -597,7 +597,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private fun canShowSpread(): Boolean {
         val usableWidth = if (::container.isInitialized && container.width > 0) container.width / resources.displayMetrics.density
             else resources.configuration.screenWidthDp.toFloat()
-        return !hingeFallback && usableWidth >= 700
+        return !hingeFallback && usableWidth >= 600
     }
 
     private fun readerColumns(): ColumnCount {

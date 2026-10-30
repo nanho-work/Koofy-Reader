@@ -2272,4 +2272,105 @@ const messages = {
     "ja": "月刊クーフィーに、あなたの文章をお寄せください。",
   },
   "이번 호 전체 보기": {"en": "Explore this issue", "ja": "今月号をすべて見る"},
+  "당신의 이야기를 들려주세요": {"en": "Share your story with us", "ja": "あなたの物語を聞かせてください"},
+  "사연 보내기": {"en": "Send your story", "ja": "エピソードを送る"},
+  "전체 보기": {"en": "View all", "ja": "すべて見る"},
+  "{0}초": {"en": "{0}s", "ja": "{0}秒"},
+  "읽기 복구 기록을 확인하지 못했습니다.": {
+    "en": "Could not check reading recovery records.",
+    "ja": "読書記録の復元情報を確認できませんでした。",
+  },
+  "올바르지 않은 파일 정보입니다.": {
+    "en": "Invalid file information.",
+    "ja": "ファイル情報が正しくありません。",
+  },
+  "올바르지 않은 콘텐츠 정보입니다.": {
+    "en": "Invalid content information.",
+    "ja": "コンテンツ情報が正しくありません。",
+  },
+  "올바르지 않은 회차 정보입니다.": {
+    "en": "Invalid episode information.",
+    "ja": "エピソード情報が正しくありません。",
+  },
+  "올바르지 않은 미리보기 정보입니다.": {
+    "en": "Invalid preview information.",
+    "ja": "プレビュー情報が正しくありません。",
+  },
+  "지원하지 않는 파일 정보입니다.": {
+    "en": "Unsupported file information.",
+    "ja": "対応していないファイル情報です。",
+  },
+  "책 파일은 EPUB 또는 TXT 한 개와 표지가 필요합니다.": {
+    "en": "A book requires one EPUB or TXT file and a cover.",
+    "ja": "本にはEPUBまたはTXTファイル1つと表紙が必要です。",
+  },
+  "이미지 경로 없음": {"en": "Image path unavailable", "ja": "画像の場所が見つかりません"},
+  "표지를 바꿀 책을 찾지 못했습니다.": {
+    "en": "Could not find the book to update its cover.",
+    "ja": "表紙を変更する本が見つかりませんでした。",
+  },
+  "변환된 책의 용량이 제한을 초과했습니다.": {
+    "en": "The converted book exceeds the size limit.",
+    "ja": "変換した本がサイズ制限を超えています。",
+  },
+  "다운로드한 책 파일을 찾을 수 없습니다.": {
+    "en": "The downloaded book file could not be found.",
+    "ja": "ダウンロードした本のファイルが見つかりません。",
+  },
+  "서재 목록이 손상되어 변경을 중단했습니다. 기존 기록은 보존했습니다. 백업 파일과 저장 공간을 확인해 주세요.": {
+    "en":
+        "Changes were stopped because the library list is damaged. Existing records are preserved. Check your backup and storage.",
+    "ja": "本棚の一覧が破損しているため変更を中止しました。既存の記録は保持されています。バックアップと空き容量を確認してください。",
+  },
+  "묶음 목록을 읽을 수 없습니다.": {
+    "en": "Could not read the collection list.",
+    "ja": "コレクション一覧を読み込めません。",
+  },
+  "중복된 책 묶음 정보입니다.": {
+    "en": "Duplicate collection information.",
+    "ja": "コレクション情報が重複しています。",
+  },
+  "묶음 이름은 1~100자로 입력해 주세요.": {
+    "en": "Enter a collection name of 1–100 characters.",
+    "ja": "コレクション名は1〜100文字で入力してください。",
+  },
+  "묶음을 찾지 못했습니다.": {"en": "Collection not found.", "ja": "コレクションが見つかりません。"},
+  "이미 묶인 책은 먼저 묶음에서 꺼내 주세요.": {
+    "en": "Remove books from their existing collection first.",
+    "ja": "先に既存のコレクションから本を取り出してください。",
+  },
+  "책을 두 권 이상 선택해 주세요.": {
+    "en": "Select at least two books.",
+    "ja": "本を2冊以上選んでください。",
+  },
+  "영구 삭제 중인 항목은 복원할 수 없습니다.": {
+    "en": "Items being permanently deleted cannot be restored.",
+    "ja": "完全削除中の項目は復元できません。",
+  },
+  "책 목록이 바뀌었습니다. 다시 시도해 주세요.": {
+    "en": "The book list has changed. Please try again.",
+    "ja": "本の一覧が変更されました。もう一度お試しください。",
+  },
+  "읽는 책을 먼저 닫아 주세요.": {
+    "en": "Close the book you are reading first.",
+    "ja": "読んでいる本を先に閉じてください。",
+  },
+  "책 변환 파일 정보를 확인할 수 없습니다.": {
+    "en": "Could not verify the converted book file information.",
+    "ja": "変換した本のファイル情報を確認できません。",
+  },
+  "휴지통 정보를 읽을 수 없습니다.": {
+    "en": "Could not read Trash information.",
+    "ja": "ゴミ箱の情報を読み込めません。",
+  },
+  "휴지통 항목이 올바르지 않습니다.": {"en": "Invalid Trash item.", "ja": "ゴミ箱の項目が正しくありません。"},
+  "묶음 휴지통 정보가 올바르지 않습니다.": {
+    "en": "Invalid collection Trash information.",
+    "ja": "コレクションのゴミ箱情報が正しくありません。",
+  },
+  "영구 삭제 중인 항목입니다. 휴지통에서 삭제를 완료해 주세요.": {
+    "en":
+        "This item is being permanently deleted. Complete the deletion in Trash.",
+    "ja": "この項目は完全削除中です。ゴミ箱で削除を完了してください。",
+  },
 };
