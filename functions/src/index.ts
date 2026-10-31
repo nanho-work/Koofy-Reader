@@ -1,3 +1,4 @@
+import { validateTranslationGroup } from './translation-groups';
 import { ensureMonthlyIssues, ensureMonthlyEpisode } from './monthly-groups';
 import { correctMonthlyLanguage } from './monthly-language';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -250,6 +251,29 @@ export const readerAdmin = onRequest(options, async (request, response) => {
         return names;
       });
       response.json({ categories }); return;
+    }
+    if (data.action === 'linkTranslations') {
+      requireValue(Array.isArray(data.items) && data.items.length >= 2 && data.items.length <= 3, '연결할 번역본 2~3개를 선택해 주세요.');
+      const refs = data.items.map((entry: { id: unknown; revision: unknown }) => ({ id: id(entry.id), revision: revision(entry.revision) }));
+      requireValue(new Set(refs.map(x => x.id)).size === refs.length, '같은 작품을 중복 선택할 수 없습니다.');
+      const items = await db.runTransaction(async transaction => {
+        const docs = await transaction.getAll(...refs.map(x => contents.doc(x.id)));
+        const values = docs.map((doc, i) => {
+          requireValue(doc.exists, '작품을 찾을 수 없습니다.');
+          const item = doc.data() as Content; assertRevision(item, refs[i].revision);
+          requireValue(!item.deleting && !item.seriesId && !item.issueMonth && !item.publishedContent?.issueMonth && item.kind !== 'font', '일반 작품만 연결할 수 있습니다.');
+          return item;
+        });
+        const groupId = validateTranslationGroup(values);
+        const existing = await transaction.get(contents.where('translationGroupId', '==', groupId));
+        validateTranslationGroup(values, existing.docs.map(d => d.data() as Content));
+        const at = new Date().toISOString();
+        const next = values.map(x => ({ ...x, translationGroupId: groupId, revision: x.revision + 1, updatedAt: at }));
+        next.forEach(x => transaction.update(contents.doc(x.id), { translationGroupId: groupId, revision: x.revision, updatedAt: at }));
+        transaction.create(db.collection('readerAudit').doc(), { action: 'linkTranslations', uid: claims.uid, ids: next.map(x => x.id), groupId, at });
+        return next;
+      });
+      response.json({ items }); return;
     }
     if (data.action === 'ensureMonthlyIssues') {
       requireValue(typeof data.issueMonth === 'string', '발행 연·월이 필요합니다.');

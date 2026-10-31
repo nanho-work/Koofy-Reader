@@ -13,6 +13,7 @@ export function requireValue(value: unknown, message: string): asserts value {
 export type Kind = 'book' | 'font' | 'series';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata {
+  translationGroupId?: string;
   language?: 'ko' | 'en' | 'ja';
   autoCompile?: boolean; expectedEpisodes?: number; byline?: string; issueMonth?: string; releaseDate?: string; releaseAt?: string; compilationId?: string;
   title: string; author: string; description: string; license: string; category?: string; source?: string;
