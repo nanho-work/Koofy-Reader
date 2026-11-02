@@ -85,6 +85,47 @@ void main() {
     },
   );
 
+  test('bulk deletion crosses SQL batches and rejects old sessions', () async {
+    final store = NativeReaderStore(NativeDatabase.memory());
+    addTearDown(store.close);
+    final sessions = <String>[];
+    for (var i = 0; i < 401; i++) {
+      final session = await store.beginSession('bulk$i', 'r1');
+      sessions.add(session.id);
+      await store.customStatement(
+        'INSERT INTO reader_positions VALUES (?, ?, ?, ?, 1, ?, ?, ?)',
+        [
+          'bulk$i',
+          'r1',
+          session.id,
+          session.generation,
+          '{"href":"body.xhtml"}',
+          '{}',
+          '[]',
+        ],
+      );
+    }
+    await store.deleteBooks({for (var i = 0; i < 400; i++) 'bulk$i'});
+    final positions = await store
+        .customSelect('SELECT publication_id FROM reader_positions')
+        .get();
+    expect(positions.map((row) => row.read<String>('publication_id')), [
+      'bulk400',
+    ]);
+    final tombstones = await store
+        .customSelect('SELECT session_id FROM reader_deleted_sessions')
+        .get();
+    expect(
+      tombstones.map((row) => row.read<String>('session_id')).toSet(),
+      sessions.take(400).toSet(),
+    );
+    final remaining = await store
+        .customSelect('SELECT session_id FROM reader_sessions')
+        .get();
+    expect(remaining.single.read<String>('session_id'), sessions.last);
+    await store.deleteBooks({});
+  });
+
   test('spacing survives native codec and can reset to publisher defaults', () {
     final preferences = defaultReaderPreferences()
       ..lineHeight = 1.8

@@ -7,11 +7,13 @@ public final class KoofyReaderBridgePlugin: NSObject, FlutterPlugin, ReaderHostA
     private let flutterAPI: ReaderFlutterApi
     private var reader: KoofyReaderViewController?
     private var journal: ReaderCheckpointStore?
+    private var bookImport: BookImportChannel?
 
     private init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
         flutterAPI = ReaderFlutterApi(binaryMessenger: registrar.messenger())
         super.init()
+        bookImport = BookImportChannel(messenger: registrar.messenger())
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {

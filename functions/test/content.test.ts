@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ApiError, Content, assertRevision, bearer, categoryName, id, inspectFont, metadata, publicItem, publish, requireSuperAdmin, validateUpload } from '../src/content';
+import { assertDraftDeletion, ApiError, CONTENT_LICENSES, Content, assertRevision, bearer, categoryName, id, inspectFont, metadata, publicItem, publish, requireSuperAdmin, validateUpload } from '../src/content';
 const item: Content = { id: 'a'.repeat(32), kind: 'book', title: '책', author: '작가', description: '', license: '배포 허가', revision: 2, assets: {}, published: false, publishedContent: null, updatedAt: '2026-09-20' };
 test('admin requires a bearer token and exact superAdmin boolean', () => {
   for (const header of [undefined, '', 'token', 'Bearer ', 'Bearer a b']) assert.throws(() => bearer(header), ApiError);
@@ -9,9 +9,13 @@ test('admin requires a bearer token and exact superAdmin boolean', () => {
   for (const superAdmin of [undefined, false, 'true', 1]) assert.throws(() => requireSuperAdmin({ superAdmin }), ApiError);
   requireSuperAdmin({ superAdmin: true });
 });
-test('input rejects paths, missing license and stale updates', () => {
+test('input rejects paths and stale updates while defaulting missing licenses', () => {
   assert.throws(() => id('../other'));
-  assert.throws(() => metadata({ ...item, license: '' }));
+  for (const language of ['ko', 'en', 'ja'] as const) {
+    assert.equal(metadata({ ...item, language, license: '' }).license, CONTENT_LICENSES[language]);
+    assert.equal(metadata({ ...item, language, license: undefined }).license, CONTENT_LICENSES[language]);
+    assert.equal(metadata({ ...item, language }).license, item.license);
+  }
   assert.throws(() => assertRevision(item, 1), (e: unknown) => e instanceof ApiError && e.status === 409);
   assertRevision(item, 2);
 });
@@ -164,4 +168,10 @@ test('series and episode metadata validate status and numeric sequence', async (
   assert.equal(fields.description, '');
   assert.throws(() => episodeMetadata({ title: '', episodeNumber: 2 }, item, item.id));
   await assert.rejects(validateUpload('series', 'txt', Buffer.from('series has no body')));
+});
+
+test('draft deletion rejects published and previously published content', () => {
+  assert.doesNotThrow(() => assertDraftDeletion(item));
+  assert.throws(() => assertDraftDeletion({...item,published:true}));
+  assert.throws(() => assertDraftDeletion({...item,published:false,publishedContent:{...item,version:2}}));
 });

@@ -54,7 +54,7 @@ class CatalogFixtureBooks implements BookRepository {
 }
 
 class FakeReaderCatalog extends ReaderCatalog {
-  FakeReaderCatalog(this.items) : super(CatalogFixtureBooks());
+  FakeReaderCatalog(this.items) : super(CatalogFixtureBooks(), cache: CatalogCache.memory());
   final List<CatalogItem> items;
   final calls = <String>[];
   final installed = <String>{};

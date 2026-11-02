@@ -108,18 +108,22 @@ class NativeReaderStore extends GeneratedDatabase {
   );
 
   Future<void> deleteBooks(Set<String> ids) => transaction(() async {
-    for (final id in ids) {
+    final values = ids.toList();
+    // Stay below SQLite's variable limit and avoid three round trips per book.
+    for (var offset = 0; offset < values.length; offset += 200) {
+      final batch = values.skip(offset).take(200).toList();
+      final placeholders = List.filled(batch.length, '?').join(',');
       await customStatement(
-        'INSERT OR IGNORE INTO reader_deleted_sessions SELECT session_id FROM reader_sessions WHERE publication_id=?',
-        [id],
+        'INSERT OR IGNORE INTO reader_deleted_sessions SELECT session_id FROM reader_sessions WHERE publication_id IN ($placeholders)',
+        batch,
       );
       await customStatement(
-        'DELETE FROM reader_positions WHERE publication_id=?',
-        [id],
+        'DELETE FROM reader_positions WHERE publication_id IN ($placeholders)',
+        batch,
       );
       await customStatement(
-        'DELETE FROM reader_sessions WHERE publication_id=?',
-        [id],
+        'DELETE FROM reader_sessions WHERE publication_id IN ($placeholders)',
+        batch,
       );
     }
   });

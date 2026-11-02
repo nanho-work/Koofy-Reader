@@ -28,8 +28,18 @@ class BookGroupEditor extends StatefulWidget {
 
 class _BookGroupEditorState extends State<BookGroupEditor> {
   late final _name = TextEditingController(text: widget.initialTitle);
-  late final _selected = widget.initialIds.toSet();
+  late final _selected = widget.initialIds.toSet().intersection(
+    widget.books.map((book) => book.id).toSet(),
+  );
   String _query = '';
+  bool _descending = false;
+
+  int _compare(Book a, Book b) {
+    final comparison = compareBookTitles(a.title, b.title);
+    final stable = comparison == 0 ? a.id.compareTo(b.id) : comparison;
+    return _descending ? -stable : stable;
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -46,7 +56,10 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
               ),
             )
             .toList()
-          ..sort((a, b) => compareBookTitles(a.title, b.title));
+          ..sort(_compare);
+    final visibleIds = books.map((book) => book.id).toSet();
+    final allSelected =
+        visibleIds.isNotEmpty && _selected.containsAll(visibleIds);
     final valid =
         _selected.length >= (widget.creating ? 2 : 1) &&
         (!widget.creating || _name.text.trim().isNotEmpty);
@@ -83,6 +96,64 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                 widget.creating
                     ? tr("함께 묶을 책을 두 권 이상 선택해 주세요.")
                     : tr("추가할 책을 선택해 주세요."),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  children: [
+                    Text(tr("{0}권 선택", [_selected.length])),
+                    PopupMenuButton<bool>(
+                      tooltip: tr("책 정렬"),
+                      initialValue: _descending,
+                      onSelected: (value) =>
+                          setState(() => _descending = value),
+                      itemBuilder: (_) => [
+                        CheckedPopupMenuItem(
+                          value: false,
+                          checked: !_descending,
+                          child: Text(tr("제목·회차 오름차순")),
+                        ),
+                        CheckedPopupMenuItem(
+                          value: true,
+                          checked: _descending,
+                          child: Text(tr("제목·회차 내림차순")),
+                        ),
+                      ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sort, size: 20),
+                            const SizedBox(width: 4),
+                            Text(tr("정렬")),
+                            const Icon(Icons.arrow_drop_down, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: visibleIds.isEmpty
+                          ? null
+                          : () => setState(() {
+                              if (allSelected) {
+                                _selected.removeAll(visibleIds);
+                              } else {
+                                _selected.addAll(visibleIds);
+                              }
+                            }),
+                      child: Text(
+                        tr(
+                          _query.trim().isEmpty
+                              ? (allSelected ? "전체 선택 해제" : "전체 선택")
+                              : (allSelected ? "검색 결과 선택 해제" : "검색 결과 전체 선택"),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Expanded(
                 child: books.isEmpty
@@ -123,10 +194,7 @@ class _BookGroupEditorState extends State<BookGroupEditor> {
                               (widget.books
                                       .where((b) => _selected.contains(b.id))
                                       .toList()
-                                    ..sort(
-                                      (a, b) =>
-                                          compareBookTitles(a.title, b.title),
-                                    ))
+                                    ..sort(_compare))
                                   .map((b) => b.id)
                                   .toList(),
                             ),

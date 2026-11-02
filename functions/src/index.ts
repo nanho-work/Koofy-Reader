@@ -1,3 +1,6 @@
+import {releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
+import { changeSeriesStatus, pendingEpisodes } from './series-status';
+import {adminCoverAsset} from './admin-cover';
 import { validateTranslationGroup } from './translation-groups';
 import { ensureMonthlyIssues, ensureMonthlyEpisode } from './monthly-groups';
 import { correctMonthlyLanguage } from './monthly-language';
@@ -12,7 +15,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { assertDraftDeletion, ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -76,7 +79,7 @@ async function requirePublishedSeries(item: Content) {
   publicItem(parent);
   requireValue(isReleased(parent), '아직 발행되지 않은 작품입니다.');
 }
-async function deleteContent(contentId: string, expected: number, uid: string) {
+async function deleteContent(contentId: string, expected: number, uid: string, draftOnly = false) {
   const ref = contents.doc(contentId);
   // Lock edits and unpublish before touching Storage. A failed cleanup can be
   // retried, but can never republish a partly deleted publication.
@@ -84,6 +87,7 @@ async function deleteContent(contentId: string, expected: number, uid: string) {
     const doc = await transaction.get(ref);
     if (!doc.exists) return; // Response loss/repeated delete is safe.
     const item = doc.data() as Content;
+    if (draftOnly) assertDraftDeletion(item);
     if (item.deleting) return;
     assertRevision(item, expected);
     if (item.kind === 'series') {
@@ -140,23 +144,34 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   const parents = [...new Set(visible.flatMap(item => publicOnly && item.seriesId ? [item.seriesId] : []))];
   const parentDocs = parents.length ? await db.getAll(...parents.map(value => contents.doc(value))) : [];
   const available = new Set(parentDocs.filter(doc => doc.data()?.kind === 'series' && doc.data()?.published && !doc.data()?.deleting && isReleased(doc.data() as Content)).map(doc => doc.id));
+  const countIds = publicOnly ? visible.filter(item => item.kind === 'series').map(item => item.id) : [];
+  const countDocuments: Content[] = [];
+  for (let offset = 0; offset < countIds.length; offset += 30) {
+    const result = await contents.where('seriesId', 'in', countIds.slice(offset, offset + 30)).where('published', '==', true)
+      .select('id','kind','seriesId','published','deleting','language','publishedContent.language','publishedContent.issueMonth','publishedContent.releaseAt','publishedContent.releaseDate').get();
+    countDocuments.push(...result.docs.map(doc => doc.data() as Content));
+  }
+  const counts = releasedEpisodeCounts(countDocuments, language);
+  const compilationIds = publicOnly ? [...new Set(visible.map(item => item.publishedContent?.compilationId).filter((value): value is string => !!value))] : [];
+  const compilations = compilationIds.length ? await db.getAll(...compilationIds.map(value => contents.doc(value))) : [];
+  const compiled = new Map(compilations.map(doc => [doc.id, doc.data() as Content | undefined]));
   const items = await Promise.all(visible.filter(item => !publicOnly || !item.seriesId || available.has(item.seriesId)).map(async item => {
     if (!publicOnly) return item;
     const result = publicItem(item);
     if (item.kind !== 'series') return result;
     const compilationId = item.publishedContent?.compilationId;
-    if (compilationId && compilationReady(item, (await contents.doc(compilationId).get()).data() as Content | undefined)) return null;
-    const count = await contents.where('seriesId', '==', item.id).where('published', '==', true).get();
-    const episodeCount = count.docs.filter(doc => isReleased(doc.data() as Content) && !doc.data().deleting && visibleInLanguage(doc.data() as Content, language)).length;
+    if (compilationId && compilationReady(item, compiled.get(compilationId))) return null;
+    const episodeCount = counts.get(item.id) ?? 0;
     if (item.publishedContent?.issueMonth && !episodeCount) return null;
     return { ...result, episodeCount };
   }));
-  return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null };
+  return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null, nextChangeAt: publicOnly ? nextCatalogChange([...docs.map(doc => doc.data() as Content), ...countDocuments]) : null };
 }
 
 async function monthly(language: 'ko' | 'en' | 'ja') {
   const documents = await contents.where('kind', '==', 'series').where('published', '==', true).get();
-  const issues = documents.docs.map(doc => doc.data() as Content).filter(item =>
+  const changes = documents.docs.map(doc => doc.data() as Content);
+  const issues = changes.filter(item =>
     !item.deleting && item.publishedContent?.issueMonth && visibleInLanguage(item, language) && isReleased(item))
     .sort((a, b) => b.publishedContent!.issueMonth!.localeCompare(a.publishedContent!.issueMonth!) || a.id.localeCompare(b.id));
   const items: ReturnType<typeof publicItem>[] = [];
@@ -173,14 +188,41 @@ async function monthly(language: 'ko' | 'en' | 'ja') {
       continue;
     }
     if (activeFound) continue;
-    const episodes = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs
-      .map(doc => doc.data() as Content).filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
+    const episodeDocuments = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs.map(doc => doc.data() as Content);
+    changes.push(...episodeDocuments);
+    const episodes = episodeDocuments.filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
       .sort((a, b) => (b.publishedContent!.releaseAt || `${b.publishedContent!.releaseDate || ''}T00:00:00+09:00`).localeCompare(a.publishedContent!.releaseAt || `${a.publishedContent!.releaseDate || ''}T00:00:00+09:00`) || b.episodeNumber! - a.episodeNumber!);
     if (!episodes.length) continue;
     items.push(publicItem(issue), publicItem(episodes[0]));
     activeFound = true;
   }
-  return { items, nextCursor: null };
+  return { items, nextCursor: null, nextChangeAt: nextCatalogChange(changes) };
+}
+
+
+// The mobile and legacy editor APIs remain unchanged. Saved-work pages expand
+// translation groups before returning them, so pagination never splits a work.
+async function adminWorks(contentKind: unknown, after: unknown, scope: unknown) {
+  requireValue(scope === undefined || ['general','monthly','novel'].includes(String(scope)), '목록 구분을 확인해 주세요.');
+  const page = await list(contentKind, after, false, true, undefined, true);
+  const inScope = (item: Content) => !item.seriesId && !item.deleting &&
+    (scope === 'general' ? item.collectionType === 'general' && !item.issueMonth && !item.publishedContent?.issueMonth : scope === 'monthly' ? !!(item.issueMonth || item.publishedContent?.issueMonth) : scope === 'novel' ? !item.collectionType && !item.issueMonth && !item.publishedContent?.issueMonth : true);
+  const seeds = page.items.filter((item): item is Content => !!item && inScope(item as Content));
+  const groupIds = [...new Set(seeds.map(item => item.translationGroupId).filter((value): value is string => !!value))];
+  const items = new Map(seeds.map(item => [item.id, item]));
+  for (let offset = 0; offset < groupIds.length; offset += 30) {
+    const linked = await contents.where('translationGroupId','in',groupIds.slice(offset,offset + 30)).get();
+    for (const doc of linked.docs) { const item = doc.data() as Content; if(item.kind === kind(contentKind) && inScope(item)) items.set(item.id,item); }
+  }
+  if (scope === 'monthly') {
+    const months = [...new Set(seeds.map(item=>item.issueMonth || item.publishedContent?.issueMonth).filter((value):value is string=>!!value))];
+    for(let offset=0;offset<months.length;offset+=10){
+      const slice=months.slice(offset,offset+10);
+      const versions=await Promise.all(['issueMonth','publishedContent.issueMonth'].map(field=>contents.where('kind','==','series').where(field,'in',slice).get()));
+      for(const version of versions)for(const doc of version.docs){const item=doc.data() as Content;if(inScope(item))items.set(item.id,item);}
+    }
+  }
+  return {...page, items:[...items.values()]};
 }
 
 export const readerAdmin = onRequest(options, async (request, response) => {
@@ -200,12 +242,39 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     catch { throw new ApiError(401, '관리자 인증이 만료되었거나 올바르지 않습니다. 다시 로그인해 주세요.'); }
     requireSuperAdmin({ superAdmin: claims.superAdmin });
     if (request.method === 'GET') {
+      if (request.query.action === 'works') { response.json(await adminWorks(request.query.kind, request.query.after, request.query.scope)); return; }
+      if (request.query.action === 'work') {
+        const item = await getItem(id(request.query.id));
+        requireValue(!item.seriesId && !item.deleting, '작품을 찾을 수 없습니다.');
+        const month=item.issueMonth || item.publishedContent?.issueMonth;
+        const monthlyVersions=month?await Promise.all(['issueMonth','publishedContent.issueMonth'].map(field=>contents.where('kind','==','series').where(field,'==',month).get())):[];
+        const linked = month?[...new Map(monthlyVersions.flatMap(version=>version.docs.map(doc=>[doc.id,doc.data() as Content] as const))).values()]:item.translationGroupId ? (await contents.where('translationGroupId','==',item.translationGroupId).get()).docs.map(doc=>doc.data() as Content) : [item];
+        response.json({items:linked.filter(value=>!value.seriesId && !value.deleting && value.kind===item.kind)}); return;
+      }
+      if(request.query.action==='coverPreview'){
+        const item=await getItem(id(request.query.id));
+        const asset=adminCoverAsset(item,revision(request.query.revision),{superAdmin:claims.superAdmin});
+        const expiresAt=Date.now()+5*60*1000;
+        const [url]=await bucket.file(asset.path).getSignedUrl({action:'read',version:'v4',expires:expiresAt});
+        response.json({url,expiresAt});return;
+      }
       if (request.query.action === 'categories') {
         response.json({ categories: categoryList((await categorySettings.get()).data()) }); return;
       }
       response.json(await list(request.query.kind, request.query.after, false, true, request.query.seriesId, request.query.topLevel === '1')); return;
     }
     if (request.method !== 'POST') { response.status(405).json({ error: '지원하지 않는 요청입니다.' }); return; }
+    if (request.query.action === 'uploadSharedCover') {
+      const checked = await validateUpload('book', 'cover', request.rawBody);
+      const hash = checked.asset.sha256;
+      const path = `readerSharedCovers/${hash}/cover.${checked.asset.extension}`;
+      const file = bucket.file(path);
+      try {
+        await file.save(checked.bytes, { resumable: false, contentType: checked.asset.contentType, preconditionOpts: { ifGenerationMatch: 0 } });
+      } catch (error) { if (Number((error as { code?: number }).code) !== 412) throw error; }
+      await db.collection('readerSharedCovers').doc(hash).set({ asset: { path, ...checked.asset } });
+      response.json({ hash }); return;
+    }
     if (request.query.action === 'upload') {
       const contentId = id(request.query.id), expected = revision(request.query.revision);
       requireValue(typeof request.query.slot === 'string', '파일 종류가 필요합니다.');
@@ -251,6 +320,44 @@ export const readerAdmin = onRequest(options, async (request, response) => {
         return names;
       });
       response.json({ categories }); return;
+    }
+    if (data.action === 'attachSharedCover') {
+      const contentId = id(data.id), expected = revision(data.revision);
+      requireValue(typeof data.hash === 'string' && /^[a-f0-9]{64}$/.test(data.hash), '공통 이미지 ID를 확인해 주세요.');
+      const shared = (await db.collection('readerSharedCovers').doc(data.hash).get()).data();
+      requireValue(shared?.asset, '공통 이미지를 다시 업로드해 주세요.');
+      const next = await change(contentId, expected, claims.uid, 'attachSharedCover', item => {
+        requireValue(item.kind === 'book' && !!item.seriesId, '회차에만 공통 이미지를 연결할 수 있습니다.');
+        return { assets: replaceAsset(item, 'cover', shared.asset) };
+      });
+      response.json(next); return;
+    }
+    if (data.action === 'setSeriesStatus') {
+      requireValue(Array.isArray(data.items) && data.items.length >= 1 && data.items.length <= 3, '작품의 언어 목록을 확인해 주세요.');
+      requireValue(data.status === 'ongoing' || data.status === 'completed', '연재 상태를 확인해 주세요.');
+      const status = data.status;
+      const refs = data.items.map((entry: {id: unknown; revision: unknown}) => ({id:id(entry.id),revision:revision(entry.revision)}));
+      requireValue(new Set(refs.map(x=>x.id)).size === refs.length, '중복된 작품입니다.');
+      const result = await db.runTransaction(async transaction => {
+        const docs = await transaction.getAll(...refs.map(x=>contents.doc(x.id)));
+        const at = new Date().toISOString();
+        const values = docs.map((doc,i)=>{requireValue(doc.exists,'작품을 찾을 수 없습니다.');const item=doc.data() as Content;assertRevision(item,refs[i].revision);changeSeriesStatus(item,status,at);return item;});
+        const group = values[0].translationGroupId;
+        requireValue(values.every(x=>x.translationGroupId===group && x.collectionType===values[0].collectionType) && (!!group || values.length===1), '같은 작품의 번역본만 함께 변경할 수 있습니다.');
+        if(group){
+          const linked=await transaction.get(contents.where('translationGroupId','==',group));
+          requireValue(linked.docs.length===values.length && linked.docs.every(doc=>refs.some(x=>x.id===doc.id)), '번역본 구성이 바뀌었습니다. 목록을 새로고침해 주세요.');
+        }
+        const children = await Promise.all(values.map(x=>transaction.get(contents.where('seriesId','==',x.id))));
+        const pending = pendingEpisodes(children.flatMap(query=>query.docs.map(doc=>doc.data() as Content)),new Date(at));
+        if(data.preview===true)return {pending,items:values};
+        requireValue(status!=='completed' || !(pending.drafts+pending.scheduled) || data.acknowledgePending===true, '미공개·예약 회차가 남아 있습니다. 확인 후 다시 변경해 주세요.');
+        const next=values.map(item=>changeSeriesStatus(item,status,at));
+        next.forEach(item=>transaction.update(contents.doc(item.id),{seriesStatus:item.seriesStatus,revision:item.revision,updatedAt:at,publishedContent:item.publishedContent}));
+        transaction.create(db.collection('readerAudit').doc(),{action:'setSeriesStatus',uid:claims.uid,ids:next.map(x=>x.id),status,pending,at});
+        return {pending,items:next};
+      });
+      response.json(result);return;
     }
     if (data.action === 'linkTranslations') {
       requireValue(Array.isArray(data.items) && data.items.length >= 2 && data.items.length <= 3, '연결할 번역본 2~3개를 선택해 주세요.');
@@ -306,7 +413,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       response.json(await monthlyPublishing.compile(contentId, expected)); return;
     }
     if (action === 'delete') {
-      response.json(await deleteContent(contentId, expected, claims.uid)); return;
+      response.json(await deleteContent(contentId, expected, claims.uid, data.draftOnly === true)); return;
     }
     // Render before entering the Firestore transaction. Recheck revision when
     // committing so a concurrent rename/upload cannot publish a stale preview.
@@ -359,7 +466,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       switch (action) {
         case 'save': {
           if (!item.seriesId) {
-            const input = { language: item.language ?? 'ko', ...(data.metadata as Record<string, unknown>) };
+            const input = { language: item.language ?? 'ko', ...(data.metadata as Record<string, unknown>), ...(item.collectionType ? { collectionType: item.collectionType } : {}) };
             const fields = item.kind === 'series' ? seriesMetadata(input) : metadata(input);
             requireValue(!item.publishedContent || fields.language === contentLanguage(item.publishedContent.language), '공개된 콘텐츠의 언어는 변경할 수 없습니다. 번역본은 별도로 등록해 주세요.');
             requireValue(!item.publishedContent || (fields.issueMonth || '') === (item.publishedContent.issueMonth || ''), '공개된 월간호의 발행 월은 변경할 수 없습니다. 새 작품을 등록해 주세요.');

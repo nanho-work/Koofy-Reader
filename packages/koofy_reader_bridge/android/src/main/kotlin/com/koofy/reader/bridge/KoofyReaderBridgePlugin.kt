@@ -15,25 +15,29 @@ import java.util.concurrent.Executors
 class KoofyReaderBridgePlugin : FlutterPlugin, ActivityAware, ReaderHostApi {
     private var activity: Activity? = null
     private var speechBackup: SpeechBackupChannel? = null
+    private var bookImport: BookImportChannel? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         ReaderRuntime.initialize(binding.applicationContext)
+        bookImport = BookImportChannel(binding.applicationContext, binding.binaryMessenger)
         speechBackup = SpeechBackupChannel(binding.applicationContext, binding.binaryMessenger)
         ReaderRuntime.events = ReaderFlutterApi(binding.binaryMessenger)
         ReaderHostApi.setUp(binding.binaryMessenger, this)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        bookImport?.dispose()
+        bookImport = null
         speechBackup?.dispose()
         speechBackup = null
         ReaderHostApi.setUp(binding.binaryMessenger, null)
         ReaderRuntime.events = null
     }
 
-    override fun onAttachedToActivity(binding: ActivityPluginBinding) { activity = binding.activity }
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) { activity = binding.activity }
-    override fun onDetachedFromActivityForConfigChanges() { activity = null }
-    override fun onDetachedFromActivity() { activity = null }
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) { activity = binding.activity; bookImport?.attach(binding) }
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) { activity = binding.activity; bookImport?.attach(binding) }
+    override fun onDetachedFromActivityForConfigChanges() { bookImport?.detach(); activity = null }
+    override fun onDetachedFromActivity() { bookImport?.detach(); activity = null }
 
     override fun openReader(request: ReaderLaunchRequest, callback: (Result<Unit>) -> Unit) {
         callback(runCatching {

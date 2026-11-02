@@ -70,6 +70,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
 
   Future<void> _refresh() async {
     if (ref.read(catalogDownloadProvider).busy) return;
+    ref.read(readerCatalogProvider).forceRefresh(_key);
     ref.invalidate(catalogItemsProvider(_key));
     ref.invalidate(catalogInstalledProvider(_key));
     ref.invalidate(catalogItemsProvider('book'));
@@ -107,6 +108,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   @override
   Widget build(BuildContext context) {
     final catalog = ref.watch(catalogItemsProvider(_key));
+    final loading = ref.watch(catalogLoadStatusProvider(_key));
     final installed = ref.watch(catalogInstalledProvider(_key));
     final download = ref.watch(catalogDownloadProvider);
     final parents = ref.watch(catalogItemsProvider('book')).valueOrNull;
@@ -245,9 +247,13 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                     if (index == 0) {
                       return Column(
                         children: [
-                          if (catalog.isLoading)
+                          if (catalog.isLoading || loading.refreshing) ...[
                             const LinearProgressIndicator(),
-                          if (catalog.hasError || installed.hasError) ...[
+                            Text(tr("전체 목록 불러오는 중…")),
+                          ],
+                          if (catalog.hasError ||
+                              installed.hasError ||
+                              loading.failed) ...[
                             const SizedBox(height: 16),
                             Text(
                               catalog.error is CatalogException
@@ -263,6 +269,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                             ),
                           ],
                           if (!catalog.isLoading &&
+                              !loading.refreshing &&
                               !catalog.hasError &&
                               episodes.isEmpty)
                             Padding(

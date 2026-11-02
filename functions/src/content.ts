@@ -13,6 +13,7 @@ export function requireValue(value: unknown, message: string): asserts value {
 export type Kind = 'book' | 'font' | 'series';
 export interface Asset { path: string; sha256: string; size: number; contentType: string; extension: string; weight?: number }
 export interface Metadata {
+  collectionType?: 'general';
   translationGroupId?: string;
   language?: 'ko' | 'en' | 'ja';
   autoCompile?: boolean; expectedEpisodes?: number; byline?: string; issueMonth?: string; releaseDate?: string; releaseAt?: string; compilationId?: string;
@@ -65,7 +66,7 @@ function monthlyMetadata(data: Record<string, unknown>) {
   const compilationId = data.compilationId ?? '';
   requireValue(typeof issueMonth === 'string' && (!issueMonth || /^20\d{2}-(0[1-9]|1[0-2])$/.test(issueMonth)), '월간호 발행 월을 확인해 주세요.');
   requireValue(typeof releaseDate === 'string' && (!releaseDate || (/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate) && Number.isFinite(Date.parse(releaseDate + 'T00:00:00Z')) && new Date(releaseDate + 'T00:00:00Z').toISOString().slice(0, 10) === releaseDate)), '발행일을 확인해 주세요.');
-  requireValue(!releaseDate || (issueMonth && releaseDate.startsWith(issueMonth + '-')), '발행일은 월간호의 해당 월이어야 합니다.');
+  requireValue(!releaseDate || (!issueMonth && data.collectionType === 'general') || (issueMonth && releaseDate.startsWith(issueMonth + '-')), '발행일은 월간호의 해당 월이어야 합니다.');
   requireValue(typeof compilationId === 'string' && (!compilationId || /^[a-f0-9]{32}$/.test(compilationId)), '합본 콘텐츠 ID를 확인해 주세요.');
   requireValue(!compilationId || !!issueMonth, '합본은 월간호에만 연결할 수 있습니다.');
   return { issueMonth, releaseDate, releaseAt, compilationId, autoCompile, byline: byline.trim() };
@@ -83,11 +84,16 @@ export function compilationReady(series: Content, book: Content | undefined): bo
     target.assets.epub && target.issueMonth === source.issueMonth &&
     contentLanguage(target.language) === contentLanguage(source.language) && isReleased(book));
 }
-export const MONTHLY_LICENSE = '쿠피랩이 제공하는 콘텐츠입니다. 개인적인 독서 목적으로 다운로드하여 이용할 수 있습니다. 무단 복제·재배포 및 상업적 이용은 허용하지 않습니다.';
+export const CONTENT_LICENSES = {
+  "ko": "쿠피랩에서 제공하는 읽기 콘텐츠입니다. 개인적인 독서 목적으로 다운로드하여 이용할 수 있습니다. 원작·번역·삽화의 권리는 각 권리자에게 있으며, 저작권이 만료된 원작의 자유로운 이용은 제한하지 않습니다.",
+  "en": "Reading content provided by Koofy Lab. You may download it for personal reading. Rights in the original text, translation, and illustrations belong to their respective rights holders. This notice does not restrict the use of public-domain originals.",
+  "ja": "Koofy Labが提供する読書コンテンツです。個人での読書を目的としてダウンロード・利用できます。原文・翻訳・挿絵の権利は各権利者に帰属します。著作権保護期間が満了した原作の自由な利用を制限するものではありません。"
+};
+export const MONTHLY_LICENSE = CONTENT_LICENSES.ko;
 export const MONTHLY_DEFAULTS = {
-  ko: { author: '쿠피랩', license: MONTHLY_LICENSE },
-  en: { author: 'Koofy Lab', license: 'This content is provided by Koofy Lab. You may download it for personal reading. Unauthorized copying, redistribution, and commercial use are not permitted.' },
-  ja: { author: 'Koofy Lab', license: 'このコンテンツはKoofy Labが提供しています。個人での読書を目的としてダウンロード・利用できます。無断での複製・再配布および商用利用は禁止されています。' },
+ ko: { author: '쿠피랩', license: CONTENT_LICENSES.ko },
+ en: { author: 'Koofy Lab', license: CONTENT_LICENSES.en },
+ ja: { author: 'Koofy Lab', license: CONTENT_LICENSES.ja },
 };
 export function monthlyLicense(value: string | undefined, language: 'ko' | 'en' | 'ja') {
   const text = value?.trim() || '';
@@ -102,9 +108,10 @@ export function metadata(input: unknown): Metadata {
     requireValue(typeof value === 'string' && value.trim().length <= max && (!required || value.trim().length > 0), `${key} 입력을 확인해 주세요.`);
     return value.trim();
   }
+  requireValue(data.collectionType === undefined || data.collectionType === 'general', '작품 관리 분류를 확인해 주세요.');
   const category = data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: data.issueMonth ? monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) : field('license', 2000, true) };
+  return { ...(data.collectionType === 'general' ? { collectionType: 'general' as const } : {}), ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -400,4 +407,9 @@ export async function validateUpload(contentKind: Kind, slot: string, bytes: Buf
     extension = inspectFont(bytes); contentType = extension === 'otf' ? 'font/otf' : 'font/ttf'; weight = Number(slot.slice(4));
   } else throw new ApiError(400, '지원하지 않는 파일 종류입니다.');
   return { bytes: output, asset: { sha256: createHash('sha256').update(output).digest('hex'), size: output.length, contentType, extension, ...(weight ? { weight } : {}) } };
+}
+
+/** Draft deletion must also reject previously published, now hidden content. */
+export function assertDraftDeletion(item: Pick<Content, 'published' | 'publishedContent'>) {
+  requireValue(!item.published && !item.publishedContent, '공개 이력이 있는 콘텐츠는 초안 삭제할 수 없습니다.');
 }

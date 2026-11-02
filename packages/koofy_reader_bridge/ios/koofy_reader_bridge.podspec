@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
   s.name             = 'koofy_reader_bridge'
   s.version          = '0.1.0'
-  s.summary          = 'Koofy native full-screen Readium reader.'
+  s.summary          = 'Koofy native Readium reader and document import.'
   s.description      = 'Typed Flutter bridge to the official Readium Swift EPUB navigator.'
   s.homepage         = 'https://github.com/readium/swift-toolkit'
   s.license          = { :type => 'Proprietary' }

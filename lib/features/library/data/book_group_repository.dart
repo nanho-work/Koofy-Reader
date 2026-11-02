@@ -158,15 +158,22 @@ class BookGroupRepository {
     }
   });
 
-  Future<GroupChange> create(String title, List<String> ids) => _change((
-    groups,
-  ) {
-    if (ids.length < 2) throw ArgumentError('책을 두 권 이상 선택해 주세요.');
-    _requireUngrouped(groups, ids);
-    groups.add(
-      BookGroup(id: 'group_${_newId()}', title: _title(title), bookIds: ids),
-    );
-  });
+  Future<GroupChange> create(String title, List<String> ids, {String? id}) =>
+      _change((groups) {
+        if (ids.length < 2) throw ArgumentError('책을 두 권 이상 선택해 주세요.');
+        _requireUngrouped(groups, ids);
+        if (id != null &&
+            (!id.startsWith('group_') || groups.any((g) => g.id == id))) {
+          throw StateError('묶음 목록이 바뀌었습니다. 다시 시도해 주세요.');
+        }
+        groups.add(
+          BookGroup(
+            id: id ?? 'group_${_newId()}',
+            title: _title(title),
+            bookIds: ids,
+          ),
+        );
+      });
   Future<GroupChange> add(String groupId, List<String> ids) =>
       _change((groups) {
         _requireUngrouped(groups, ids);

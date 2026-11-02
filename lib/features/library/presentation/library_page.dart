@@ -4,11 +4,11 @@ import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
-import 'package:koofy_reader/features/library/application/cover_matching.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
 import 'package:koofy_reader/core/storage/local_storage.dart';
 import 'package:koofy_reader/features/library/data/library_trash_store.dart';
-import 'package:koofy_reader/features/library/presentation/text_import_preview.dart';
+import 'book_import_page.dart';
+import '../application/book_import_controller.dart';
 import 'dart:math' as math;
 import 'dart:ui' show DisplayFeatureType, DisplayFeatureState;
 
@@ -18,7 +18,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
-import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/features/library/domain/book_group.dart';
 import 'package:koofy_reader/features/library/presentation/book_group_editor.dart';
@@ -48,8 +47,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   final _sidebarScroll = ScrollController();
   LibraryBookStatus? _filter;
   bool _titleSort = false;
-  bool _importing = false;
-  String _importProgress = tr("가져오는 중…");
+  bool get _importing => ref.read(bookImportControllerProvider).busy;
+  String get _importProgress => tr("서재 등록 {0}/{1}권 완료", [
+    ref.read(bookImportControllerProvider).completed,
+    ref.read(bookImportControllerProvider).books.length,
+  ]);
   bool _opening = false;
   bool _updatingCover = false;
   bool _groupBusy = false;
@@ -105,6 +107,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(bookImportControllerProvider);
     ref.watch(monthlyGroupCoverSyncProvider);
     Localizations.localeOf(
       context,
@@ -322,14 +325,27 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ),
                 ),
               if (recent.isEmpty) SliverToBoxAdapter(child: intro),
-              if (_importing)
+              if (_importing ||
+                  ref.read(bookImportControllerProvider).files.isNotEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 8,
                     ),
-                    child: Text(_importProgress),
+                    child: TextButton(
+                      onPressed: _importBook,
+                      child: Text(
+                        _importing
+                            ? _importProgress
+                            : tr(
+                                ref.read(bookImportControllerProvider).stage ==
+                                        ImportStage.finished
+                                    ? '가져오기 결과'
+                                    : '책 가져오기',
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               if (books.isNotEmpty || groups.isNotEmpty) shelf,
@@ -1009,105 +1025,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 
   Future<void> _importBook() async {
-    if (_importing || _updatingCover) return;
+    if (_updatingCover) return;
     if (kIsWeb) {
       _snack(tr("파일 가져오기는 Android · iOS 앱에서 이용해 주세요."));
       return;
     }
-    setState(() {
-      _importing = true;
-      _importProgress = tr("파일 선택 중…");
-    });
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['txt', 'epub', ...coverImageExtensions],
-        allowMultiple: true,
-        dialogTitle: tr("책과 같은 이름의 표지 이미지 함께 선택"),
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-      final selected = result.files
-          .map((f) => BookImportFile(f.name, f.path))
-          .toList();
-      final images = selected
-          .where((f) => coverImageExtensions.contains(fileExtension(f.name)))
-          .toList();
-      final bookFiles = selected
-          .where((f) => !coverImageExtensions.contains(fileExtension(f.name)))
-          .toList();
-      if (bookFiles.isEmpty) {
-        await showBatchCovers(context, ref, images: images);
-        return;
-      }
-      setState(() => _importProgress = tr("가져오는 중 0/{0}", [bookFiles.length]));
-      final imported = await importBooks(
-        ref.read(bookRepositoryProvider),
-        bookFiles,
-        importFile: (path) => importWithTextPreview(
-          context,
-          ref.read(bookRepositoryProvider),
-          path,
-        ),
-        onProgress: (completed, total) {
-          if (mounted) {
-            setState(
-              () => _importProgress = tr("가져오는 중 {0}/{1}", [completed, total]),
-            );
-          }
-        },
-      );
-      if (!mounted) return;
-      ref.invalidate(booksProvider);
-      setState(() {
-        _filter = null;
-        _search.clear();
-      });
-      final summary = [
-        tr("가져오기 완료: {0}권 추가", [imported.added]),
-        if (imported.existing > 0) tr(' · 이미 등록된 책 {0}권', [imported.existing]),
-        if (imported.skipped > 0) tr(' · 건너뛴 파일 {0}개', [imported.skipped]),
-      ].join();
-      if (imported.failedNames.isEmpty) {
-        _snack(summary);
-      } else {
-        await showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(tr("가져오기 결과")),
-            content: SingleChildScrollView(
-              child: Text(
-                tr("{0}\n\n다음 {1}개 파일은 가져오지 못했습니다. ", [
-                      summary,
-                      imported.failedNames.length,
-                    ]) +
-                    tr("파일이 기기에 내려받아져 있는지, TXT·EPUB 형식인지 확인해 주세요.\n\n") +
-                    imported.failedNames.join('\n'),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(tr("확인")),
-              ),
-            ],
-          ),
-        );
-      }
-      if (mounted && images.isNotEmpty) {
-        await showBatchCovers(
-          context,
-          ref,
-          images: images,
-          bookIds: imported.importedIds.toSet(),
-        );
-      }
-      if (mounted && bookFiles.length > 1 && imported.addedIds.isNotEmpty) {
-        await _organizeImportedBooks(imported.addedIds);
-      }
-    } catch (_) {
-      _snack(tr("책을 가져오지 못했습니다. 파일을 확인하고 다시 시도해 주세요."));
-    } finally {
-      if (mounted) setState(() => _importing = false);
-    }
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const BookImportPage()));
   }
 }

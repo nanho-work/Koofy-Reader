@@ -15,9 +15,13 @@ class UiTrashService extends LibraryTrashService {
     : super(deleteReadingRecords: (_) async {});
   final File file;
   final removed = <String>{};
+  int sizeCalls = 0;
   @override
-  Future<int> bytes(Set<String> keys) async =>
-      file.existsSync() ? file.lengthSync() : 0;
+  Future<int> bytes(Set<String> keys) async {
+    sizeCalls++;
+    return file.existsSync() ? file.lengthSync() : 0;
+  }
+
   @override
   Future<void> empty(Set<String> keys) async {
     removed.addAll(keys);
@@ -29,6 +33,72 @@ class UiTrashService extends LibraryTrashService {
 }
 
 void main() {
+  testWidgets('progress remains visible without repeating the size scan', (
+    tester,
+  ) async {
+    final root = Directory.systemTemp.createTempSync('trash_progress_ui_');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final source = File('${root.path}/source.txt')..writeAsStringSync('body');
+    final storage = MemoryStorage();
+    await LibraryTrashStore(storage).moveBook(
+      Book.localFile(
+        id: 'a',
+        title: '300화 묶음',
+        author: '',
+        description: '',
+        localPath: source.path,
+      ),
+    );
+    final service = UiTrashService(storage, root, source);
+    final container = ProviderContainer(
+      overrides: [
+        localStorageProvider.overrideWithValue(storage),
+        libraryTrashServiceProvider.overrideWith((ref) async => service),
+      ],
+    );
+    addTearDown(container.dispose);
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            child: child!,
+          ),
+          home: const LibraryTrashPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(service.sizeCalls, 1);
+    final notifier = container.read(libraryTrashProgressProvider.notifier);
+    for (var completed = 1; completed <= 5; completed++) {
+      notifier.state = TrashDeleteProgress(
+        stage: TrashDeleteStage.files,
+        completedEntries: 0,
+        totalEntries: 1,
+        completedFiles: completed,
+        totalFiles: 300,
+        title: '300화 묶음',
+      );
+      await tester.pump();
+    }
+    expect(find.text('파일 정리 5/300'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(service.sizeCalls, 1);
+    expect(tester.takeException(), isNull);
+    notifier.state = null;
+    await tester.pumpAndSettle();
+    expect(service.sizeCalls, 2);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
   testWidgets(
     'trash offers restore, permanent delete and confirmed emptying at large text',
     (tester) async {

@@ -34,6 +34,9 @@ Future<BookImportResult> importBooks(
   List<BookImportFile> files, {
   void Function(int completed, int total)? onProgress,
   Future<Book?> Function(String path)? importFile,
+  bool Function()? shouldStop,
+  Future<void> Function(BookImportFile file)? beforeFile,
+  Future<void> Function()? onCommitted,
 }) async {
   final knownIds = (await repository.getBooks()).map((b) => b.id).toSet();
   var added = 0;
@@ -42,36 +45,54 @@ Future<BookImportResult> importBooks(
   var existing = 0;
   var skipped = 0;
   final failed = <String>[];
-  for (var index = 0; index < files.length; index++) {
-    final file = files[index];
-    final format = file.name.split('.').last.toLowerCase();
-    final analytics = ReaderAnalytics.instance;
-    analytics.bookImport(format, 'start');
-    try {
-      final path = file.path;
-      final book = path == null || path.isEmpty
-          ? null
-          : await (importFile ?? repository.importBookFile)(path);
-      if (book == null) {
-        analytics.bookImport(format, 'failed');
-        failed.add(file.name);
-      } else if (knownIds.add(book.id)) {
-        analytics.bookImport(format, 'success');
-        added++;
-        addedIds.add(book.id);
-      } else {
-        analytics.bookImport(format, 'existing');
-        existing++;
+  for (var offset = 0; offset < files.length; offset += 16) {
+    if (shouldStop?.call() == true) break;
+    Future<void> chunk() async {
+      for (
+        var index = offset;
+        index < files.length && index < offset + 16;
+        index++
+      ) {
+        if (shouldStop?.call() == true) break;
+        final file = files[index];
+        final format = file.name.split('.').last.toLowerCase();
+        final analytics = ReaderAnalytics.instance;
+        analytics.bookImport(format, 'start');
+        try {
+          await beforeFile?.call(file);
+          final path = file.path;
+          final book = path == null || path.isEmpty
+              ? null
+              : await (importFile ?? repository.importBookFile)(path);
+          if (book == null) {
+            analytics.bookImport(format, 'failed');
+            failed.add(file.name);
+          } else if (knownIds.add(book.id)) {
+            analytics.bookImport(format, 'success');
+            added++;
+            addedIds.add(book.id);
+          } else {
+            analytics.bookImport(format, 'existing');
+            existing++;
+          }
+          if (book != null) importedIds.add(book.id);
+        } on BookImportSkipped {
+          analytics.bookImport(format, 'cancelled');
+          skipped++;
+        } catch (_) {
+          analytics.bookImport(format, 'failed');
+          failed.add(file.name);
+        }
+        onProgress?.call(index + 1, files.length);
       }
-      if (book != null) importedIds.add(book.id);
-    } on BookImportSkipped {
-      analytics.bookImport(format, 'cancelled');
-      skipped++;
-    } catch (_) {
-      analytics.bookImport(format, 'failed');
-      failed.add(file.name);
     }
-    onProgress?.call(index + 1, files.length);
+
+    if (repository is LocalBookRepository) {
+      await repository.importChunk(chunk);
+    } else {
+      await chunk();
+    }
+    await onCommitted?.call();
   }
   return BookImportResult(
     added,

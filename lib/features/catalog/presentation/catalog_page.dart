@@ -103,6 +103,9 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
                             ? null
                             : () {
                                 final kind = _tab == 0 ? 'book' : 'font';
+                                ref
+                                    .read(readerCatalogProvider)
+                                    .forceRefresh(kind);
                                 ref.invalidate(catalogItemsProvider(kind));
                                 ref.invalidate(catalogInstalledProvider(kind));
                               },
@@ -185,6 +188,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
 
   Future<void> _refresh() async {
     if (ref.read(catalogDownloadProvider).busy) return;
+    ref.read(readerCatalogProvider).forceRefresh(widget.kind);
     ref.invalidate(catalogItemsProvider(widget.kind));
     ref.invalidate(catalogInstalledProvider(widget.kind));
     try {
@@ -219,6 +223,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
   @override
   Widget build(BuildContext context) {
     final catalog = ref.watch(catalogItemsProvider(widget.kind));
+    final loading = ref.watch(catalogLoadStatusProvider(widget.kind));
     final installed = ref.watch(catalogInstalledProvider(widget.kind));
     final download = ref.watch(catalogDownloadProvider);
     final query = _search.text.trim().toLowerCase();
@@ -306,7 +311,8 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
-                          catalog.isLoading
+                          catalog.isLoading ||
+                                  (!loading.complete && loading.refreshing)
                               ? tr("전체 목록 불러오는 중…")
                               : tr("{0}개 · 가나다순", [items.length]),
                           style: Theme.of(context).textTheme.bodySmall,
@@ -338,12 +344,14 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                     if (index == 0) {
                       return Column(
                         children: [
-                          if (catalog.isLoading)
+                          if (catalog.isLoading || loading.refreshing)
                             const Padding(
                               padding: EdgeInsets.all(16),
                               child: LinearProgressIndicator(),
                             ),
-                          if (catalog.hasError || installed.hasError)
+                          if (catalog.hasError ||
+                              installed.hasError ||
+                              loading.failed)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Column(
@@ -361,6 +369,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                               ),
                             ),
                           if (!catalog.isLoading &&
+                              !loading.refreshing &&
                               !catalog.hasError &&
                               items.isEmpty)
                             Padding(

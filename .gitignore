@@ -59,3 +59,8 @@ android/upload-keystore.jks
 /functions/lib/
 .firebase/
 !/functions/.env.example
+
+# Temporary portfolio render previews (keep source scripts and final PDFs)
+/tmp/pdfs/*.png
+/tmp/pdfs/*.jpg
+/tmp/pdfs/*.jpeg

@@ -62,27 +62,37 @@ Future<CoverBatchResult> applyCoverMatches(
 }) async {
   final result = CoverBatchResult();
   var done = 0;
-  for (final entry in selected.entries) {
-    try {
-      await LibraryMutations.run(() async {
-        final books = await repository.getBooks();
-        final matches = books.where((b) => b.id == entry.key);
-        if (matches.isEmpty ||
-            (!replaceExisting && matches.first.coverPath != null)) {
-          result.skipped++;
-          return;
+  final entries = selected.entries.toList();
+  for (var offset = 0; offset < entries.length; offset += 16) {
+    Future<void> apply(List<Book> books) async {
+      final byId = {for (final book in books) book.id: book};
+      for (final entry in entries.skip(offset).take(16)) {
+        try {
+          final book = byId[entry.key];
+          if (book == null || (!replaceExisting && book.coverPath != null)) {
+            result.skipped++;
+          } else {
+            final path = entry.value.path;
+            if (path == null || path.isEmpty) {
+              throw const FormatException('이미지 경로 없음');
+            }
+            await repository.setBookCover(entry.key, path);
+            result.applied++;
+          }
+        } catch (_) {
+          result.failures.add(entry.value.name);
         }
-        final path = entry.value.path;
-        if (path == null || path.isEmpty) {
-          throw const FormatException('이미지 경로 없음');
-        }
-        await repository.setBookCover(entry.key, path);
-        result.applied++;
-      });
-    } catch (_) {
-      result.failures.add(entry.value.name);
+        onProgress?.call(++done, selected.length);
+      }
     }
-    onProgress?.call(++done, selected.length);
+
+    if (repository is LocalBookRepository) {
+      await repository.coverChunk(apply);
+    } else {
+      await LibraryMutations.run(
+        () async => apply(await repository.getBooks()),
+      );
+    }
   }
   return result;
 }

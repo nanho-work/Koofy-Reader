@@ -95,6 +95,8 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
             alignment: Alignment.centerLeft,
             child: TextButton(
               onPressed: () {
+                ref.read(readerCatalogProvider).forceRefresh('book');
+                ref.read(readerCatalogProvider).forceRefresh('series');
                 ref.invalidate(catalogItemsProvider('book'));
                 ref.invalidate(catalogItemsProvider('series'));
               },

@@ -1,5 +1,6 @@
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:isolate';
+import 'dart:async';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'dart:typed_data';
@@ -46,6 +47,35 @@ abstract class BookRepository {
 }
 
 class LocalBookRepository implements BookRepository {
+  static final _importZone = Object();
+  static final _coverZone = Object();
+  Future<T> coverChunk<T>(Future<T> Function(List<Book>) operation) =>
+      LibraryMutations.run(() async {
+        final books = await getBooks();
+        return runZoned(
+          () => operation(books),
+          zoneValues: {
+            _coverZone: (this, books.map((book) => book.id).toSet()),
+          },
+        );
+      });
+
+  /// Commit a small import chunk under one lease. Other library mutations cannot
+  /// invalidate duplicate checks; readers see only fully committed chunks.
+  Future<T> importChunk<T>(Future<T> Function() operation) =>
+      LibraryMutations.run(() async {
+        final batch = _ImportBatch(
+          this,
+          await _loadLocalBooks(),
+          await LibraryTrashStore(_storage).hiddenBookIds(),
+        );
+        final result = await runZoned(
+          operation,
+          zoneValues: {_importZone: batch},
+        );
+        if (batch.changed) await _saveLocalBooks(batch.books);
+        return result;
+      });
   LocalBookRepository(
     this._storage, {
     BookCoverStore? covers,
@@ -127,7 +157,13 @@ class LocalBookRepository implements BookRepository {
   @override
   Future<void> setBookCover(String bookId, String imagePath) =>
       LibraryMutations.run(() async {
-        if (!(await getBooks()).any((book) => book.id == bookId)) {
+        final zone = Zone.current[_coverZone];
+        final available =
+            zone is (LocalBookRepository, Set<String>) &&
+                identical(zone.$1, this)
+            ? zone.$2.contains(bookId)
+            : (await getBooks()).any((book) => book.id == bookId);
+        if (!available) {
           throw StateError('표지를 바꿀 책을 찾지 못했습니다.');
         }
         await _covers.setImage(bookId, imagePath);
@@ -158,7 +194,11 @@ class LocalBookRepository implements BookRepository {
       return null;
     }
 
-    final localBooks = await _loadLocalBooks();
+    final zone = Zone.current[_importZone];
+    final batch = zone is _ImportBatch && identical(zone.repository, this)
+        ? zone
+        : null;
+    final localBooks = batch?.books ?? await _loadLocalBooks();
     final fileName = _fileNameFromPath(path);
     var title = fileName.replaceAll(
       RegExp(r'\.(txt|epub)$', caseSensitive: false),
@@ -179,7 +219,8 @@ class LocalBookRepository implements BookRepository {
       throw const FormatException('변환된 책의 용량이 제한을 초과했습니다.');
     }
     final fingerprint = await _fingerprint(bytes);
-    final hidden = await LibraryTrashStore(_storage).hiddenBookIds();
+    final hidden =
+        batch?.hidden ?? await LibraryTrashStore(_storage).hiddenBookIds();
     for (final existing in localBooks.where((b) => !hidden.contains(b.id))) {
       var hash = existing.sourceHash;
       if (hash == null && existing.localPath != null) {
@@ -227,8 +268,12 @@ class LocalBookRepository implements BookRepository {
       sourceHash: fingerprint,
     );
 
-    final next = [imported, ...localBooks];
-    await _saveLocalBooks(next);
+    if (batch != null) {
+      batch.books.insert(0, imported);
+      batch.changed = true;
+    } else {
+      await _saveLocalBooks([imported, ...localBooks]);
+    }
     return imported;
   });
 
@@ -371,3 +416,11 @@ class LocalBookRepository implements BookRepository {
 
 Future<String> _fingerprint(Uint8List bytes) =>
     Isolate.run(() => sha256.convert(bytes).toString());
+
+class _ImportBatch {
+  _ImportBatch(this.repository, this.books, this.hidden);
+  final LocalBookRepository repository;
+  final List<Book> books;
+  final Set<String> hidden;
+  bool changed = false;
+}

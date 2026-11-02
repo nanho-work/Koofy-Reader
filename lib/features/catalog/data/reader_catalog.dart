@@ -2,6 +2,8 @@ import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'dart:async';
+import 'catalog_cache.dart';
+export 'catalog_cache.dart' show CatalogCache;
 import 'dart:convert';
 import 'dart:io';
 
@@ -23,31 +25,44 @@ final readerCatalogProvider = Provider<ReaderCatalog>((ref) {
   return catalog;
 });
 
-// Cache metadata separately from the files. Search includes every server page,
-// including empty pages produced by backwards-compatible catalog filtering.
+class CatalogLoadStatus {
+  const CatalogLoadStatus({
+    this.refreshing = false,
+    this.complete = false,
+    this.failed = false,
+  });
+  final bool refreshing, complete, failed;
+}
+
+final catalogLoadStatusProvider =
+    StateProvider.family<CatalogLoadStatus, String>(
+      (ref, kind) => const CatalogLoadStatus(),
+    );
+
+// Show disk metadata immediately, then progressively fill a cold catalog. Search
+// still spans all pages; UI explicitly labels the period before it is complete.
 final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
   ref,
   kind,
 ) async {
   final language = ref.watch(appContentLanguageProvider);
+  var active = true;
+  ref.onDispose(() => active = false);
   final repository = ref.watch(readerCatalogProvider);
-  final items = <String, CatalogItem>{};
-  final visited = <String>{};
-  String? cursor;
-  do {
-    final page = await repository.list(kind, after: cursor, language: language);
-    for (final item in page.items) {
-      items[item.id] = item;
-    }
-    cursor = page.nextCursor;
-    if (cursor != null && !visited.add(cursor)) {
-      throw const CatalogException('목록을 끝까지 읽지 못했습니다. 다시 시도해 주세요.');
-    }
-  } while (cursor != null);
-  return items.values.toList()..sort((a, b) {
-    final order = a.title.toLowerCase().compareTo(b.title.toLowerCase());
-    return order != 0 ? order : a.id.compareTo(b.id);
-  });
+  var last = <CatalogItem>[];
+  await for (final items in repository.watchItems(
+    kind,
+    language: language,
+    status: (value) {
+      if (active) {
+        ref.read(catalogLoadStatusProvider(kind).notifier).state = value;
+      }
+    },
+  )) {
+    last = items;
+    if (active) ref.state = AsyncData(items);
+  }
+  return last;
 });
 
 // Repair old downloaded monthly groups without replacing personal cover choices.
@@ -108,14 +123,10 @@ final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
   if (kind == 'book' || kind == 'monthly' || kind.startsWith('series:')) {
     ref.watch(booksProvider);
   }
-  final items = await ref.watch(catalogItemsProvider(kind).future);
-  final installed = <String>{};
-  for (final item in items) {
-    if (item.kind != 'series' && await repository.isInstalled(item)) {
-      installed.add(catalogItemKey(item));
-    }
-  }
-  return installed;
+  final value = ref.watch(catalogItemsProvider(kind));
+  final items =
+      value.valueOrNull ?? await ref.watch(catalogItemsProvider(kind).future);
+  return repository.installedKeys(items ?? const []);
 });
 
 class CatalogDownloadState {
@@ -158,9 +169,9 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
         // Grouping failure must not roll back a successfully verified download.
         try {
           final episodes = [
-            ...await ref.read(
-              catalogItemsProvider('series:${item.seriesId}').future,
-            ),
+            ...await ref
+                .read(readerCatalogProvider)
+                .completeItems('series:${item.seriesId}'),
           ]..sort((a, b) => a.episodeNumber!.compareTo(b.episodeNumber!));
           await ref
               .read(bookGroupRepositoryProvider)
@@ -245,7 +256,8 @@ class CatalogAsset {
 
 class CatalogItem {
   CatalogItem.fromJson(Map<String, dynamic> json)
-    : id = json['id'] as String,
+    : json = Map<String, dynamic>.unmodifiable(json),
+      id = json['id'] as String,
       kind = json['kind'] as String,
       title = json['title'] as String,
       author = json['author'] as String,
@@ -316,6 +328,7 @@ class CatalogItem {
       throw const FormatException('책 파일은 EPUB 또는 TXT 한 개와 표지가 필요합니다.');
     }
   }
+  final Map<String, dynamic> json;
   final String id, kind, title, author, description, license, category, source;
   final int version;
   final Map<String, CatalogAsset> assets;
@@ -334,7 +347,8 @@ class CatalogItem {
 }
 
 class CatalogPage {
-  const CatalogPage(this.items, this.nextCursor);
+  const CatalogPage(this.items, this.nextCursor, {this.nextChange});
+  final DateTime? nextChange;
   final List<CatalogItem> items;
   final String? nextCursor;
 }
@@ -346,7 +360,9 @@ class ReaderCatalog {
     this.books, {
     Uri? endpoint,
     Future<Directory> Function()? directory,
-  }) : endpoint = endpoint ?? Uri.parse(readerCatalogEndpoint),
+    CatalogCache? cache,
+  }) : _cacheOverride = cache,
+       endpoint = endpoint ?? Uri.parse(readerCatalogEndpoint),
        _directory = directory ?? getApplicationSupportDirectory;
   final BookRepository books;
   final Uri endpoint;
@@ -354,9 +370,161 @@ class ReaderCatalog {
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 20);
   bool _installing = false;
+  final CatalogCache? _cacheOverride;
+  late final _cache = _cacheOverride ?? CatalogCache(_directory);
+  final _forced = <String>{};
+  final _requests = <String, Future<Map<String, dynamic>>>{};
+  final _covers = <String, Future<Uint8List?>>{};
+  final _coverSizes = <String, int>{};
+  int _coverBytes = 0;
+  void _forgetCover(String key) {
+    _covers.remove(key);
+    _coverBytes -= _coverSizes.remove(key) ?? 0;
+  }
+
+  final _downloads = <String, Future<File>>{};
+  String _listKey(String kind, String language) => '$endpoint|$language|$kind';
+  void forceRefresh(String kind, {String? language}) =>
+      _forced.add(_listKey(kind, language ?? AppLanguage.instance.code));
+
+  Stream<List<CatalogItem>> watchItems(
+    String kind, {
+    required String language,
+    required void Function(CatalogLoadStatus) status,
+  }) async* {
+    final key = _listKey(kind, language);
+    final force = _forced.remove(key);
+    final saved = await _cache.read(key);
+    List<CatalogItem>? previous;
+    try {
+      if (saved != null) {
+        previous = (saved['items'] as List)
+            .map(
+              (item) =>
+                  CatalogItem.fromJson(Map<String, dynamic>.from(item as Map)),
+            )
+            .toList();
+      }
+    } catch (_) {
+      /* A corrupt snapshot must fall back to the server. */
+    }
+    if (previous != null) {
+      status(
+        CatalogLoadStatus(
+          complete: true,
+          refreshing: force || !_cache.fresh(saved!),
+        ),
+      );
+      yield previous;
+      if (!force && _cache.fresh(saved!)) return;
+    } else {
+      status(const CatalogLoadStatus(refreshing: true));
+    }
+    final items = <String, CatalogItem>{}, visited = <String>{};
+    String? cursor;
+    DateTime? nextChange;
+    try {
+      do {
+        final page = await list(kind, after: cursor, language: language);
+        for (final item in page.items) {
+          items[item.id] = item;
+        }
+        if (page.nextChange != null &&
+            (nextChange == null || page.nextChange!.isBefore(nextChange))) {
+          nextChange = page.nextChange;
+        }
+        cursor = page.nextCursor;
+        if (cursor != null && !visited.add(cursor)) {
+          throw const CatalogException('목록을 끝까지 읽지 못했습니다. 다시 시도해 주세요.');
+        }
+        // Preserve a complete saved search index during refresh; cold starts can
+        // already browse the first page while subsequent pages arrive.
+        if (previous == null && cursor != null) yield _sorted(items.values);
+      } while (cursor != null);
+      final result = _sorted(items.values);
+      try {
+        await _cache.save(
+          key,
+          result.map((item) => item.json).toList(),
+          nextChange: nextChange,
+        );
+      } catch (_) {
+        /* Disk cache failure must not discard a successful response. */
+      }
+      status(const CatalogLoadStatus(complete: true));
+      yield result;
+    } catch (_) {
+      status(CatalogLoadStatus(complete: previous != null, failed: true));
+      if (previous == null) rethrow;
+    }
+  }
+
+  Future<List<CatalogItem>> completeItems(String kind, {String? language}) =>
+      watchItems(
+        kind,
+        language: language ?? AppLanguage.instance.code,
+        status: (_) {},
+      ).last;
+
+  List<CatalogItem> _sorted(Iterable<CatalogItem> items) =>
+      items.toList()..sort((a, b) {
+        final order = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        return order != 0 ? order : a.id.compareTo(b.id);
+      });
+
+  Future<Set<String>> installedKeys(List<CatalogItem> items) async {
+    if (books is! LocalBookRepository) {
+      final installed = <String>{};
+      for (final item in items) {
+        if (item.kind != 'series' && await isInstalled(item)) {
+          installed.add(catalogItemKey(item));
+        }
+      }
+      return installed;
+    }
+    final local = {for (final book in await books.getBooks()) book.id: book};
+    final installed = <String>{};
+    Map<String, dynamic>? fonts;
+    Directory? fontRoot;
+    for (final item in items) {
+      if (item.kind == 'book') {
+        final path = local[item.bookId]?.localPath;
+        if (path != null && await File(path).exists()) {
+          installed.add(catalogItemKey(item));
+        }
+      } else if (item.kind == 'font') {
+        fontRoot ??= await _root();
+        fonts ??= await _fontManifest(fontRoot);
+        if ((fonts['families'] as List).any(
+          (dynamic family) =>
+              family['id'] == item.fontId &&
+              family['remoteVersion'] == item.version &&
+              (family['faces'] as List).every(
+                (dynamic face) => File(
+                  '${fontRoot!.path}/fonts/${face['file']}',
+                ).existsSync(),
+              ),
+        )) {
+          installed.add(catalogItemKey(item));
+        }
+      }
+    }
+    return installed;
+  }
+
   void close() => _client.close(force: true);
 
-  Future<Map<String, dynamic>> _json(Map<String, String> query) async {
+  Future<Map<String, dynamic>> _json(Map<String, String> query) {
+    final key = jsonEncode(query);
+    return _requests.putIfAbsent(
+      key,
+      () => _fetchJson(query).whenComplete(() {
+        _requests.remove(key);
+      }),
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchJson(Map<String, String> query) async {
     try {
       if (endpoint.scheme != 'https' &&
           !(kDebugMode &&
@@ -423,6 +591,7 @@ class ReaderCatalog {
           .map((item) => CatalogItem.fromJson(item as Map<String, dynamic>))
           .toList(),
       data['nextCursor'] as String?,
+      nextChange: DateTime.tryParse(data['nextChangeAt'] as String? ?? ''),
     );
   }
 
@@ -463,6 +632,30 @@ class ReaderCatalog {
   }
 
   Future<File> _download(
+    CatalogItem item,
+    String slot,
+    Directory directory,
+    void Function(int) received, {
+    CatalogAsset? previewAsset,
+  }) {
+    final key =
+        '${directory.path}/${(previewAsset ?? item.assets[slot]!).filename}';
+    return _downloads.putIfAbsent(
+      key,
+      () =>
+          _downloadFile(
+            item,
+            slot,
+            directory,
+            received,
+            previewAsset: previewAsset,
+          ).whenComplete(() {
+            _downloads.remove(key);
+          }),
+    );
+  }
+
+  Future<File> _downloadFile(
     CatalogItem item,
     String slot,
     Directory directory,
@@ -559,9 +752,29 @@ class ReaderCatalog {
     return _download(item, 'cover', Directory('${root.path}/previews'), (_) {});
   }
 
-  Future<Uint8List?> coverPreview(CatalogItem item) async {
-    final file = await coverFile(item);
-    return file?.readAsBytes();
+  Future<Uint8List?> coverPreview(CatalogItem item) {
+    final asset = item.assets['cover'];
+    if (asset == null) return Future.value(null);
+    if (_covers.length >= 32 && !_covers.containsKey(asset.filename)) {
+      _forgetCover(_covers.keys.first);
+    }
+    return _covers.putIfAbsent(asset.filename, () async {
+      try {
+        final file = await coverFile(item);
+        final bytes = await file?.readAsBytes();
+        if (bytes != null && _covers.containsKey(asset.filename)) {
+          _coverBytes += bytes.length - (_coverSizes[asset.filename] ?? 0);
+          _coverSizes[asset.filename] = bytes.length;
+          while (_coverBytes > 8 * 1024 * 1024 && _covers.isNotEmpty) {
+            _forgetCover(_covers.keys.first);
+          }
+        }
+        return bytes;
+      } catch (_) {
+        _forgetCover(asset.filename);
+        rethrow;
+      }
+    });
   }
 
   Future<void> install(

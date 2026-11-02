@@ -63,8 +63,13 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
     }
   }
 
-  void _refresh() {
+  void _refresh({bool force = false}) {
     if (!mounted || ref.read(catalogDownloadProvider).busy || _opening) return;
+    if (force) {
+      for (final kind in ['monthly', 'book', 'series']) {
+        ref.read(readerCatalogProvider).forceRefresh(kind);
+      }
+    }
     ref.invalidate(monthlyGroupCoverSyncProvider);
     ref.invalidate(catalogItemsProvider('monthly'));
     ref.invalidate(catalogItemsProvider('book'));
@@ -200,7 +205,10 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
           ),
           if (download.busy) LinearProgressIndicator(value: download.progress),
           if (result.hasError)
-            TextButton(onPressed: _refresh, child: Text(tr('다시 시도'))),
+            TextButton(
+              onPressed: () => _refresh(force: true),
+              child: Text(tr('다시 시도')),
+            ),
           if (_preferencesLoaded)
             for (final book in compilations)
               Card(
