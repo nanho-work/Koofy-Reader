@@ -1,0 +1,26 @@
+[
+  {
+    "file": "01-google-feature-1024x500.png",
+    "width": 1024,
+    "height": 500,
+    "hasAlpha": false
+  },
+  {
+    "file": "02-play-intro-1080x1920.png",
+    "width": 1080,
+    "height": 1920,
+    "hasAlpha": false
+  },
+  {
+    "file": "03-apple-intro-1320x2868.png",
+    "width": 1320,
+    "height": 2868,
+    "hasAlpha": false
+  },
+  {
+    "file": "04-apple-wide-2853x2007.png",
+    "width": 2853,
+    "height": 2007,
+    "hasAlpha": false
+  }
+]

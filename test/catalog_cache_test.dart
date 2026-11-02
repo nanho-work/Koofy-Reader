@@ -17,8 +17,9 @@ class PagedCatalog extends ReaderCatalog {
     String? language,
   }) async {
     calls++;
-    if (fail || (failSecond && after != null))
+    if (fail || (failSecond && after != null)) {
       throw const CatalogException('offline');
+    }
     if (after != null && nextPage != null) await nextPage!.future;
     return after == null
         ? CatalogPage([catalogFixture(1)], 'next')

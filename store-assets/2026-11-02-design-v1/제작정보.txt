@@ -1,0 +1,39 @@
+쿠피리더 스토어 디자인 시안 v1 — 2026-11-02
+
+이번 작업은 대표 배너와 첫 소개 이미지의 디자인 검토용입니다.
+앱 기능, 달력, 아이콘, 스토어 등록 상태는 변경하지 않았습니다.
+
+파일
+01-google-feature-1024x500.png : Google Play 대표 그래픽 규격
+02-play-intro-1080x1920.png : Google Play 세로형 첫 소개 시안
+03-apple-intro-1320x2868.png : Apple 세로형 첫 소개 시안
+04-apple-wide-2853x2007.png : Apple 넓은 화면 첫 소개 시안
+
+모든 PNG는 RGB, 알파 없음. 스토어에는 업로드하지 않았습니다.
+previews : 축소 검토본 및 가운데 기준 16:9 / 4:3 잘림 검토본. 업로드하지 않습니다.
+sources : 이미지가 내장된 편집 가능한 SVG 원본.
+render.mjs : 같은 디자인을 규격별로 다시 출력하는 조판 스크립트.
+
+제작 방식
+내장 image_gen 도구로 종이와 세이지색 배경만 새로 생성했습니다. CLI/API 키는 사용하지 않았습니다.
+워드마크는 기존 앱의 실제 자산을 사용했습니다.
+Korean 문구는 조판 원본의 텍스트이므로 번역·크기·위치 수정이 가능합니다.
+앱 UI와 책 본문은 AI로 그리지 않고 기존 네이티브 독서 화면 캡처를 사용했습니다.
+
+원본 출처
+inputs/android-fold-reading.png : work/store-190/raw/ko/fold-reading.png, 2026-10-30 보관 캡처.
+inputs/ipad-reading.png : work/store-190/raw/ko/ipad-reading.png, 2026-10-30 보관 캡처.
+inputs/reader-content-reference.png : work/store-duo/raw/02-reading.png, 이전 보관 캡처.
+대표 배너는 이 캡처에서 책 삽화와 본문 영역을 확대해 조판했습니다. 화면 전체 캡처는 아닙니다.
+inputs/wordmark.png : assets/images/promotions/koofy_reader_wordmark.png의 사본.
+배경 생성 프롬프트는 같은 폴더의 배경-생성-프롬프트.txt에 저장했습니다.
+
+검토 기준
+짧고 큰 제목, 충분한 가장자리 여백, 실제 두 페이지 독서 경험을 중심으로 구성했습니다.
+대표 배너의 가운데 기준 16:9·4:3 잘림에서도 제목과 워드마크가 남는지 확인했습니다.
+이 검사는 예상 잘림 시뮬레이션이며 모든 스토어 노출 위치에 공통된 공식 안전 영역을 뜻하지 않습니다.
+
+후속 작업
+디자인 확정 후 이번 버그 수정 빌드의 최신 캡처로 플랫폼·기기별 내용을 다시 확인합니다.
+Apple 소개 시안에는 큰 화면 기능을 보여주는 iPad 캡처가 들어 있습니다. 최종 iPhone·Duo·iPad 등록은 각 슬롯에 맞는 실제 기기 캡처와 규격을 확인해야 합니다.
+한국어 방향 확정 후 영어·일본어 문구와 해당 언어의 실제 책 화면으로 같은 디자인을 제작합니다.

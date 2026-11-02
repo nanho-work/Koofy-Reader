@@ -56,7 +56,7 @@ void main() {
   Completer<void>? hold;
   Completer<void>? started;
   Future<dynamic> native(MethodCall call) async {
-    if (call.method == 'pick')
+    if (call.method == 'pick') {
       return [
         for (var i = 1; i <= count; i++)
           for (final ext in ['txt', if (images) 'png'])
@@ -65,6 +65,7 @@ void main() {
               'source': 'content://test/$i.$ext',
             },
       ];
+    }
     if (call.method == 'cancel') {
       hold?.complete();
       hold = null;

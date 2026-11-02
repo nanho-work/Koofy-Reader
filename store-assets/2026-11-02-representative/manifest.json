@@ -1,0 +1,65 @@
+[
+  {
+    "file": "ko-google-feature.png",
+    "width": 1024,
+    "height": 500,
+    "language": "ko",
+    "placement": "google-feature"
+  },
+  {
+    "file": "ko-apple-header.png",
+    "width": 3840,
+    "height": 1646,
+    "language": "ko",
+    "placement": "apple-header"
+  },
+  {
+    "file": "ko-apple-search.png",
+    "width": 1920,
+    "height": 1280,
+    "language": "ko",
+    "placement": "apple-search"
+  },
+  {
+    "file": "en-google-feature.png",
+    "width": 1024,
+    "height": 500,
+    "language": "en",
+    "placement": "google-feature"
+  },
+  {
+    "file": "en-apple-header.png",
+    "width": 3840,
+    "height": 1646,
+    "language": "en",
+    "placement": "apple-header"
+  },
+  {
+    "file": "en-apple-search.png",
+    "width": 1920,
+    "height": 1280,
+    "language": "en",
+    "placement": "apple-search"
+  },
+  {
+    "file": "ja-google-feature.png",
+    "width": 1024,
+    "height": 500,
+    "language": "ja",
+    "placement": "google-feature"
+  },
+  {
+    "file": "ja-apple-header.png",
+    "width": 3840,
+    "height": 1646,
+    "language": "ja",
+    "placement": "apple-header"
+  },
+  {
+    "file": "ja-apple-search.png",
+    "width": 1920,
+    "height": 1280,
+    "language": "ja",
+    "placement": "apple-search"
+  }
+]
