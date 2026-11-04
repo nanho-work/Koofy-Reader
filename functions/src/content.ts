@@ -165,6 +165,7 @@ export function publicItem(item: Content) {
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
   const { preview, sourceTxt: _sourceTxt, autoCompile: _autoCompile, expectedEpisodes: _expectedEpisodes, ...fields } = snapshot;
   return { id: item.id, kind: item.kind, ...fields,
+    ...(item.translationGroupId ? { translationGroupId: item.translationGroupId } : {}),
     ...(snapshot.issueMonth ? { author: snapshot.byline || '' } : {}),
     ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.language === 'en' ? `Chapter ${snapshot.episodeNumber}` : snapshot.language === 'ja' ? `第${snapshot.episodeNumber}話` : `${snapshot.episodeNumber}화`} — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
     assets, ...(preview ? { preview: { sha256: preview.sha256, size: preview.size, extension: preview.extension } } : {}) };

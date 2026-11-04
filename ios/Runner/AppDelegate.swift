@@ -23,6 +23,16 @@ import UserMessagingPlatform
     let channel = FlutterMethodChannel(name: "com.koofylab.koofyreader/privacy",
       binaryMessenger: registry.registrar(forPlugin: "KoofyPrivacy")!.messenger())
     channel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "notificationSettings" {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else {
+          result(FlutterError(code: "settings_unavailable", message: "Settings unavailable", details: nil)); return
+        }
+        UIApplication.shared.open(url, options: [:]) { success in
+          if success { result(nil) }
+          else { result(FlutterError(code: "settings_unavailable", message: "Settings unavailable", details: nil)) }
+        }
+        return
+      }
       if call.method == "prepareConsent" || call.method == "showConsentOptions" {
         guard let self else { result(FlutterError(code: "consent_unavailable", message: "App unavailable", details: nil)); return }
         self.adConsent.handle(options: call.method == "showConsentOptions", result: result)

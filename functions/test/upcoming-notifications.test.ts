@@ -20,3 +20,13 @@ test('notification topics follow language and work identity; monthly follows acr
  assert.match(notificationPayload(base,parent).condition,/reader_work_cccccccccccccccccccccccccccccccc_ko/);
  assert.equal(releaseTimestamp(base,0),Date.parse(base.publishedContent!.releaseAt!));
 });
+test('linked translations expose stable public work identity and retain old topic aliases',async()=>{
+ const {publicItem}=await import('../src/content');
+ const group='c'.repeat(32);
+ const parent={...base,id:'b'.repeat(32),kind:'series',translationGroupId:group,publishedContent:{...base.publishedContent!,seriesId:undefined}} as Content;
+ assert.equal(publicItem(parent).translationGroupId,group);
+ const condition=notificationPayload(base,parent).condition;
+ assert.match(condition,new RegExp(`reader_work_${group}_ko`));
+ assert.match(condition,new RegExp(`reader_work_${parent.id}_ko`));
+ assert.match(condition,/reader_books_ko/); // legacy explicit all-story opt-ins only
+});

@@ -46,11 +46,9 @@ Future<void> _initialize() async {
     }
   }
   await ReaderAnalytics.instance.initialize(mobile: mobile);
-  if (mobile) {
-    try {
-      await ReaderNotifications.instance.initialize();
-    } catch (_) {
-      /* Offline reading remains available. */
-    }
+  try {
+    await ReaderNotifications.instance.initialize();
+  } catch (_) {
+    /* Offline reading remains available. */
   }
 }

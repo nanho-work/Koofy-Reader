@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
@@ -93,6 +94,14 @@ class CatalogShelfCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ),
+                  if (item.kind != 'font' &&
+                      item.seriesId == null &&
+                      !item.upcoming)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: FavoriteButton(item: item),
                     ),
                   if (installed && progress == null)
                     Positioned(

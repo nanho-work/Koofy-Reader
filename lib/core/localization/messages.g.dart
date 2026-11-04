@@ -4091,5 +4091,57 @@ const messages = {
   "알림": {
     "en": "Notice",
     "ja": "お知らせ"
+  },
+  "즐겨찾기": {
+    "en": "Favorites",
+    "ja": "お気に入り"
+  },
+  "즐겨찾기 추가": {
+    "en": "Add to favorites",
+    "ja": "お気に入りに追加"
+  },
+  "즐겨찾기 해제": {
+    "en": "Remove from favorites",
+    "ja": "お気に入りを解除"
+  },
+  "새 이야기 알림": {
+    "en": "New story notifications",
+    "ja": "新しいお話の通知"
+  },
+  "즐겨찾기한 책에 새로운 이야기가 올라오면 알려드려요. 알림을 켤까요?": {
+    "en": "Get notified when a favorite has a new story. Turn on notifications?",
+    "ja": "お気に入りに新しいお話が公開されたらお知らせします。通知をオンにしますか？"
+  },
+  "알림 켜기": {
+    "en": "Turn on notifications",
+    "ja": "通知をオンにする"
+  },
+  "즐겨찾기 새 글 알림": {
+    "en": "Updates from favorites",
+    "ja": "お気に入りの新着通知"
+  },
+  "별표한 작품의 새 회차와 월간 쿠피 소식을 받아요. 즐겨찾기는 도서에서 관리할 수 있어요.": {
+    "en": "Receive new chapters from starred works and Koofy Monthly. Manage favorites in Books.",
+    "ja": "星を付けた作品の新しい話や月刊クーフィーの更新を受け取ります。お気に入りは「本」で管理できます。"
+  },
+  "기기에서 알림이 허용되어야 새 글 알림을 받을 수 있어요. 즐겨찾기는 알림 없이도 사용할 수 있어요.": {
+    "en": "Allow notifications in device settings to receive updates. Favorites work even without notifications.",
+    "ja": "新着通知を受け取るには端末で通知を許可してください。通知を許可しなくてもお気に入りは利用できます。"
+  },
+  "기존 전체 새 글 알림": {
+    "en": "Previously enabled all-story updates",
+    "ja": "以前の全作品の新着通知"
+  },
+  "이전에 선택한 전체 새 글 알림입니다. 끄면 즐겨찾기한 작품의 소식만 받아요.": {
+    "en": "Your previous all-story subscription is preserved. Turn it off to receive updates only from favorites.",
+    "ja": "以前に選択した全作品の新着通知です。オフにするとお気に入りの更新のみを受け取ります。"
+  },
+  "현재 언어의 도서 목록에서 찾을 수 없어요. 즐겨찾기는 유지됩니다.": {
+    "en": "Unavailable in the current language catalog. Your favorite is kept.",
+    "ja": "現在の言語の本の一覧にはありません。お気に入りは保持されます。"
+  },
+  "즐겨찾기한 책이 없습니다. 책의 별표를 눌러 추가해 보세요.": {
+    "en": "No favorites yet. Tap the star on a book to add it.",
+    "ja": "お気に入りはまだありません。本の星をタップして追加してください。"
   }
 };

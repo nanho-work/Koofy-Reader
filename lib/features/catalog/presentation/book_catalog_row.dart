@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'catalog_cover.dart';
 import 'catalog_shelf.dart';
@@ -34,6 +35,8 @@ class BookCatalogRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(child: CatalogCover(item: item, width: 72)),
+            if (item.seriesId == null)
+              FavoriteButton(item: item, showLabel: true),
             const SizedBox(height: 16),
             Text(
               [

@@ -1,7 +1,6 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'dart:async';
 import 'package:koofy_reader/features/notifications/notification_widgets.dart';
-import 'package:koofy_reader/features/notifications/reader_notifications.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'catalog_cover.dart';
 import 'catalog_shelf.dart';
@@ -419,7 +418,7 @@ class _SeriesInformation extends StatelessWidget {
         const SizedBox(height: 6),
         if (series.author.trim().isNotEmpty) Text(series.author),
         const SizedBox(height: 6),
-        NotificationChoice(base: notificationBase(series), title: series.title),
+        FavoriteButton(item: series, showLabel: true),
         Text(tr('{0} · {1}화 공개', [tr(series.seriesStatusLabel), count])),
       ],
     );

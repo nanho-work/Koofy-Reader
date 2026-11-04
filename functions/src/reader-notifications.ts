@@ -14,8 +14,10 @@ export function notificationPayload(item: Content,parent?: Content) {
   const monthly=!!s.issueMonth || !!parent?.publishedContent?.issueMonth;
   const title=language==='ko'?(monthly?'오늘의 월간 쿠피가 도착했어요':'새로운 이야기가 도착했어요'):language==='ja'?(monthly?'月刊クーフィーの新しいお話です':'新しいお話が届きました'):(monthly?'A new Koofy Monthly story':'A new story is here');
   const body=language==='ko'?`「${s.title}」, 잠깐 쉬며 읽어보세요.`:language==='ja'?`「${s.title}」を読んでみませんか。`:`Take a reading break with “${s.title}”.`;
-  const work=parent?.publishedContent?.translationGroupId || parent?.id || s.translationGroupId || item.id;
-  const bases=monthly?['monthly']:[`work_${work}`,'books'];
+  const work=parent?.translationGroupId || parent?.publishedContent?.translationGroupId || parent?.id || item.translationGroupId || s.translationGroupId || item.id;
+  // Keep explicit subscriptions from older clients working after translation linkage.
+  // New clients subscribe only to favorite work topics; books is legacy opt-in.
+  const bases=monthly?['monthly']:[...new Set([`work_${work}`, `work_${parent?.id || item.id}`, 'books'])];
   return {condition:bases.map(b=>`'reader_${b}_${language}' in topics`).join(' || '),notification:{title,body},data:{id:item.id,seriesId:s.seriesId||'',language},android:{notification:{tag:`reader-${item.id}`}},apns:{headers:{'apns-collapse-id':`reader-${item.id}`},payload:{aps:{sound:'default'}}}};
 }
 

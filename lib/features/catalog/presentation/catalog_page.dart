@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/notifications/reader_notifications.dart';
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'open_catalog_book.dart';
 export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
@@ -162,6 +163,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
 
   final _scroll = ScrollController();
   String? _category;
+  bool _favoritesOnly = false;
   bool _openedInitialSeries = false;
   bool get _books => widget.kind == 'book';
 
@@ -218,6 +220,19 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
     final loading = ref.watch(catalogLoadStatusProvider(widget.kind));
     final installed = ref.watch(catalogInstalledProvider(widget.kind));
     final download = ref.watch(catalogDownloadProvider);
+    ref.watch(notificationPreferencesProvider);
+    ref.watch(readerNotificationsChangesProvider);
+    final favorites = ref.watch(readerNotificationsProvider);
+    if (_books &&
+        catalog.hasValue &&
+        favorites.needsReconcile(catalog.value!)) {
+      final items = catalog.value!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          favorites.reconcile(items).catchError((Object _) {});
+        }
+      });
+    }
     final query = _search.text.trim().toLowerCase();
     if (_books &&
         !_openedInitialSeries &&
@@ -242,12 +257,42 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
     final items = (catalog.valueOrNull ?? const <CatalogItem>[])
         .where(
           (item) =>
+              (!_favoritesOnly || favorites.isFavorite(item)) &&
               (_category == null || item.category == _category) &&
               (_books ? '${item.title} ${item.author}' : item.title)
                   .toLowerCase()
                   .contains(query),
         )
         .toList();
+    // One monthly subscription across issues; show the latest visible issue.
+    if (_favoritesOnly) {
+      final grouped = <String, CatalogItem>{};
+      for (final item in items) {
+        final base = notificationBase(item),
+            previous = grouped[notificationBase(item)];
+        if (previous == null ||
+            item.issueMonth.compareTo(previous.issueMonth) > 0) {
+          grouped[base] = item;
+        }
+      }
+      items
+        ..clear()
+        ..addAll(grouped.values);
+    }
+    final missingFavorites =
+        _favoritesOnly && loading.complete && !catalog.hasError
+        ? favorites.favorites.entries
+              .where(
+                (e) =>
+                    e.value.toLowerCase().contains(query) &&
+                    !(catalog.valueOrNull ?? const <CatalogItem>[]).any(
+                      (item) =>
+                          notificationBase(item) == e.key ||
+                          'work_${item.id}' == e.key,
+                    ),
+              )
+              .toList()
+        : <MapEntry<String, String>>[];
     final categories = <String>{
       ...catalogBookCategories,
       ...?catalog.valueOrNull?.map((item) => item.category),
@@ -263,13 +308,27 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                 ? CrossAxisAlignment.stretch
                 : CrossAxisAlignment.center,
             children: [
+              if (_books)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6, top: 8),
+                  child: SelectionMenuChip(
+                    label: tr('즐겨찾기'),
+                    selected: _favoritesOnly,
+                    onSelected: (_) {
+                      _favoritesOnly = true;
+                      _category = null;
+                      _changed();
+                    },
+                  ),
+                ),
               for (final category in <String?>[null, ...categories])
                 Padding(
                   padding: const EdgeInsets.only(right: 6, top: 8),
                   child: SelectionMenuChip(
                     label: tr(category ?? '전체'),
-                    selected: _category == category,
+                    selected: !_favoritesOnly && _category == category,
                     onSelected: (_) {
+                      _favoritesOnly = false;
                       _category = category;
                       _changed();
                     },
@@ -336,6 +395,34 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                     if (index == 0) {
                       return Column(
                         children: [
+                          for (final entry in missingFavorites)
+                            ListTile(
+                              title: Text(entry.value),
+                              subtitle: Text(
+                                tr('현재 언어의 도서 목록에서 찾을 수 없어요. 즐겨찾기는 유지됩니다.'),
+                              ),
+                              trailing: IconButton(
+                                tooltip: tr('즐겨찾기 해제'),
+                                icon: const Icon(Icons.star_rounded),
+                                onPressed: () async {
+                                  try {
+                                    await favorites.setFavorite(
+                                      entry.key,
+                                      entry.value,
+                                      false,
+                                    );
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ReaderAlerts.of(context).show(
+                                        ReaderNotice(
+                                          content: Text(_message(e)),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
                           if (catalog.isLoading || loading.refreshing)
                             const Padding(
                               padding: EdgeInsets.all(16),
@@ -363,16 +450,19 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                           if (!catalog.isLoading &&
                               !loading.refreshing &&
                               !catalog.hasError &&
-                              items.isEmpty)
+                              items.isEmpty &&
+                              missingFavorites.isEmpty)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 24),
                               child: Text(
-                                widget.initialQuery.isNotEmpty &&
-                                        query ==
-                                            widget.initialQuery
-                                                .trim()
-                                                .toLowerCase() &&
-                                        _category == null
+                                _favoritesOnly && query.isEmpty
+                                    ? tr('즐겨찾기한 책이 없습니다. 책의 별표를 눌러 추가해 보세요.')
+                                    : widget.initialQuery.isNotEmpty &&
+                                          query ==
+                                              widget.initialQuery
+                                                  .trim()
+                                                  .toLowerCase() &&
+                                          _category == null
                                     ? tr(
                                         "아직 공개된 회차가 없습니다.\n다음 화가 공개되면 이곳에서 내려받을 수 있습니다.",
                                       )

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/notifications/reader_notifications.dart';
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
@@ -126,6 +127,14 @@ class _NativeReaderLaunchPageState
           .timeout(const Duration(seconds: 1), onTimeout: () => false);
       if (!mounted || _leaveRequested) return;
       final diaryBook = await DiaryBook.snapshot(_book, group: diaryGroup);
+      if (!mounted || _leaveRequested) return;
+      // Ask while the Flutter host Activity is still foreground. Android's
+      // messaging plugin cannot reliably request from behind ReaderActivity.
+      try {
+        await ref.read(readerNotificationsProvider).firstReading();
+      } catch (_) {
+        /* Optional notifications never prevent reading. */
+      }
       if (!mounted || _leaveRequested) return;
       await services.coordinator.open(
         diaryBook: diaryBook,

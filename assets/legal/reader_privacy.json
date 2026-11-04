@@ -26,7 +26,7 @@
           "paragraphs": [
             "공개된 도서·표지·글꼴 목록 조회와 파일 다운로드에 Firebase Cloud Functions, Cloud Firestore 및 Cloud Storage를 사용합니다. 이 과정에서 요청한 콘텐츠 식별자, IP 주소, 요청 시각, 응답·오류 등 서버 접속 정보가 서비스 제공·보안·장애 대응을 위해 처리될 수 있습니다.",
             "앱 시작 시 업데이트 안내를 확인하기 위해 Firebase Remote Config를 사용합니다. 이 과정에서 Firebase 설치 식별자, 앱 버전과 기기·운영체제 정보 등이 설정 제공을 위해 처리될 수 있습니다. 이 기능에 독서 본문·기록을 전송하지 않으며 Analytics 기반 개인화나 A/B 테스트를 사용하지 않습니다.",
-            "새 글 알림은 설정 또는 작품 화면에서 직접 신청한 경우에만 사용합니다. Firebase Cloud Messaging(FCM), Android 알림 서비스 및 Apple Push Notification service(APNs)가 알림 전달을 위해 앱 설치의 등록 토큰, 기기·앱 정보와 언어별 공개 콘텐츠 구독 주제를 처리합니다. 개인 파일의 본문·독서 기록은 알림에 사용하지 않습니다. 앱 설정에서 구독을 해제하고 운영체제 설정에서 알림 허용을 변경할 수 있습니다."
+            "새 글 알림은 알림이 허용된 경우 즐겨찾기한 작품을 대상으로 전달합니다. 즐겨찾기와 전체 알림 선택은 기기에 저장하며, 알림을 거부해도 즐겨찾기와 독서를 이용할 수 있습니다. 첫 독서 진입 때 운영체제의 알림 권한을 한 번 요청하고, 이후 변경은 앱과 기기 설정에서 제공합니다. 별표 해제 시 해당 작품의 구독을 해제하며, 월간 쿠피 즐겨찾기는 다음 달에도 유지합니다. Firebase Cloud Messaging(FCM), Android 알림 서비스 및 Apple Push Notification service(APNs)가 알림 전달을 위해 앱 설치의 등록 토큰, 기기·앱 정보와 언어별 공개 콘텐츠 구독 주제를 처리합니다. 개인 파일의 본문·독서 기록은 알림에 사용하지 않습니다. 이전 버전에서 직접 신청한 전체 새 글 알림은 선택을 보존하며 설정에서 해제할 수 있습니다."
           ]
         },
         {
@@ -144,7 +144,7 @@
           "paragraphs": [
             "Firebase Cloud Functions, Cloud Firestore, and Cloud Storage provide the public catalog and book, cover, and font downloads. Content identifiers, IP addresses, request times, responses, and error information may be processed to deliver and secure these services and diagnose problems.",
             "Firebase Remote Config checks for update notices at app startup. Firebase installation identifiers, app version and device or operating system information may be processed to deliver configuration values. Reading content and history are not sent for this feature. Analytics-based personalization and A/B testing are not used.",
-            "New-story notifications are optional and enabled only when you subscribe in Settings or on a work’s page. Firebase Cloud Messaging (FCM), Android notification services and Apple Push Notification service (APNs) process an installation’s registration token, device/app information and language-specific public-content topic subscriptions to deliver notifications. Your personal book text and reading history are not used for notifications. You can unsubscribe in the app and change notification permission in OS settings."
+            "When notifications are allowed, updates are sent for your favorite works. Favorites and the overall notification choice are stored on your device; declining notifications does not restrict favorites or reading. The app requests OS notification permission once when you first enter reading. You can change your choice in app and device settings. Removing a star unsubscribes from that work; a Koofy Monthly favorite continues across months. Firebase Cloud Messaging (FCM), Android notification services and Apple Push Notification service (APNs) process an installation’s registration token, device/app information and language-specific public-content topic subscriptions to deliver notifications. Your personal book text and reading history are not used for notifications. An all-story subscription explicitly enabled in an earlier version is preserved and can be disabled in Settings."
           ]
         },
         {
@@ -261,7 +261,7 @@
           "paragraphs": [
             "公開カタログの取得と本・表紙・フォントのダウンロードには、Firebase Cloud Functions、Cloud Firestore、Cloud Storageを使用します。サービスの提供・保護・障害対応のため、コンテンツ識別子、IPアドレス、リクエスト時刻、応答、エラー情報などが処理される場合があります。",
             "起動時にFirebase Remote Configで更新のお知らせを確認します。設定値の配信のため、Firebaseインストール識別子、アプリのバージョン、端末・OS情報などが処理される場合があります。この機能で本文や読書履歴は送信しません。AnalyticsによるパーソナライズやA/Bテストは使用しません。",
-            "新着通知は、設定または作品画面で利用者が購読した場合のみ使用します。Firebase Cloud Messaging（FCM）、Androidの通知サービスおよびApple Push Notification service（APNs）は、通知の配信にアプリの登録トークン、端末・アプリ情報と言語別の公開コンテンツの購読トピックを使用します。個人の本の本文や読書記録は通知に使用しません。アプリ内で購読を解除し、OSの設定で通知の許可を変更できます。"
+            "通知が許可されている場合、お気に入りの作品の更新をお知らせします。お気に入りと通知全体の選択は端末内に保存し、通知を拒否してもお気に入りや読書は利用できます。初めて読書に入る際にOSの通知許可を一度求め、その後はアプリや端末の設定から変更できます。星を外すとその作品の購読を解除し、月刊クーフィーのお気に入りは翌月も維持します。Firebase Cloud Messaging（FCM）、Androidの通知サービスおよびApple Push Notification service（APNs）は、配信のためアプリの登録トークン、端末・アプリ情報と言語別の公開コンテンツの購読トピックを処理します。個人の本の本文や読書記録は通知に使用しません。以前のバージョンで利用者が選択した全作品の新着通知は保持し、設定から解除できます。"
           ]
         },
         {
