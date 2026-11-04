@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/notifications/reader_notifications.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -45,4 +46,11 @@ Future<void> _initialize() async {
     }
   }
   await ReaderAnalytics.instance.initialize(mobile: mobile);
+  if (mobile) {
+    try {
+      await ReaderNotifications.instance.initialize();
+    } catch (_) {
+      /* Offline reading remains available. */
+    }
+  }
 }

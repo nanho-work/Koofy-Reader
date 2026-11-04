@@ -29,8 +29,7 @@ internal class ReaderSpeechDialog(private val context: Context, private val spee
             setBackgroundColor(palette.background)
         }
         val scroll = ScrollView(context).apply { addView(column) }
-        val title = text(L("듣기 설정"), 20f).apply { setPadding(dp(20), dp(20), dp(20), dp(8)) }
-        val dialog = AlertDialog.Builder(context).setCustomTitle(title)
+        val dialog = ReaderAlert.Builder(context, palette).setTitle(L("듣기 설정"))
             .setView(scroll).setPositiveButton(L("완료"), null).create()
         fun heading(value: String) {
             column.addView(text(value, 13f, true).apply {
@@ -92,6 +91,7 @@ internal class ReaderSpeechDialog(private val context: Context, private val spee
         voiceButton = action("${selectedName()}  ›") {
             if (voices.isEmpty()) return@action
             speech.stopPreview()
+            dialog.dismiss()
             val labels = voices.mapIndexed { i, voice -> L("한국어 음성 {0}", i + 1) + "\n${voice.id.value}" }
             val adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_list_item_single_choice, labels) {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
@@ -99,16 +99,14 @@ internal class ReaderSpeechDialog(private val context: Context, private val spee
                         setTextColor(palette.foreground); setBackgroundColor(palette.background)
                     }
             }
-            val picker = AlertDialog.Builder(context).setCustomTitle(text(L("한국어 목소리 선택"), 20f).apply {
-                setPadding(dp(20), dp(20), dp(20), dp(8))
-            }).setSingleChoiceItems(adapter,
+            val picker = ReaderAlert.Builder(context, palette).setTitle(L("한국어 목소리 선택")).setSingleChoiceItems(adapter,
                     voices.indexOfFirst { it.id.value == speech.voiceId }) { picker, index ->
                     speech.selectVoice(voices[index].id.value)
                     voiceButton.text = "${selectedName()}  ›"
                     picker.dismiss()
                 }.setNegativeButton(L("닫기"), null).create()
+            picker.setOnDismissListener { this@ReaderSpeechDialog.show() }
             picker.show()
-            picker.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(palette.background))
             picker.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(palette.accent)
         }
         voiceButton.isEnabled = voices.isNotEmpty()
@@ -138,13 +136,6 @@ internal class ReaderSpeechDialog(private val context: Context, private val spee
         })
         dialog.setOnDismissListener { speech.stopPreview() }
         dialog.show()
-        dialog.window?.apply {
-            setBackgroundDrawable(GradientDrawable().apply {
-                setColor(palette.background); cornerRadius = dp(24).toFloat()
-            })
-            setGravity(Gravity.BOTTOM)
-            setLayout(minOf(context.resources.displayMetrics.widthPixels - dp(24), dp(480)), ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(palette.accent)
     }
 }

@@ -121,14 +121,14 @@ final class ReaderSpeechSettingsViewController: UITableViewController {
             else if !speech.voices.isEmpty {
                 speech.stopPreview()
                 let voices = speech.voices
-                let alert = UIAlertController(title: L("한국어 목소리 선택"), message: nil, preferredStyle: .alert)
+                let alert = ReaderAlertController(title: L("한국어 목소리 선택"), message: nil, preferredStyle: .alert, palette: palette)
                 for voice in voices {
-                    alert.addAction(UIAlertAction(title: "\(voice.identifier == speech.voiceID ? "✓ " : "")\(voice.name)", style: .default) { [weak self] _ in
+                    alert.addAction(ReaderAlertAction(title: "\(voice.identifier == speech.voiceID ? "✓ " : "")\(voice.name)", style: .default) { [weak self] _ in
                         self?.speech.selectVoice(voice.identifier); self?.tableView.reloadData()
                     })
                 }
-                alert.addAction(UIAlertAction(title: L("닫기"), style: .cancel))
-                present(alert, animated: true)
+                alert.addAction(ReaderAlertAction(title: L("닫기"), style: .cancel))
+                alert.present(from: self)
             }
         case 3: speech.setFollow(!speech.follow); tableView.reloadData()
         case 4: dismiss(animated: true) { [speech] in speech.start(savedPosition: true) }

@@ -1,3 +1,4 @@
+import {upcomingItem} from './content';
 import {releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
 import { changeSeriesStatus, pendingEpisodes } from './series-status';
 import {adminCoverAsset} from './admin-cover';
@@ -117,7 +118,7 @@ async function deleteContent(contentId: string, expected: number, uid: string, d
   });
   return { id: contentId, deleted: true };
 }
-async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false, language: 'ko' | 'en' | 'ja' = 'ko') {
+async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false, language: 'ko' | 'en' | 'ja' = 'ko', supportsUpcoming = false) {
   const selectedKind = kind(contentKind);
   let query = grouped && selectedKind === 'book' && publicOnly
     ? contents.where('kind', 'in', ['book', 'series']) : contents.where('kind', '==', selectedKind);
@@ -136,7 +137,7 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   // Older apps reject unknown asset slots. Keep TXT out of their responses,
   // retaining the raw document cursor even when a page contains only TXT books.
   const visible = docs.slice(0, 40).map(doc => doc.data() as Content).filter(item =>
-    (!publicOnly || (visibleInLanguage(item, language) && isReleased(item))) &&
+    (!publicOnly || (visibleInLanguage(item, language) && (isReleased(item) || (supportsUpcoming && !!seriesId && !!item.publishedContent)))) &&
     (!grouped || selectedKind !== 'book' || !item.seriesId) &&
     (!publicOnly || supportsTxt || !item.publishedContent?.assets.txt));
   // Legacy apps still receive complete individual books. A private parent also
@@ -157,7 +158,7 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   const compiled = new Map(compilations.map(doc => [doc.id, doc.data() as Content | undefined]));
   const items = await Promise.all(visible.filter(item => !publicOnly || !item.seriesId || available.has(item.seriesId)).map(async item => {
     if (!publicOnly) return item;
-    const result = publicItem(item);
+    const result = !isReleased(item) ? upcomingItem(item) : publicItem(item);
     if (item.kind !== 'series') return result;
     const compilationId = item.publishedContent?.compilationId;
     if (compilationId && compilationReady(item, compiled.get(compilationId))) return null;
@@ -496,7 +497,7 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
     if (request.query.action === 'download') {
       const item = await getItem(id(request.query.id));
       publicItem(item); // Never sign draft/unpublished paths supplied by a caller.
-      requireValue(isReleased(item), '아직 발행되지 않은 콘텐츠입니다.');
+      requireValue(isReleased(item) || (request.query.slot === 'cover' && !!item.seriesId), '아직 발행되지 않은 콘텐츠입니다.');
       await requirePublishedSeries(item);
       const snapshot = item.publishedContent!;
       if (Number(request.query.version) !== snapshot.version) throw new ApiError(409, '새 버전이 공개되었습니다. 목록을 새로고침해 주세요.');
@@ -508,7 +509,7 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }
     if (request.query.action === 'monthly') { response.json(await monthly(catalogLanguage(request.query.language))); return; }
-    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language)));
+    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language), request.query.supportsUpcoming === '1'));
   } catch (error) { sendError(error, response); }
 });
 
@@ -536,3 +537,5 @@ export const readerMonthlyCompilation = onSchedule({
     }
   }
 });
+
+export {readerQueueNewStory,readerSendNewStories} from './reader-notifications';

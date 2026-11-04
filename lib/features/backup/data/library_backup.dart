@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
@@ -139,6 +140,23 @@ class LibraryBackupService {
         'source': add(bytes, extension),
       });
     }
+    // Historical covers are deduplicated payloads, keeping the JSON manifest small.
+    final diaryRows = (await ReadingDiary(
+      storage,
+    ).load()).map((d) => d.toJson()).toList();
+    final diaryCovers = <String, String>{};
+    for (final day in diaryRows) {
+      for (final entry in day['entries'] as List) {
+        final cover = entry.remove('cover');
+        if (cover is String) {
+          final hash = sha256.convert(base64Decode(cover)).toString();
+          entry['coverSource'] = diaryCovers.putIfAbsent(
+            hash,
+            () => add(base64Decode(cover), 'png'),
+          );
+        }
+      }
+    }
     final manifest = <String, dynamic>{
       'format': 'koofy-reader-backup',
       'version': 1,
@@ -148,6 +166,7 @@ class LibraryBackupService {
       'covers': coverEntries,
       'files': hashes,
       'reader': await reader.exportBackup(ids),
+      'readingDiary': diaryRows,
       'completion': await LibraryCompletionRepository(storage).load(),
       'hidden': await _hiddenBooks(),
       'displayCover': await storage.getInt(readerCoverSettingKey) != 0,
@@ -306,6 +325,28 @@ class LibraryBackupService {
         throw const FormatException('글꼴 식별자가 올바르지 않습니다.');
       }
     }
+    final diaryRows = manifest['readingDiary'];
+    if (diaryRows is List) {
+      for (final day in diaryRows) {
+        if (day is! Map || day['entries'] is! List) {
+          throw const FormatException('Invalid reading diary backup');
+        }
+        for (final entry in day['entries'] as List) {
+          if (entry is! Map) {
+            throw const FormatException('Invalid reading diary backup');
+          }
+          final source = entry.remove('coverSource');
+          if (source != null) {
+            final bytes = files[source];
+            if (source is! String || bytes == null || bytes.length > 100000) {
+              throw const FormatException('Invalid reading diary cover');
+            }
+            entry['cover'] = base64Encode(bytes);
+          }
+        }
+      }
+    }
+    ReadingDiary.validateBackup(manifest['readingDiary']);
     manifest['speech'] = SpeechBackup.validated(manifest['speech'], ids);
     final state = Map<String, dynamic>.from(manifest['reader'] as Map);
     preferencesFromJson(state['preferences'] as String);
@@ -439,6 +480,9 @@ class LibraryBackupService {
       final hidden = await _hiddenBooks();
       pending[AppConstants.hiddenBooksKey] = jsonEncode(
         {...hidden, ...manifest['hidden'] as List}.toList(),
+      );
+      pending.addAll(
+        await ReadingDiary.mergeBackup(storage, manifest['readingDiary']),
       );
       final previous = <String, String?>{};
       for (final key in pending.keys) {

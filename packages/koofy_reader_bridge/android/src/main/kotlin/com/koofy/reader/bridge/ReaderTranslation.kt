@@ -4,7 +4,6 @@ import android.graphics.BitmapFactory
 import android.speech.tts.TextToSpeech
 import android.view.View
 import android.widget.*
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.common.model.RemoteModelManager
@@ -31,6 +30,7 @@ internal class ReaderTranslation(
 ) {
     val view = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
     var enabled = false; private set
+    private var currentPalette = ReaderPalette.forTheme("light")
     private var foreground = true
     private var disposed = false
     private var generation = 0
@@ -75,11 +75,12 @@ internal class ReaderTranslation(
         actions.addView(download, LinearLayout.LayoutParams(0, dp(44), 1f))
         view.addView(actions)
         view.addView(badge, LinearLayout.LayoutParams(dp(140), dp(22)).apply { gravity = android.view.Gravity.END; rightMargin = dp(12) })
-        badge.setOnClickListener { AlertDialog.Builder(activity).setTitle(L("Google Translate 자동 번역"))
+        badge.setOnClickListener { ReaderAlert.Builder(activity, currentPalette).setTitle(L("Google Translate 자동 번역"))
             .setMessage(L("선택한 본문은 기기 안에서 번역합니다. 번역은 학습 참고용이며 정확성·신뢰성·특정 목적 적합성을 보장하지 않습니다. Google은 번역에 관한 명시적·묵시적 보증을 제공하지 않습니다. 처음에는 Wi-Fi로 언어 데이터를 내려받아야 합니다. SDK는 성능·사용 통계를 Google에 전송할 수 있습니다."))
             .setPositiveButton(L("확인"), null).show() }
     }
     fun palette(p: ReaderPalette) {
+        currentPalette = p
         view.setBackgroundColor(p.background); text.setTextColor(p.foreground)
         fun tint(v: View) { if (v is TextView) v.setTextColor(p.foreground); if (v is android.view.ViewGroup) for (i in 0 until v.childCount) tint(v.getChildAt(i)) }
         tint(view)
@@ -161,6 +162,10 @@ internal class ReaderTranslation(
             if (enabled && foreground && token == generation) { text.text = selected + "\n\n" + L("번역하지 못했습니다. 다시 번역을 눌러 주세요."); controls() }
         }
     }
+    private fun notice(message: String) {
+        ReaderAlert.Builder(activity, currentPalette).setTitle(L("번역"))
+            .setMessage(message).setPositiveButton(L("확인"), null).show()
+    }
     private fun speak(value: String, language: String) {
         if (value.isBlank() || value.length > TextToSpeech.getMaxSpeechInputLength() || !foreground) return
         pauseBook()
@@ -175,14 +180,14 @@ internal class ReaderTranslation(
                         if (id == "selection-$voiceGeneration") stopVoice()
                     } }
                 })
-                if (enabled && foreground) Toast.makeText(activity, if (ttsReady) L("음성이 준비됐습니다. 듣기를 다시 눌러 주세요.") else L("기기 음성 엔진을 사용할 수 없습니다."), Toast.LENGTH_SHORT).show()
+                if (enabled && foreground) notice(if (ttsReady) L("음성이 준비됐습니다. 듣기를 다시 눌러 주세요.") else L("기기 음성 엔진을 사용할 수 없습니다."))
             }
             return
         }
         val engine = tts ?: return
         if (!ttsReady) return
         val voice = engine.voices?.filter { it.locale.language == language && !it.isNetworkConnectionRequired && !(it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) ?: false) }?.maxByOrNull { it.quality }
-        if (voice == null) { Toast.makeText(activity, L("기기 TTS 설정에서 {0} 오프라인 음성을 설치해 주세요.", L(if (language == "en") "영어" else "한국어")), Toast.LENGTH_LONG).show(); return }
+        if (voice == null) { notice(L("기기 TTS 설정에서 {0} 오프라인 음성을 설치해 주세요.", L(if (language == "en") "영어" else "한국어"))); return }
         @Suppress("DEPRECATION")
         val granted = audio.requestAudioFocus(focus, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         if (granted != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return

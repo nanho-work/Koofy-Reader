@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
@@ -9,10 +10,22 @@ import 'package:koofy_reader_bridge/koofy_reader_bridge.dart';
 
 /// Serializes DB commits independently from Flutter frame/lifecycle callbacks.
 class NativeReaderCoordinator {
-  NativeReaderCoordinator({required this.gateway, required this.store}) {
+  NativeReaderCoordinator({
+    required this.gateway,
+    required this.store,
+    this.diary,
+    Stopwatch? readingClock,
+    DateTime Function()? now,
+  }) : _readingClock = readingClock ?? Stopwatch(),
+       _now = now ?? DateTime.now {
     _subscription = gateway.events.listen(_receive);
   }
 
+  final ReadingDiary? diary;
+  DiaryBook? _diaryBook;
+  bool _readyForTime = false;
+  bool _foreground = true;
+  bool _uncovered = true;
   final ReaderGateway gateway;
   final NativeReaderStore store;
   final _events = StreamController<ReaderEvent>.broadcast();
@@ -21,12 +34,23 @@ class NativeReaderCoordinator {
   Future<void> _queue = Future<void>.value();
   bool _opening = false;
   String? _activeSessionId;
-  final Stopwatch _readingClock = Stopwatch();
+  final Stopwatch _readingClock;
+  final DateTime Function() _now;
   Timer? _readingTimer;
   void _flushReadingTime() {
     final elapsed = _readingClock.elapsed;
     final seconds = elapsed.inSeconds;
     _readingClock.reset();
+    final book = _diaryBook;
+    if (book != null && elapsed.inMilliseconds > 0 && diary != null) {
+      unawaited(
+        diary!.add(book, _now().subtract(elapsed), elapsed).catchError((
+          Object error,
+        ) {
+          _errors.add(error);
+        }),
+      );
+    }
     if (seconds > 0) ReaderAnalytics.instance.readingTime(seconds);
     if (elapsed.inMilliseconds > 0) {
       unawaited(ReaderReviewService.instance.addReadingTime(elapsed));
@@ -46,27 +70,35 @@ class NativeReaderCoordinator {
         _errors.add(error);
       }
       if (event.sessionId == _activeSessionId) {
-        if (event.kind == 'ready' && !_readingClock.isRunning) {
-          _readingTimer?.cancel();
-          _readingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (event.kind == 'ready') {
+          _readyForTime = true;
+          _readingTimer ??= Timer.periodic(const Duration(seconds: 15), (_) {
             if (_readingClock.isRunning) _flushReadingTime();
           });
-          _readingClock
-            ..reset()
-            ..start();
+          _syncReadingClock();
         }
         if (event.kind == 'usage') {
-          if (event.message == 'reading_pause') {
-            _readingClock.stop();
-            _flushReadingTime();
-          } else if (event.message == 'reading_resume') {
-            _readingClock.start();
-          } else {
-            ReaderAnalytics.instance.feature(event.message ?? '');
+          switch (event.message) {
+            case 'reading_pause':
+              _foreground = false;
+              _syncReadingClock();
+            case 'reading_resume':
+              _foreground = true;
+              _syncReadingClock();
+            case 'reading_overlay_pause':
+              _uncovered = false;
+              _syncReadingClock();
+            case 'reading_overlay_resume':
+              _uncovered = true;
+              _syncReadingClock();
+            default:
+              ReaderAnalytics.instance.feature(event.message ?? '');
           }
         }
         if (event.kind == 'closed') {
           _readingTimer?.cancel();
+          _readingTimer = null;
+          _readyForTime = false;
           _readingClock.stop();
           _flushReadingTime();
           _activeSessionId = null;
@@ -74,6 +106,15 @@ class NativeReaderCoordinator {
         _events.add(event);
       }
     });
+  }
+
+  void _syncReadingClock() {
+    if (_readyForTime && _foreground && _uncovered) {
+      _readingClock.start();
+    } else {
+      _readingClock.stop();
+      _flushReadingTime();
+    }
   }
 
   bool _isCheckpoint(ReaderEvent event) =>
@@ -105,6 +146,7 @@ class NativeReaderCoordinator {
     required String contentRevision,
     required String filePath,
     required String title,
+    DiaryBook? diaryBook,
     String? bannerAdUnitId,
     int? adHiddenUntilEpochMs,
     String? nextBookTitle,
@@ -127,6 +169,13 @@ class NativeReaderCoordinator {
           : await resolveInitialLocator(position);
       final session = await store.beginSession(publicationId, contentRevision);
       _activeSessionId = session.id;
+      _diaryBook = diaryBook;
+      _readyForTime = false;
+      _foreground = true;
+      _uncovered = true;
+      _readingClock
+        ..stop()
+        ..reset();
       try {
         await gateway.open(
           ReaderLaunchRequest(
@@ -161,7 +210,10 @@ class NativeReaderCoordinator {
     if (sessionId != null) await gateway.close(sessionId);
   }
 
-  Future<void> flush() => _queue;
+  Future<void> flush() async {
+    await _queue;
+    await diary?.flush();
+  }
 
   /// Backup must include the native journal even before the first book is opened.
   Future<void> recoverCheckpoints() async {
@@ -172,6 +224,7 @@ class NativeReaderCoordinator {
     try {
       await _queue;
       await _recover();
+      await diary?.flush();
     } finally {
       _opening = false;
     }
@@ -214,6 +267,7 @@ class NativeReaderCoordinator {
     _readingTimer?.cancel();
     _readingClock.stop();
     _flushReadingTime();
+    await diary?.flush();
     await _events.close();
     await _errors.close();
     await store.close();

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -102,9 +103,9 @@ class _PersonalFontsPageState extends State<PersonalFontsPage> {
   }
 
   Future<void> _remove(Map<String, dynamic> font) async {
-    final yes = await showDialog<bool>(
+    final yes = await showReaderDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(tr("내 글꼴 삭제")),
         content: Text(
           tr("“{0}”을 삭제할까요? 사용 중인 글꼴이면 기본 글꼴로 돌아갑니다.", [font['label']]),

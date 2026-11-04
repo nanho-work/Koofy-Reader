@@ -78,13 +78,13 @@ internal class ReaderTools(private val context: Context, private val scope: Coro
         fun rename(id: String) {
             val row = entries().firstOrNull { it.getString("id") == id } ?: return
             val field = EditText(context).apply { setSingleLine(); setText(row.getString("label")); selectAll() }
-            val editor = AlertDialog.Builder(context).setTitle(L("책갈피 이름")).setView(field).setPositiveButton(L("저장"), null).setNegativeButton(L("취소"), null).create()
-            editor.show(); tint(editor)
+            val editor = ReaderAlert.Builder(context, palette).setTitle(L("책갈피 이름")).setView(field).setPositiveButton(L("저장"), null).setNegativeButton(L("취소"), null).create()
+            editor.show()
             editor.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 if (saving) return@setOnClickListener
                 val all = entries()
                 all.firstOrNull { it.getString("id") == id }?.put("label", ReaderBookmarkIdentity.label(field.text.toString()))
-                commit(all) { ok -> if (ok) editor.dismiss() else message(L("저장하지 못했습니다. 다시 시도해 주세요.")); refresh() }
+                commit(all) { ok -> if (ok) editor.dismiss() else editor.setMessage(L("저장하지 못했습니다. 다시 시도해 주세요.")); refresh() }
             }
         }
         val adapter = object : BaseAdapter() {
@@ -161,7 +161,7 @@ internal class ReaderTools(private val context: Context, private val scope: Coro
         }
         dialog.window?.decorView?.let(::apply)
     }
-    private fun message(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    private fun message(text: String) { ReaderAlert.Builder(context, palette).setTitle(L("책갈피")).setMessage(text).setPositiveButton(L("확인"), null).show() }
     fun add(selectedOnly: Boolean = false) {
         if (saving) return
         val locator = current() ?: return
@@ -171,7 +171,7 @@ internal class ReaderTools(private val context: Context, private val scope: Coro
         if (rows.size >= 100) { message(L("책갈피는 책마다 100개까지 저장할 수 있습니다.")); return }
         val name = if (selectedOnly) locator.text.highlight?.takeIf { it.isNotBlank() } ?: snippet(locator) else snippet(locator)
         val row = JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("label", ReaderBookmarkIdentity.label(name)).put("locator", locator.toJSON())
-        commit(rows + row) { ok -> if (ok) { message(L("책갈피를 저장했습니다.")); show() } else message(L("저장하지 못했습니다. 다시 시도해 주세요.")) }
+        commit(rows + row) { ok -> if (ok) { show() } else message(L("저장하지 못했습니다. 다시 시도해 주세요.")) }
     }
     fun search() {
         val query = EditText(context).apply { hint = L("단어 또는 문장 검색"); setSingleLine(); maxEms = 100 }

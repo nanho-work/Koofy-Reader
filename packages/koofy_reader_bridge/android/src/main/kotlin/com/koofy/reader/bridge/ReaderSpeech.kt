@@ -11,7 +11,6 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -50,6 +49,7 @@ internal class ReaderSpeech(
     private val located: (Locator?) -> Unit,
     private val prefs: SharedPreferences = host.getSharedPreferences("reader_speech", Context.MODE_PRIVATE),
     private val createEngine: suspend () -> ReaderSpeechEngine? = { OfflineSpeechEngine.create(host) },
+    private val palette: () -> ReaderPalette = { ReaderPalette.forTheme("light") },
 ) {
     private val audio = host.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var engine: ReaderSpeechEngine? = null
@@ -295,5 +295,8 @@ internal class ReaderSpeech(
         runCatching { host.unregisterReceiver(noisy) }
     }
     fun installVoice() { pause(); AndroidTtsEngine.requestInstallVoice(host) }
-    private fun message(value: String) { if (!closed && active) Toast.makeText(host, value, Toast.LENGTH_LONG).show() }
+    private fun message(value: String) {
+        if (!closed && active) ReaderAlert.Builder(host, palette()).setTitle(L("책 읽어주기"))
+            .setMessage(value).setPositiveButton(L("확인"), null).show()
+    }
 }

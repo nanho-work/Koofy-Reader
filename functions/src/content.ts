@@ -413,3 +413,15 @@ export async function validateUpload(contentKind: Kind, slot: string, bytes: Buf
 export function assertDraftDeletion(item: Pick<Content, 'published' | 'publishedContent'>) {
   requireValue(!item.published && !item.publishedContent, '공개 이력이 있는 콘텐츠는 초안 삭제할 수 없습니다.');
 }
+
+/** Deliberate teaser: never expose body asset metadata or draft fields. */
+export function upcomingItem(item: Content) {
+  if(item.deleting || !item.published || !item.publishedContent || isReleased(item) || !item.seriesId) throw new ApiError(404,'예정 회차가 없습니다.');
+  const s=item.publishedContent;
+  const cover=s.assets.cover;
+  requireValue(cover,'표지가 없습니다.');
+  const {path: _path,...asset}=cover;
+  return {id:item.id,kind:'book',title:s.title,episodeTitle:s.title,seriesId:s.seriesId,seriesTitle:s.seriesTitle,episodeNumber:s.episodeNumber,
+    author:s.byline||s.author||'',description:'',license:'',category:s.category||'기타',language:s.language||'ko',version:s.version,
+    releaseAt:s.releaseAt,releaseDate:s.releaseDate,issueMonth:s.issueMonth||'',upcoming:true,assets:{cover:asset}};
+}

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,9 +37,9 @@ class _BookImportPageState extends ConsumerState<BookImportPage> {
   Future<void> _newFiles() async {
     final job = ref.read(bookImportControllerProvider);
     if (job.files.isNotEmpty) {
-      final discard = await showDialog<bool>(
+      final discard = await showReaderDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => ReaderAlertDialog(
           title: Text(tr('새 파일 선택')),
           content: Text(tr('현재 가져오기 목록을 비울까요? 이미 서재에 등록된 책은 유지됩니다.')),
           actions: [

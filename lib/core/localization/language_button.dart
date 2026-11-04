@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:flutter/material.dart';
 import 'app_language.dart';
 
@@ -62,8 +63,8 @@ class LanguageButton extends StatelessWidget {
           await AppLanguage.instance.select(value == 'system' ? null : value);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(tr('언어를 저장하지 못했습니다. 다시 시도해 주세요.'))),
+            ReaderAlerts.of(context).show(
+              ReaderNotice(content: Text(tr('언어를 저장하지 못했습니다. 다시 시도해 주세요.'))),
             );
           }
         }

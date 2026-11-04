@@ -50,45 +50,37 @@ void main() {
       },
     );
   }
-  testWidgets(
-    'home, books and library have distinct content and save selection',
-    (tester) async {
-      await pumpLibrary(tester, rootPage: const MainTabsPage());
-      await tester.pumpAndSettle();
-      expect(find.byType(MonthlyKoofySection), findsOneWidget);
-      await capture(tester, 'tabs-home');
-      expect(find.byType(LibraryPage), findsNothing);
-      await tester.tap(find.text('도서').last);
-      await tester.pumpAndSettle();
-      expect(find.byType(MonthlyKoofySection), findsNothing);
-      expect(find.byType(SegmentedButton<int>), findsNothing);
-      await tester.tap(find.text('서재').last);
-      await tester.pumpAndSettle();
-      expect(find.byType(LibraryPage), findsOneWidget);
-      expect(find.byType(MonthlyKoofySection), findsNothing);
-      expect(
-        (await SharedPreferences.getInstance()).getInt(
-          MainTabsPage.selectionKey,
-        ),
-        2,
-      );
-      expect(tester.takeException(), isNull);
-      await capture(tester, 'tabs-library');
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-  );
-  testWidgets('restores library selection on next launch', (tester) async {
+  testWidgets('home, books and library have distinct content', (tester) async {
+    await pumpLibrary(tester, rootPage: const MainTabsPage());
+    await tester.pumpAndSettle();
+    expect(find.byType(MonthlyKoofySection), findsOneWidget);
+    await capture(tester, 'tabs-home');
+    expect(find.byType(LibraryPage), findsNothing);
+    await tester.tap(find.text('도서').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(MonthlyKoofySection), findsNothing);
+    expect(find.byType(SegmentedButton<int>), findsNothing);
+    await tester.tap(find.text('서재').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryPage), findsOneWidget);
+    expect(find.byType(MonthlyKoofySection), findsNothing);
+
+    expect(tester.takeException(), isNull);
+    await capture(tester, 'tabs-library');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('always starts at home despite an old saved tab', (tester) async {
     SharedPreferences.setMockInitialValues({MainTabsPage.selectionKey: 2});
     await pumpLibrary(tester, rootPage: const MainTabsPage());
     await tester.pumpAndSettle();
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      2,
+      0,
     );
-    expect(find.byType(LibraryPage), findsOneWidget);
+    expect(find.byType(LibraryPage), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
-  testWidgets('settings is a persistent fourth page without a close button', (
+  testWidgets('settings is the fifth page and a new launch starts home', (
     tester,
   ) async {
     await pumpLibrary(tester, rootPage: const MainTabsPage());
@@ -103,20 +95,16 @@ void main() {
     expect(find.byTooltip('닫기'), findsNothing);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      3,
-    );
-    expect(
-      (await SharedPreferences.getInstance()).getInt(MainTabsPage.selectionKey),
-      3,
+      4,
     );
     await tester.pumpWidget(const SizedBox.shrink());
     await pumpLibrary(tester, rootPage: const MainTabsPage());
     await tester.pumpAndSettle();
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      3,
+      0,
     );
-    expect(find.text('독서 배경'), findsOneWidget);
+    expect(find.text('독서 배경'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -130,6 +118,8 @@ void main() {
       rootPage: const MainTabsPage(),
       size: const Size(1000, 800),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(tr('설정')).last);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('settings-sidebar')), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
@@ -171,6 +161,8 @@ void main() {
           ),
         ],
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(tr('설정')).last);
       await tester.pumpAndSettle();
       final list = find.descendant(
         of: find.byType(SettingsPage),

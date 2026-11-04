@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/backup/data/speech_backup.dart';
@@ -72,9 +74,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         _progress(tr("백업 파일 확인 중…"));
         final backup = await LibraryBackupService.read(File(path));
         if (!mounted) return;
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showReaderDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (context) => ReaderAlertDialog(
             title: Text(tr("백업 복원")),
             content: Text(
               tr("{0}권이 포함된 백업입니다.\n\n현재 서재에 없는 책·묶음·독서 기록을 추가합니다. ", [
@@ -97,6 +99,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         if (confirmed != true || !mounted) return;
         _progress(tr("책과 독서 기록 복원 중…"));
         final count = await service.restore(backup);
+        ref.read(readingDiaryProvider).refresh();
         ref.invalidate(booksProvider);
         ref.invalidate(bookGroupsProvider);
         ref.invalidate(nativeLibraryPositionsProvider);

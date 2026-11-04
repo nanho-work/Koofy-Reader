@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/features/analytics/presentation/analytics_choice.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
@@ -19,8 +20,8 @@ Future<void> openReaderLink(BuildContext context, Uri uri) async {
     if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
   } catch (_) {}
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(tr("연결할 앱을 열지 못했습니다. 표시된 주소를 복사해 이용해 주세요."))),
+  ReaderAlerts.of(context).show(
+    ReaderNotice(content: Text(tr("연결할 앱을 열지 못했습니다. 표시된 주소를 복사해 이용해 주세요."))),
   );
 }
 
@@ -133,7 +134,7 @@ class _AdvertisingChoicesPageState
             const SizedBox(height: 12),
             Text(
               tr(
-                "책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.",
+                "책과 읽던 위치는 기기에 보관합니다. 독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.",
               ),
             ),
             const SizedBox(height: 12),
@@ -214,8 +215,8 @@ class _AdvertisingChoicesPageState
                         }
                       } catch (_) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                          ReaderAlerts.of(context).show(
+                            ReaderNotice(
                               content: Text(tr("선택을 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );
@@ -320,8 +321,8 @@ class PrivacySettingsPage extends ConsumerWidget {
                         );
                       } catch (_) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                          ReaderAlerts.of(context).show(
+                            ReaderNotice(
                               content: Text(tr("설정을 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );
@@ -491,7 +492,7 @@ class ReaderSupportPage extends StatelessWidget {
         Text(
           reportAd
               ? tr(
-                  "광고가 나온 시각, 서재·독서 화면 등 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.",
+                  "광고가 나온 시각, 독서 화면에서의 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.",
                 )
               : tr(
                   "기기 종류, OS 버전, 발생한 문제와 재현 방법을 알려 주세요. 개인정보 관련 요청도 같은 메일로 접수합니다.",
@@ -508,9 +509,9 @@ class ReaderSupportPage extends StatelessWidget {
               const ClipboardData(text: readerSupportEmail),
             );
             if (context.mounted) {
-              ScaffoldMessenger.of(
+              ReaderAlerts.of(
                 context,
-              ).showSnackBar(SnackBar(content: Text(tr("메일 주소를 복사했습니다."))));
+              ).show(ReaderNotice(content: Text(tr("메일 주소를 복사했습니다."))));
             }
           },
         ),

@@ -1,9 +1,9 @@
+import 'package:koofy_reader/features/catalog/presentation/catalog_shelf.dart';
 import 'package:koofy_reader/features/catalog/presentation/editorial_story.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
-import 'package:koofy_reader/features/catalog/presentation/catalog_cover.dart';
 import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
 import 'package:koofy_reader/features/catalog/presentation/open_catalog_book.dart';
 import 'package:koofy_reader/features/catalog/presentation/series_catalog.dart';
@@ -17,11 +17,10 @@ class DiscoveryFeed extends ConsumerStatefulWidget {
 }
 
 class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
-  bool _opening = false;
+  final _opening = <String>{};
 
   Future<void> _open(CatalogItem item) async {
-    if (_opening || ref.read(catalogDownloadProvider).busy) return;
-    setState(() => _opening = true);
+    if (!_opening.add(item.id)) return;
     try {
       if (item.kind == 'series') {
         await Navigator.of(context).push(
@@ -33,7 +32,7 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
         await openCatalogBook(context, ref, item);
       }
     } finally {
-      if (mounted) setState(() => _opening = false);
+      _opening.remove(item.id);
     }
   }
 
@@ -52,7 +51,7 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
         .where((item) => item.category != '사람을 만나다')
         .take(6)
         .toList();
-    final busy = _opening || ref.watch(catalogDownloadProvider).busy;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -67,9 +66,9 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
                   item.category == '사람을 만나다' ? '사람을 만나다' : '새로 도착한 이야기',
                 ),
                 item: item,
-                onTap: busy ? null : () => _open(item),
+                onTap: () => _open(item),
                 overlayActions: TextButton(
-                  onPressed: busy ? null : () => _open(item),
+                  onPressed: () => _open(item),
                   child: Text(tr(item.kind == 'series' ? '전체 보기' : '읽기')),
                 ),
               ),
@@ -106,38 +105,34 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
         LayoutBuilder(
           builder: (context, constraints) {
             final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-            final count = (constraints.maxWidth / (150 * scale)).floor().clamp(
-              2,
-              4,
+            final count = catalogShelfColumns(
+              window: MediaQuery.sizeOf(context),
+              shelfWidth: constraints.maxWidth,
+              textScale: scale,
             );
-            final width = (constraints.maxWidth - (count - 1) * 18) / count;
+            final width =
+                (constraints.maxWidth - (count - 1) * bookShelfSpacing) / count;
             return Wrap(
-              spacing: 18,
+              spacing: bookShelfSpacing,
               runSpacing: 24,
               children: [
                 for (final item in newBooks)
                   SizedBox(
                     width: width,
-                    child: InkWell(
-                      onTap: busy ? null : () => _open(item),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CatalogCover(item: item, width: width),
-                          const SizedBox(height: 10),
-                          Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          if (item.kind == 'series')
-                            Text(
-                              tr(item.seriesStatusLabel),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                        ],
-                      ),
+                    child: CatalogShelfCard(
+                      item: item,
+                      onTap: () => _open(item),
+                      installed:
+                          ref
+                              .watch(catalogInstalledProvider('book'))
+                              .valueOrNull
+                              ?.contains(catalogItemKey(item)) ??
+                          false,
+                      progress:
+                          ref.watch(catalogDownloadProvider).itemKey ==
+                              catalogItemKey(item)
+                          ? ref.watch(catalogDownloadProvider).progress
+                          : null,
                     ),
                   ),
               ],
@@ -151,10 +146,7 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
           for (final item in interviews.take(3))
             Padding(
               padding: const EdgeInsets.only(bottom: 24),
-              child: EditorialStory(
-                item: item,
-                onTap: busy ? null : () => _open(item),
-              ),
+              child: EditorialStory(item: item, onTap: () => _open(item)),
             ),
         ],
       ],

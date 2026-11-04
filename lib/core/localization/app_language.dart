@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'messages.g.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 /// A missing preference means follow the device, including later OS changes.
 class AppLanguage extends ChangeNotifier with WidgetsBindingObserver {
@@ -24,6 +25,7 @@ class AppLanguage extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> initialize({SharedPreferences? preferences}) async {
+    await initializeDateFormatting();
     _preferences = preferences ?? await SharedPreferences.getInstance();
     final saved = _preferences!.getString(preferenceKey);
     _selection = supported.contains(saved) ? saved : null;
@@ -33,6 +35,7 @@ class AppLanguage extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> select(String? language) async {
+    await initializeDateFormatting();
     if (language != null && !supported.contains(language)) {
       throw ArgumentError.value(language, 'language');
     }

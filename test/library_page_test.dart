@@ -522,7 +522,13 @@ void main() {
   testWidgets('book menu exposes archived records and has no engine chooser', (
     tester,
   ) async {
-    await pumpLibrary(tester);
+    await pumpLibrary(
+      tester,
+      states: () => Future.value({
+        ...demoState,
+        'b0': const LibraryReadingState(needsMigration: true),
+      }),
+    );
     await tester.ensureVisible(find.byTooltip('숲의 문장들 더보기'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('숲의 문장들 더보기'));

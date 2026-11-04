@@ -1,3 +1,7 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'dart:async';
+import 'package:koofy_reader/features/notifications/notification_widgets.dart';
+import 'package:koofy_reader/features/notifications/reader_notifications.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'catalog_cover.dart';
 import 'catalog_shelf.dart';
@@ -37,12 +41,16 @@ class ReaderSeriesPage extends ConsumerStatefulWidget {
 class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  Timer? _refreshTimer;
   bool _newest = false;
   bool _opening = false;
   @override
   void initState() {
     super.initState();
     ReaderAnalytics.instance.seriesOpened(widget.series.id);
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) _refresh();
+    });
   }
 
   Future<void> _read(CatalogItem item) async {
@@ -58,6 +66,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   String get _key => 'series:${widget.series.id}';
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _search.dispose();
     _scroll.dispose();
     super.dispose();
@@ -84,16 +93,10 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   Future<void> _download(CatalogItem item) async {
     try {
       await ref.read(catalogDownloadProvider.notifier).download(item);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr("{0}화를 내 서재에 추가했습니다.", [item.episodeNumber])),
-        ),
-      );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ReaderAlerts.of(context).show(
+          ReaderNotice(
             content: Text(
               error is CatalogException
                   ? tr(error.message)
@@ -137,14 +140,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
             return _newest ? -order : order;
           });
     return PopScope(
-      canPop: !download.busy,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr("다운로드가 끝날 때까지 잠시 기다려 주세요."))),
-          );
-        }
-      },
+      canPop: true,
       child: Scaffold(
         body: SafeArea(
           child: LayoutBuilder(
@@ -153,7 +149,9 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
               final info = _SeriesInformation(
                 series: series,
                 expanded: wide,
-                count: catalog.valueOrNull?.length ?? series.episodeCount,
+                count:
+                    catalog.valueOrNull?.where((i) => !i.upcoming).length ??
+                    series.episodeCount,
               );
               final back = Align(
                 alignment: Alignment.centerLeft,
@@ -295,8 +293,8 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                       item: episode,
                       installed: received,
                       onOpen:
-                          series.issueMonth.isNotEmpty &&
-                              !download.busy &&
+                          !episode.upcoming &&
+                              (received || series.issueMonth.isNotEmpty) &&
                               !_opening
                           ? () => _read(episode)
                           : null,
@@ -311,8 +309,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                           ? download.progress
                           : null,
                       onDownload:
-                          download.busy ||
-                              _opening ||
+                          _opening ||
                               installed.isLoading ||
                               !installed.hasValue ||
                               installed.hasError ||
@@ -422,6 +419,7 @@ class _SeriesInformation extends StatelessWidget {
         const SizedBox(height: 6),
         if (series.author.trim().isNotEmpty) Text(series.author),
         const SizedBox(height: 6),
+        NotificationChoice(base: notificationBase(series), title: series.title),
         Text(tr('{0} · {1}화 공개', [tr(series.seriesStatusLabel), count])),
       ],
     );

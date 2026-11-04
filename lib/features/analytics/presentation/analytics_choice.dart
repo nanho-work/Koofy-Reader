@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import '../data/reader_analytics.dart';
@@ -76,8 +77,8 @@ class AnalyticsSetting extends StatelessWidget {
           await ReaderAnalytics.instance.choose(value);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(tr('설정을 저장하지 못했습니다. 다시 시도해 주세요.'))),
+            ReaderAlerts.of(context).show(
+              ReaderNotice(content: Text(tr('설정을 저장하지 못했습니다. 다시 시도해 주세요.'))),
             );
           }
         }

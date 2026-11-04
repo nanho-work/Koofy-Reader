@@ -129,16 +129,17 @@ void main() {
     (tester) async {
       final source = legacyFile;
       Book? imported;
+      late Future<Book?> importTask;
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
             builder: (context) => TextButton(
               onPressed: () async {
-                imported = await importWithTextPreview(
+                imported = await (importTask = importWithTextPreview(
                   context,
                   repo,
                   source.path,
-                );
+                ));
               },
               child: const Text('가져오기'),
             ),
@@ -152,9 +153,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('한글 텍스트 확인'), findsOneWidget);
       expect(imported, isNull);
+      await tester.tap(find.text('확인 후 가져오기'));
+      await tester.pumpAndSettle();
       await tester.runAsync(() async {
-        await tester.tap(find.text('확인 후 가져오기'));
-        await Future<void>.delayed(const Duration(milliseconds: 700));
+        await importTask;
       });
       await tester.pumpAndSettle();
       expect(imported, isNotNull);

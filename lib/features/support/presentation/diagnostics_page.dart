@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -88,9 +89,9 @@ class _DiagnosticsPageState extends ConsumerState<DiagnosticsPage> {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: snapshot.data!));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
+                  ReaderAlerts.of(
                     context,
-                  ).showSnackBar(SnackBar(content: Text(tr("진단 정보를 복사했습니다."))));
+                  ).show(ReaderNotice(content: Text(tr("진단 정보를 복사했습니다."))));
                 }
               },
               icon: const Icon(Icons.copy_outlined),

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -148,7 +149,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('도서 001'));
       await tester.pumpAndSettle();
-      expect(find.text('다운로드 완료'), findsOneWidget);
+      expect(find.text('읽기'), findsOneWidget);
     },
   );
 
@@ -177,24 +178,16 @@ void main() {
         150,
         scrollable: find
             .descendant(
-              of: find.byType(DraggableScrollableSheet),
+              of: find.byType(ReaderAlertDialog),
               matching: find.byType(Scrollable),
             )
-            .last,
+            .first,
       );
       expect(find.text(item.license), findsOneWidget);
-      final detailList = tester.widget<ListView>(
-        find
-            .descendant(
-              of: find.byType(DraggableScrollableSheet),
-              matching: find.byType(ListView),
-            )
-            .last,
-      );
-      detailList.controller!.jumpTo(0);
+
       await tester.pumpAndSettle();
       expect(catalog.installed, isEmpty);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.widgetWithText(TextButton, '닫기'));
       await tester.pumpAndSettle();
       final category = find.widgetWithText(ChoiceChip, '역사');
       await tester.ensureVisible(category);
@@ -240,25 +233,17 @@ void main() {
       150,
       scrollable: find
           .descendant(
-            of: find.byType(DraggableScrollableSheet),
+            of: find.byType(ReaderAlertDialog),
             matching: find.byType(Scrollable),
           )
-          .last,
+          .first,
     );
     expect(find.text(item.license), findsOneWidget);
-    final detailList = tester.widget<ListView>(
-      find
-          .descendant(
-            of: find.byType(DraggableScrollableSheet),
-            matching: find.byType(ListView),
-          )
-          .last,
-    );
-    detailList.controller!.jumpTo(0);
+
     await tester.pumpAndSettle();
     expect(find.text(item.source), findsOneWidget);
     expect(catalog.installed, isEmpty);
-    await tester.tap(find.byTooltip('닫기'));
+    await tester.tap(find.widgetWithText(TextButton, '닫기'));
     await tester.pumpAndSettle();
     catalog.downloadGate = Completer<void>();
     await tester.tap(find.byTooltip('메이플스토리 다운로드'));

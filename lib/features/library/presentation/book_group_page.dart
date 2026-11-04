@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
@@ -43,8 +44,8 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
       ref.invalidate(bookGroupsProvider);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr("묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요."))),
+        ReaderAlerts.of(context).show(
+          ReaderNotice(content: Text(tr("묶음 설정을 저장하지 못했습니다. 다시 시도해 주세요."))),
         );
       }
     } finally {
@@ -343,8 +344,8 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                         ref.invalidate(bookGroupsProvider);
                       } catch (_) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                          ReaderAlerts.of(context).show(
+                            ReaderNotice(
                               content: Text(tr("순서를 저장하지 못했습니다. 다시 시도해 주세요.")),
                             ),
                           );

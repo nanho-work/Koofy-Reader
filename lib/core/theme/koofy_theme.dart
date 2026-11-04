@@ -92,10 +92,49 @@ abstract final class KoofyTheme {
         scrolledUnderElevation: 0,
         systemOverlayStyle: systemStyle(brightness),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: p.background,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+          color: p.foreground,
+        ),
+        contentTextStyle: TextStyle(
+          fontSize: 14,
+          height: 1.6,
+          color: p.foreground,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: p.foreground,
+        contentTextStyle: TextStyle(
+          color: p.background,
+          fontSize: 13,
+          height: 1.45,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 1,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: p.accent,
+        linearTrackColor: p.accent.withValues(alpha: .1),
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.background,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-21",
+  "updatedAt": "2026-11-04",
   "email": "koofylab@gmail.com",
   "translations": {
     "ko": {
@@ -17,23 +17,25 @@
           "paragraphs": [
             "계정 생성이나 로그인 없이 이용하며, 앱 내 결제 기능은 없습니다. 이용자가 가져온 책의 본문·표지, 책 묶음, 읽던 위치, 글꼴과 독서 설정, 광고 숨김 만료 시각 및 광고 선택 기록은 앱 전용 기기 저장소에 보관됩니다.",
             "앱은 이용자가 가져온 책·표지나 독서 기록을 운영자 서버로 업로드하거나 다른 이용자에게 공개하지 않습니다. 운영체제의 기기 백업·복원은 이용자의 OS 설정에 따라 별도로 작동할 수 있습니다.",
-            "평가 요청 시점을 정하기 위한 누적 독서 시간과 마지막 평가 요청 시각은 기기에만 보관하며 운영자 서버로 전송하지 않습니다. 별점이나 리뷰 작성 여부는 앱에서 확인하지 않습니다."
+            "평가 요청 시점을 정하기 위한 누적 독서 시간과 마지막 평가 요청 시각은 기기에만 보관하며 운영자 서버로 전송하지 않습니다. 별점이나 리뷰 작성 여부는 앱에서 확인하지 않습니다.",
+            "독서 달력에는 날짜별 뷰어 이용 시간, 책 제목, 작은 표지 사본과 묶음책의 회차별 시간이 기기에 저장됩니다. 화면 잠금·다른 앱 사용 중의 시간은 제외하며 실제 독서 여부를 판정하지 않습니다. 책을 서재에서 삭제해도 이 기록은 남으며 이용자가 내보낸 서재 백업에 포함될 수 있습니다. 이 기록 기능은 통계 수집 동의와 별개로 기기 안에서 동작합니다."
           ]
         },
         {
           "heading": "3. 도서·글꼴 다운로드와 서버 기록",
           "paragraphs": [
             "공개된 도서·표지·글꼴 목록 조회와 파일 다운로드에 Firebase Cloud Functions, Cloud Firestore 및 Cloud Storage를 사용합니다. 이 과정에서 요청한 콘텐츠 식별자, IP 주소, 요청 시각, 응답·오류 등 서버 접속 정보가 서비스 제공·보안·장애 대응을 위해 처리될 수 있습니다.",
-            "앱 시작 시 업데이트 안내를 확인하기 위해 Firebase Remote Config를 사용합니다. 이 과정에서 Firebase 설치 식별자, 앱 버전과 기기·운영체제 정보 등이 설정 제공을 위해 처리될 수 있습니다. 이 기능에 독서 본문·기록을 전송하지 않으며 Analytics 기반 개인화나 A/B 테스트를 사용하지 않습니다."
+            "앱 시작 시 업데이트 안내를 확인하기 위해 Firebase Remote Config를 사용합니다. 이 과정에서 Firebase 설치 식별자, 앱 버전과 기기·운영체제 정보 등이 설정 제공을 위해 처리될 수 있습니다. 이 기능에 독서 본문·기록을 전송하지 않으며 Analytics 기반 개인화나 A/B 테스트를 사용하지 않습니다.",
+            "새 글 알림은 설정 또는 작품 화면에서 직접 신청한 경우에만 사용합니다. Firebase Cloud Messaging(FCM), Android 알림 서비스 및 Apple Push Notification service(APNs)가 알림 전달을 위해 앱 설치의 등록 토큰, 기기·앱 정보와 언어별 공개 콘텐츠 구독 주제를 처리합니다. 개인 파일의 본문·독서 기록은 알림에 사용하지 않습니다. 앱 설정에서 구독을 해제하고 운영체제 설정에서 알림 허용을 변경할 수 있습니다."
           ]
         },
         {
           "heading": "4. 광고와 선택권",
           "paragraphs": [
             "Unity LevelPlay를 통해 ironSource Ads, Unity Ads 및 Google AdMob의 배너·선택형 리워드 광고를 제공합니다. 광고 제공, 성과 측정, 부정 이용 방지 및 진단을 위해 광고 사업자가 IP 주소, 기기·운영체제·앱 정보, 광고 노출·클릭·보상·오류 정보 등을 처리할 수 있습니다. 광고 식별자와 개인화에 사용되는 정보는 OS 권한과 이용자의 선택, 제공자 정책에 따라 처리됩니다.",
-            "첫 실행에서 광고와 개인정보 처리를 안내하며 안내 절차가 끝나기 전에는 광고 SDK를 초기화하지 않습니다. Android에서는 앱에서 광고 방식을 선택합니다. 맞춤형 광고를 거부하더라도 독서는 이용할 수 있으며 광고 제공·보안에 필요한 제한된 정보가 처리되는 비맞춤형 광고가 표시될 수 있습니다.",
-            "iOS에서는 안내 화면의 계속 버튼을 누른 뒤 아직 결정하지 않은 Apple 추적 권한을 시스템 창에서 선택합니다. 계속 버튼 자체는 추적 동의가 아닙니다. 거부·제한·미결정 상태에서는 비맞춤형 광고를 적용합니다. 설정 > 개인정보 및 광고에서 현재 상태를 확인하고 비맞춤형 광고만 사용하도록 제한할 수 있으며, OS 추적 권한은 기기 설정에서 변경할 수 있습니다. 기존에 선택한 비맞춤형 광고 설정은 유지합니다.",
-            "리워드 광고는 이용자가 버튼을 눌러 선택했을 때만 표시됩니다. 시청 완료 보상은 배너를 2시간 숨기는 기능이며, 추적 허가에 대한 대가가 아닙니다.",
+            "처음에는 통계 수집을 끄고 비맞춤형 광고로 시작합니다. 기존 선택은 보존합니다. 별도의 자체 광고 선택 팝업 없이 지역에 따라 UMP의 필수 동의 절차와 광고 요청 가능 여부를 확인하며, 확인 전이나 실패 시 광고를 요청하지 않습니다. 광고는 독서 뷰어에서만 표시합니다.",
+            "iOS의 Apple 추적 권한(ATT)은 앱 시작 시 자동 요청하지 않습니다. 권한과 지역별 동의가 허용하지 않는 경우 비맞춤형 광고로 제한합니다. 선택은 설정의 정보 동의 화면과 운영체제 설정에서 변경할 수 있으며, 추적을 허용하지 않아도 독서를 이용할 수 있습니다.",
+            "리워드 광고는 이용자가 버튼을 눌러 선택했을 때만 표시됩니다. 시청 완료 보상은 배너를 4시간 숨기는 기능이며, 추적 허가에 대한 대가가 아닙니다.",
             "Google User Messaging Platform(UMP)을 통해 앱 실행 시 지역별 광고 개인정보 요건을 확인하고 필요한 동의 화면을 표시합니다. 동의 화면 처리가 끝났다는 사실만으로 맞춤형 광고에 동의한 것으로 해석하지 않습니다. 지역별 동의 관리가 필요한 경우 비맞춤형 광고로 제한하며, SDK가 광고 요청을 허용하지 않으면 광고를 요청하지 않습니다. 확인 실패 시에도 독서는 이용할 수 있습니다. 해당되는 경우 설정 > 개인정보 및 광고 > 광고 개인정보 선택 관리에서 선택을 변경할 수 있습니다. SDK는 동의 상태를 기기에 저장하고 IP 주소와 앱·기기 정보 등을 동의 안내 제공에 사용할 수 있습니다."
           ]
         },
@@ -41,7 +43,7 @@
           "heading": "5. 문의와 광고 신고",
           "paragraphs": [
             "이용자가 대표 메일로 문의하거나 광고를 신고하면 이메일 주소, 문의 내용 및 직접 첨부한 자료가 문의 응대·문제 확인에 사용됩니다. 앱은 문의 메일을 자동 발송하지 않으며, 책 본문이나 독서 기록을 자동 첨부하지 않습니다.",
-            "광고 신고 시 발생 시각, 서재·독서 화면 등 표시 위치, 광고 내용과 기기 정보를 알려 주시면 확인에 도움이 됩니다. 민감한 정보는 첨부 전에 가려 주세요."
+            "광고 신고 시 발생 시각, 독서 화면에서의 표시 위치, 광고 내용과 기기 정보를 알려 주시면 확인에 도움이 됩니다. 민감한 정보는 첨부 전에 가려 주세요."
           ]
         },
         {
@@ -71,7 +73,7 @@
           "paragraphs": [
             "기기의 책과 표지는 서재에서 삭제할 수 있습니다. 앱 전용 데이터는 앱 삭제 또는 운영체제의 앱 데이터 삭제 시 제거됩니다. 원래 가져온 파일, 별도로 저장한 사본 및 OS 백업은 별도로 관리해야 합니다.",
             "광고 선택은 선택 내용·선택 시각·안내 버전을 기기에 저장합니다. 설정에서 선택을 변경할 수 있습니다. 광고 숨김 만료 시각은 기기에서 처리하며 구매 내역이 아닙니다.",
-            "문의 이메일은 문의 해결과 필요한 분쟁 대응 기간 동안 보관한 후 삭제하며 법령이 별도 보관을 요구하면 그 기간을 따릅니다. 인프라 접속 기록과 광고 사업자가 처리하는 데이터의 보유·삭제 기간은 처리 목적, 계약 및 각 제공자의 정책에 따릅니다."
+            "문의 이메일과 첨부 자료는 Gmail로만 관리하며, 문의 처리 완료 후 1년 이내에 삭제합니다. 법령이 별도 보관을 요구하면 그 기간을 따릅니다. 인프라 접속 기록과 광고 사업자가 처리하는 데이터의 보유·삭제 기간은 처리 목적, 계약 및 각 제공자의 정책에 따릅니다."
           ]
         },
         {
@@ -133,23 +135,25 @@
           "paragraphs": [
             "No account, login, or in-app purchases are required. Imported books and covers, book groups, reading positions, fonts, reader settings, the ad-free expiry time, and advertising choices are stored in app-private device storage.",
             "The app does not upload imported books, covers, or reading history to our servers or publish them to other users. Device backup and restoration may operate separately under your operating-system settings.",
-            "Accumulated reading time and the last rating request time are stored only on your device to determine when to request a rating. They are not sent to our servers. The app cannot determine your rating or whether you submitted a review."
+            "Accumulated reading time and the last rating request time are stored only on your device to determine when to request a rating. They are not sent to our servers. The app cannot determine your rating or whether you submitted a review.",
+            "The reading journal stores daily foreground viewer time, book titles, small cover copies and chapter times for collections on your device. Locked-screen and background time is excluded; the feature does not verify whether you actually read. Journal entries remain after a book is deleted and may be included in library backups you export. This local feature works independently of optional Analytics consent."
           ]
         },
         {
           "heading": "3. Downloads and infrastructure logs",
           "paragraphs": [
             "Firebase Cloud Functions, Cloud Firestore, and Cloud Storage provide the public catalog and book, cover, and font downloads. Content identifiers, IP addresses, request times, responses, and error information may be processed to deliver and secure these services and diagnose problems.",
-            "Firebase Remote Config checks for update notices at app startup. Firebase installation identifiers, app version and device or operating system information may be processed to deliver configuration values. Reading content and history are not sent for this feature. Analytics-based personalization and A/B testing are not used."
+            "Firebase Remote Config checks for update notices at app startup. Firebase installation identifiers, app version and device or operating system information may be processed to deliver configuration values. Reading content and history are not sent for this feature. Analytics-based personalization and A/B testing are not used.",
+            "New-story notifications are optional and enabled only when you subscribe in Settings or on a work’s page. Firebase Cloud Messaging (FCM), Android notification services and Apple Push Notification service (APNs) process an installation’s registration token, device/app information and language-specific public-content topic subscriptions to deliver notifications. Your personal book text and reading history are not used for notifications. You can unsubscribe in the app and change notification permission in OS settings."
           ]
         },
         {
           "heading": "4. Advertising and your choices",
           "paragraphs": [
             "Unity LevelPlay mediates banner and optional rewarded ads from ironSource Ads, Unity Ads and Google AdMob. Advertising providers may process IP addresses, device, operating-system and app details, and ad impressions, interactions, rewards, and errors for ad delivery, measurement, fraud prevention, and diagnostics. Advertising identifiers and personalization data depend on your choices, OS permissions, and provider policies.",
-            "Advertising and privacy information is presented at first launch. The advertising SDK is not initialized before this flow is completed. On Android, you select an advertising preference in the app. Declining personalized ads does not prevent reading. Non-personalized ads may still process limited information needed for delivery and security.",
-            "On iOS, Continue leads to the Apple tracking permission prompt if permission has not been determined. Continue itself does not grant tracking permission. Denied, restricted or undetermined permission results in non-personalized ads. In Settings > Privacy and advertising you can review the status and restrict ads to non-personalized ads. OS tracking permission can be changed in device settings. Existing non-personalized advertising preferences are preserved.",
-            "Rewarded ads play only after you choose to watch. A completed reward hides banners for two hours; it is not a reward for granting tracking permission.",
+            "New users start with analytics off and non-personalized ads; existing choices are preserved. There is no separate app-owned advertising selection prompt at startup. Required regional UMP consent procedures and ad-request eligibility checks remain in place. Ads are not requested before these checks or if they fail. Banners appear only in the reading viewer.",
+            "Apple tracking permission (ATT) is not automatically requested at startup. Ads are restricted to non-personalized ads where OS permission or regional consent does not permit personalization. Choices can be changed in the app’s consent settings and OS settings. Reading is available without tracking permission.",
+            "Rewarded ads play only after you choose to watch. A completed reward hides banners for four hours; it is not a reward for granting tracking permission.",
             "Google User Messaging Platform (UMP) checks regional advertising privacy requirements at app launch and presents required messages. Completing a form is not treated as agreement to personalized advertising. We restrict advertising to non-personalized ads where regional consent management is required, and do not request ads unless the SDK permits it. Reading remains available if the check fails. Where applicable, you can change choices in Settings > Privacy and advertising > Manage advertising privacy choices. The SDK stores consent status on the device and may use IP addresses and app/device information to provide the consent flow."
           ]
         },
@@ -157,7 +161,7 @@
           "heading": "5. Support and reporting ads",
           "paragraphs": [
             "If you contact our email address or report an ad, your email address, message and attachments are used to respond and investigate. The app does not automatically send email or attach book contents or reading history.",
-            "For an ad report, the time, placement (library or reader), ad description and device information help us investigate. Remove sensitive information before attaching a screenshot."
+            "For an ad report, the time, placement in the reading viewer, ad description and device information help us investigate. Remove sensitive information before attaching a screenshot."
           ]
         },
         {
@@ -186,7 +190,7 @@
           "paragraphs": [
             "Books and covers can be removed from your library. Uninstalling the app or clearing app data removes app-private device data. Original imported files, separately saved copies and OS backups must be managed separately.",
             "Your advertising choice, choice time and notice version are stored on your device and can be updated in settings. The ad-free expiry time is local and is not a purchase record.",
-            "Support email is retained as needed to resolve the request and necessary disputes, subject to any legally required retention. Infrastructure logs and advertising data follow their processing purposes, applicable agreements and provider retention/deletion policies."
+            "Support email and attachments are managed only in Gmail and deleted within one year after the inquiry is resolved, unless a different retention period is required by law. Infrastructure logs and advertising data follow their processing purposes, applicable agreements and provider retention/deletion policies."
           ]
         },
         {
@@ -248,23 +252,25 @@
           "paragraphs": [
             "アカウント作成やログインは不要で、アプリ内購入機能はありません。追加した本の本文・表紙、コレクション、読書位置、フォント、読書設定、広告非表示の有効期限、広告の選択記録は、アプリ専用の端末内ストレージに保存されます。",
             "追加した本・表紙や読書履歴を運営者のサーバーにアップロードしたり、他の利用者に公開したりすることはありません。OSによる端末のバックアップ・復元は、利用者のOS設定に従って別途動作する場合があります。",
-            "評価をお願いするタイミングを判断するための累計読書時間と前回の評価リクエスト日時は、端末内にのみ保存し、運営者のサーバーには送信しません。アプリは星の数やレビューの投稿有無を確認できません。"
+            "評価をお願いするタイミングを判断するための累計読書時間と前回の評価リクエスト日時は、端末内にのみ保存し、運営者のサーバーには送信しません。アプリは星の数やレビューの投稿有無を確認できません。",
+            "読書カレンダーには、日別のビューア利用時間、本のタイトル、小さな表紙のコピー、コレクションの各話の利用時間を端末内に保存します。画面ロック中や他のアプリの使用中は計測せず、実際に読んだかどうかを判定するものではありません。本を本棚から削除しても記録は残り、利用者が書き出すバックアップに含まれることがあります。任意の利用統計への同意とは独立して端末内で動作します。"
           ]
         },
         {
           "heading": "3. ダウンロードとサーバー記録",
           "paragraphs": [
             "公開カタログの取得と本・表紙・フォントのダウンロードには、Firebase Cloud Functions、Cloud Firestore、Cloud Storageを使用します。サービスの提供・保護・障害対応のため、コンテンツ識別子、IPアドレス、リクエスト時刻、応答、エラー情報などが処理される場合があります。",
-            "起動時にFirebase Remote Configで更新のお知らせを確認します。設定値の配信のため、Firebaseインストール識別子、アプリのバージョン、端末・OS情報などが処理される場合があります。この機能で本文や読書履歴は送信しません。AnalyticsによるパーソナライズやA/Bテストは使用しません。"
+            "起動時にFirebase Remote Configで更新のお知らせを確認します。設定値の配信のため、Firebaseインストール識別子、アプリのバージョン、端末・OS情報などが処理される場合があります。この機能で本文や読書履歴は送信しません。AnalyticsによるパーソナライズやA/Bテストは使用しません。",
+            "新着通知は、設定または作品画面で利用者が購読した場合のみ使用します。Firebase Cloud Messaging（FCM）、Androidの通知サービスおよびApple Push Notification service（APNs）は、通知の配信にアプリの登録トークン、端末・アプリ情報と言語別の公開コンテンツの購読トピックを使用します。個人の本の本文や読書記録は通知に使用しません。アプリ内で購読を解除し、OSの設定で通知の許可を変更できます。"
           ]
         },
         {
           "heading": "4. 広告と利用者の選択",
           "paragraphs": [
             "Unity LevelPlayを通じてironSource Ads、Unity Ads、Google AdMobのバナーおよび任意のリワード広告を配信します。広告提供者は、配信・測定・不正防止・診断のため、IPアドレス、端末・OS・アプリ情報、広告の表示・操作・報酬・エラー情報などを処理する場合があります。広告識別子やパーソナライズ情報の取り扱いは、利用者の選択、OS権限、提供者のポリシーに従います。",
-            "初回起動時に広告とプライバシーについて説明します。この手順が完了する前に広告SDKを初期化しません。Androidではアプリ内で広告の設定を選択します。パーソナライズ広告を拒否しても読書できます。非パーソナライズ広告でも、配信とセキュリティに必要な限定的な情報は処理される場合があります。",
-            "iOSでは、権限が未決定の場合に「続ける」からAppleのトラッキング許可画面に進みます。「続ける」を押すこと自体はトラッキングの許可を意味しません。拒否・制限・未決定の場合は非パーソナライズ広告を使用します。「設定 > プライバシーと広告」で状態を確認し、非パーソナライズ広告のみに制限できます。OSのトラッキング権限は端末の設定で変更できます。既存の非パーソナライズ広告の設定は保持します。",
-            "リワード広告は利用者が視聴を選んだ場合のみ再生します。報酬の獲得でバナーを2時間非表示にします。トラッキングを許可することへの報酬ではありません。",
+            "初回は利用統計の収集をオフにし、非パーソナライズ広告で開始します。既存の選択は保持します。起動時に独自の広告選択画面は表示しません。地域に応じたUMPの必須同意手続きと広告リクエストの可否確認は維持し、確認前または失敗時には広告をリクエストしません。バナー広告は読書ビューアーにのみ表示します。",
+            "iOSのAppleトラッキング許可（ATT）は起動時に自動で要求しません。OSの許可や地域別の同意で認められない場合は非パーソナライズ広告に制限します。選択はアプリの情報同意画面やOSの設定で変更でき、トラッキングを許可しなくても読書できます。",
+            "リワード広告は利用者が視聴を選んだ場合のみ再生します。報酬の獲得でバナーを4時間非表示にします。トラッキングを許可することへの報酬ではありません。",
             "Google User Messaging Platform（UMP）は起動時に地域の広告プライバシー要件を確認し、必要なメッセージを表示します。フォームの完了をパーソナライズ広告への同意とは扱いません。地域の同意管理が必要な場合は非パーソナライズ広告に制限し、SDKが許可しない限り広告を要求しません。確認に失敗しても読書できます。対象となる場合は「設定 > プライバシーと広告 > 広告のプライバシー設定」で選択を変更できます。SDKは同意状態を端末に保存し、同意手順の提供のためIPアドレスやアプリ・端末情報を利用する場合があります。"
           ]
         },
@@ -272,7 +278,7 @@
           "heading": "5. お問い合わせと広告の報告",
           "paragraphs": [
             "メールでのお問い合わせや広告の報告では、返信・調査のためにメールアドレス、本文、添付ファイルを使用します。アプリがメールを自動送信したり、本の本文や読書履歴を自動添付したりすることはありません。",
-            "広告の報告には、表示時刻、場所（本棚・読書画面など）、広告の内容、端末情報が調査に役立ちます。スクリーンショットを添付する場合は、機密情報を隠してください。"
+            "広告の報告には、表示時刻、読書画面内の表示位置、広告の内容、端末情報が調査に役立ちます。スクリーンショットを添付する場合は、機密情報を隠してください。"
           ]
         },
         {
@@ -301,7 +307,7 @@
           "paragraphs": [
             "本や表紙は本棚から削除できます。アプリのアンインストールやデータの消去で、アプリ専用の端末内データが削除されます。取り込んだ元のファイル、別途保存したコピー、OSのバックアップは個別に管理してください。",
             "広告の選択、選択日時、説明のバージョンは端末に保存され、設定から更新できます。広告非表示の有効期限は端末内の情報であり、購入記録ではありません。",
-            "お問い合わせのメールは、対応や必要な紛争解決に必要な期間、法令で義務付けられる保存期間を考慮して保管します。サーバーログと広告情報は、処理目的、適用される契約、提供者の保存・削除方針に従います。"
+            "お問い合わせのメールと添付資料はGmailのみで管理し、対応完了後1年以内に削除します。法令により別の保存期間が定められる場合は、その期間に従います。サーバーログと広告情報は、処理目的、適用される契約、提供者の保存・削除方針に従います。"
           ]
         },
         {

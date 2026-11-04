@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'dart:io';
@@ -17,8 +18,8 @@ Future<void> showBatchCovers(
   List<BookImportFile>? images,
 }) async {
   if (kIsWeb) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(tr("표지 이미지는 Android · iOS 앱에서 등록해 주세요."))),
+    ReaderAlerts.of(context).show(
+      ReaderNotice(content: Text(tr("표지 이미지는 Android · iOS 앱에서 등록해 주세요."))),
     );
     return;
   }
@@ -52,9 +53,9 @@ Future<void> showBatchCovers(
     );
   } catch (_) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr("표지 파일을 불러오지 못했습니다. 다시 시도해 주세요."))),
-      );
+      ReaderAlerts.of(
+        context,
+      ).show(ReaderNotice(content: Text(tr("표지 파일을 불러오지 못했습니다. 다시 시도해 주세요."))));
     }
   }
 }
@@ -110,9 +111,9 @@ class _BatchCoverPageState extends State<BatchCoverPage> {
     widget.onChanged();
     if (!mounted) return;
     setState(() => _saving = false);
-    await showDialog<void>(
+    await showReaderDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(tr("표지 등록 결과")),
         content: SingleChildScrollView(
           child: Text(

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,29 +19,14 @@ class FontCatalogRow extends ConsumerWidget {
   final VoidCallback? onDownload;
 
   void _details(BuildContext context) {
-    showModalBottomSheet<void>(
+    showReaderDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .55,
-        minChildSize: .3,
-        maxChildSize: .9,
-        builder: (context, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      builder: (context) => ReaderAlertDialog(
+        title: Text(item.title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                tooltip: tr("닫기"),
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            Text(item.title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
             Text(
               '${item.author} · ${(item.totalSize / 1024 / 1024).toStringAsFixed(1)} MB',
             ),
@@ -48,19 +34,16 @@ class FontCatalogRow extends ConsumerWidget {
               const SizedBox(height: 16),
               Text(item.description),
             ],
-            const SizedBox(height: 24),
-            Text(
-              tr("출처·이용 조건"),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            const SizedBox(height: 20),
+            Text(tr('출처·이용 조건'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             if (item.source.isNotEmpty) ...[
               SelectableText(item.source),
               const SizedBox(height: 8),
             ],
             SelectableText(item.license),
-            const SizedBox(height: 24),
-            Text(tr("내려받은 글꼴은 책의 독서 설정에서 선택할 수 있어요.")),
+            const SizedBox(height: 16),
+            Text(tr('내려받은 글꼴은 책의 독서 설정에서 선택할 수 있어요.')),
           ],
         ),
       ),

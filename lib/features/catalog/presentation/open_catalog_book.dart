@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/app/router.dart';
@@ -12,6 +13,7 @@ Future<void> openCatalogBook(
   CatalogItem item,
 ) async {
   try {
+    if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
     if (!ref.read(nativeReaderAvailableProvider)) {
       throw const CatalogException('독서 화면은 Android와 iOS 앱에서 사용할 수 있습니다.');
     }
@@ -21,6 +23,9 @@ Future<void> openCatalogBook(
       await ref.read(catalogDownloadProvider.notifier).download(item);
     }
     if (!context.mounted) return;
+    if (ModalRoute.of(context)?.isCurrent != true || !TickerMode.of(context)) {
+      return;
+    }
     final books = await ref.read(booksProvider.future);
     if (!context.mounted) return;
     final book = books.where((book) => book.id == item.bookId).firstOrNull;
@@ -29,8 +34,8 @@ Future<void> openCatalogBook(
     if (context.mounted) ref.invalidate(nativeLibraryPositionsProvider);
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ReaderAlerts.of(context).show(
+        ReaderNotice(
           content: Text(
             error is CatalogException
                 ? tr(error.message)

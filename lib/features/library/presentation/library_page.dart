@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
@@ -806,16 +807,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         (ref.read(bookGroupsProvider).valueOrNull ?? <BookGroup>[])
             .where((g) => g.bookIds.contains(book.id))
             .toList();
-    final action = await showModalBottomSheet<String>(
+    final action = await showReaderDialog<String>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
+      builder: (context) => ReaderAlertDialog(
+        title: Text(book.title),
+        content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(title: Text(book.title)),
               if (membership.isEmpty) ...[
                 ListTile(
                   leading: const Icon(Icons.create_new_folder_outlined),
@@ -864,12 +863,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ),
                 onTap: () => Navigator.pop(context, 'completion'),
               ),
-              ListTile(
-                leading: const Icon(Icons.history),
-                title: Text(tr("이전 버전의 독서 기록")),
-                subtitle: Text(tr("보존된 기록을 확인하고 읽던 곳을 찾습니다.")),
-                onTap: () => Navigator.pop(context, 'history'),
-              ),
+              if (state?.needsMigration == true ||
+                  ref
+                          .read(legacyReadingProgressProvider)
+                          .valueOrNull
+                          ?.containsKey(book.id) ==
+                      true)
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: Text(tr("이전 버전의 독서 기록")),
+                  subtitle: Text(tr("보존된 기록을 확인하고 읽던 곳을 찾습니다.")),
+                  onTap: () => Navigator.pop(context, 'history'),
+                ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: Text(book.isLocalFile ? tr("책 삭제") : tr("서재에서 숨기기")),
@@ -921,9 +926,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   Future<void> _confirmRemoveBook(Book book) async {
     final action = book.isLocalFile ? tr("삭제") : tr("숨김");
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showReaderDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(tr("책 {0}", [action])),
         content: Text(
           tr("“{0}”을 휴지통으로 옮길까요? 파일·표지·읽던 위치는 유지되며 설정의 휴지통에서 복원할 수 있습니다.", [
@@ -948,10 +953,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       await trash.moveBook(book);
       if (!mounted) return;
       ref.invalidate(booksProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ReaderAlerts.of(context).show(
+        ReaderNotice(
           content: Text(tr("휴지통으로 이동: {0}", [book.title])),
-          action: SnackBarAction(
+          action: ReaderNoticeAction(
             label: tr("실행 취소"),
             onPressed: () async {
               try {
@@ -1008,9 +1013,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   void _snack(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ReaderAlerts.of(context).show(ReaderNotice(content: Text(message)));
     }
   }
 

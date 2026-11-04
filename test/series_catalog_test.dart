@@ -125,9 +125,9 @@ void main() {
               find.byKey(ValueKey('book-download-${episodes[39].id}')),
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.widgetWithText(TextButton, '닫기'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('series-back-to-books')));
       await tester.pumpAndSettle();

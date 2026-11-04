@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,7 @@ class CatalogShelfCard extends StatelessWidget {
     this.installed = false,
   });
   final CatalogItem item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double? progress;
   final bool installed;
 
@@ -29,15 +30,16 @@ class CatalogShelfCard extends StatelessWidget {
         ? tr('{0}화 · {1}', [item.episodeNumber, item.episodeTitle])
         : item.title;
     return Semantics(
-      button: true,
+      button: !item.upcoming,
       label: [
         title,
         if (item.kind == 'series') tr(item.seriesStatusLabel),
         if (installed) tr('다운로드 완료'),
+        if (item.upcoming) _releaseLabel(item),
       ].join(', '),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
+        onTap: item.upcoming ? null : onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -55,9 +57,12 @@ class CatalogShelfCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: CatalogCover(
-                      item: item,
-                      width: constraints.maxWidth,
+                    child: Opacity(
+                      opacity: item.upcoming ? .38 : 1,
+                      child: CatalogCover(
+                        item: item,
+                        width: constraints.maxWidth,
+                      ),
                     ),
                   ),
                   if (item.kind == 'series')
@@ -92,19 +97,39 @@ class CatalogShelfCard extends StatelessWidget {
                   if (installed && progress == null)
                     Positioned(
                       bottom: 6,
+                      left: 6,
                       right: 6,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          shape: BoxShape.circle,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: Icon(
-                            Icons.check,
-                            size: 16,
-                            color: colors.primary,
-                          ),
+                        decoration: BoxDecoration(
+                          color: colors.surface.withValues(alpha: .96),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 13,
+                              color: colors.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                tr('서재에 있음'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -142,6 +167,20 @@ class CatalogShelfCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (item.upcoming)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _releaseLabel(item),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    height: 1.4,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -214,7 +253,9 @@ class CatalogShelfList extends StatelessWidget {
                   mainAxisExtent:
                       tileWidth * 1.5 +
                       8 +
-                      CatalogShelfCard.titleHeight(context),
+                      CatalogShelfCard.titleHeight(context) +
+                      8 +
+                      MediaQuery.textScalerOf(context).scale(11) * 1.4 * 2,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => itemBuilder(context, index + 1),
@@ -227,4 +268,19 @@ class CatalogShelfList extends StatelessWidget {
       },
     );
   }
+}
+
+String _releaseLabel(CatalogItem item) {
+  final date = DateTime.tryParse(
+    item.releaseAt.isNotEmpty
+        ? item.releaseAt
+        : '${item.releaseDate}T00:00:00+09:00',
+  );
+  return date == null
+      ? tr('공개 예정')
+      : tr('{0} 공개 예정', [
+          DateFormat.Md(
+            AppLanguage.instance.code,
+          ).add_Hm().format(date.toLocal()),
+        ]);
 }

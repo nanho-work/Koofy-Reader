@@ -123,16 +123,16 @@ final class ReaderBookmarksViewController: ReaderToolTableController {
     }
     private func rename(_ id: String) {
         guard let row = rows.first(where: { $0.id == id }) else { return }
-        let editor = UIAlertController(title: L("책갈피 이름"), message: nil, preferredStyle: .alert)
+        let editor = ReaderAlertController(title: L("책갈피 이름"), message: nil, preferredStyle: .alert, palette: palette)
         editor.addTextField { $0.text = row.label }
-        editor.addAction(UIAlertAction(title: L("취소"), style: .cancel))
-        editor.addAction(UIAlertAction(title: L("저장"), style: .default) { [weak self, weak editor] _ in
+        editor.addAction(ReaderAlertAction(title: L("취소"), style: .cancel))
+        editor.addAction(ReaderAlertAction(title: L("저장"), style: .default) { [weak self, weak editor] _ in
             guard let self, let index = self.rows.firstIndex(where: { $0.id == id }) else { return }
             var next = self.rows
             next[index] = ReaderBookmark(id: row.id, label: ReaderBookmark.label(editor?.textFields?.first?.text ?? ""), locator: row.locator)
             self.persist(next)
         })
-        present(editor, animated: true)
+        editor.present(from: self)
     }
     private func open(_ locator: Locator) { dismiss(animated: true) { self.jump(locator) } }
     override func numberOfSections(in tableView: UITableView) -> Int { 2 }

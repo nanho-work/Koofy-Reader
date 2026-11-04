@@ -179,9 +179,9 @@
     "en": "Privacy and advertising",
     "ja": "プライバシーと広告"
   },
-  "책과 읽던 위치는 기기에 보관합니다. 서재·독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.": {
-    "en": "Books and reading positions stay on your device. Library and reader banners and optional rewarded ads are served by Unity Ads, ironSource Ads and Google AdMob through Unity LevelPlay.",
-    "ja": "本と読書位置は端末に保存します。本棚・読書画面のバナーと任意のリワード広告は、Unity LevelPlayを通じてUnity Ads・ironSource Ads・Google AdMobが提供します。"
+  "책과 읽던 위치는 기기에 보관합니다. 독서 화면의 배너와 선택형 리워드 광고는 Unity LevelPlay의 Unity Ads·ironSource Ads·Google AdMob이 제공합니다.": {
+    "en": "Books and reading positions stay on your device. Banners in the reading viewer and optional rewarded ads are served by Unity Ads, ironSource Ads and Google AdMob through Unity LevelPlay.",
+    "ja": "本と読書位置は端末に保存します。読書画面のバナーと任意のリワード広告は、Unity LevelPlayを通じてUnity Ads・ironSource Ads・Google AdMobが提供します。"
   },
   "광고 제공·측정·부정 이용 방지를 위해 IP 주소, 기기·앱 정보와 광고 이용 정보가 처리될 수 있습니다. 맞춤형 광고를 허용하면 허용된 식별자와 다른 앱·웹 이용 관련 정보가 개인화에 사용될 수 있습니다.": {
     "en": "IP address, device and app information, and ad interaction data may be processed to serve and measure ads and prevent fraud. If you allow personalized ads, permitted identifiers and information about activity in other apps and websites may be used for personalization.",
@@ -351,9 +351,9 @@
     "en": "View the latest policy online",
     "ja": "最新のポリシーをウェブで確認"
   },
-  "광고가 나온 시각, 서재·독서 화면 등 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.": {
-    "en": "Tell us when the ad appeared, where it appeared (library or reader), and what it showed. If needed, attach a screenshot after hiding personal information and book text.",
-    "ja": "広告の表示時刻、表示場所（本棚・読書画面など）、内容をお知らせください。必要に応じて、個人情報と本文を隠したスクリーンショットを添付してください。"
+  "광고가 나온 시각, 독서 화면에서의 표시 위치, 광고 내용을 알려 주세요. 필요하면 개인정보와 책 본문을 가린 화면 캡처를 직접 첨부해 주세요.": {
+    "en": "Tell us when the ad appeared, its placement in the reading viewer, and what it showed. If needed, attach a screenshot after hiding personal information and book text.",
+    "ja": "広告の表示時刻、読書画面内の表示位置、内容をお知らせください。必要に応じて、個人情報と本文を隠したスクリーンショットを添付してください。"
   },
   "기기 종류, OS 버전, 발생한 문제와 재현 방법을 알려 주세요. 개인정보 관련 요청도 같은 메일로 접수합니다.": {
     "en": "Tell us your device, OS version, the issue and how to reproduce it. Privacy requests are accepted at the same email address.",
@@ -2032,7 +2032,7 @@
     "ja": "韓国語の音声を選択"
   },
   "앱 정보": {
-    "en": "About",
+    "en": "About the app",
     "ja": "アプリ情報"
   },
   "표지표시": {
@@ -3954,5 +3954,141 @@
   "이전 파일 작업을 정리하는 중입니다. 잠시 후 다시 시도해 주세요.": {
     "en": "The previous file request is still stopping. Please try again shortly.",
     "ja": "前のファイル処理を終了しています。少し待ってから再試行してください。"
+  },
+  "기록": {
+    "en": "Journal",
+    "ja": "記録"
+  },
+  "달력 보기": {
+    "en": "Calendar",
+    "ja": "カレンダー"
+  },
+  "그래프 보기": {
+    "en": "Reading graph",
+    "ja": "グラフ"
+  },
+  "독서 시간": {
+    "en": "Reading time",
+    "ja": "読書時間"
+  },
+  "책을 읽으면 쿠피가 여기에 남아요": {
+    "en": "Read a little. Koofy will leave a stamp here.",
+    "ja": "本を読むと、ここにクーフィーのスタンプがつきます"
+  },
+  "독서 기록을 불러오지 못했습니다.": {
+    "en": "Could not load your reading journal.",
+    "ja": "読書記録を読み込めませんでした。"
+  },
+  "회차별 기록": {
+    "en": "Chapter history",
+    "ja": "各話の記録"
+  },
+  "일별": {
+    "en": "Daily",
+    "ja": "日別"
+  },
+  "월별": {
+    "en": "Monthly",
+    "ja": "月別"
+  },
+  "확대": {
+    "en": "Zoom in",
+    "ja": "拡大"
+  },
+  "축소": {
+    "en": "Zoom out",
+    "ja": "縮小"
+  },
+  "그래프를 누르면 기록을 볼 수 있어요": {
+    "en": "Tap a point to view your reading history",
+    "ja": "グラフをタップすると記録を確認できます"
+  },
+  "1분 미만": {
+    "en": "Less than 1 min",
+    "ja": "1分未満"
+  },
+  "{0}시간": {
+    "en": "{0} hr",
+    "ja": "{0}時間"
+  },
+  "{0}시간 {1}분": {
+    "en": "{0} hr {1} min",
+    "ja": "{0}時間{1}分"
+  },
+  "서재에 있음": {
+    "en": "In your library",
+    "ja": "本棚に追加済み"
+  },
+  "공개 예정": {
+    "en": "Coming soon",
+    "ja": "公開予定"
+  },
+  "{0} 공개 예정": {
+    "en": "Available {0}",
+    "ja": "{0} 公開予定"
+  },
+  "아직 공개되지 않은 회차입니다.": {
+    "en": "This chapter is not available yet.",
+    "ja": "この話はまだ公開されていません。"
+  },
+  "다운로드하고 읽기": {
+    "en": "Download and read",
+    "ja": "ダウンロードして読む"
+  },
+  "새 글 알림 받기": {
+    "en": "Notify me of new stories",
+    "ja": "新しいお話の通知を受け取る"
+  },
+  "새 글 알림": {
+    "en": "New story notifications",
+    "ja": "新着通知"
+  },
+  "새로 출간된 책": {
+    "en": "New books",
+    "ja": "新しく公開された本"
+  },
+  "알림 연결 다시 확인": {
+    "en": "Retry notification setup",
+    "ja": "通知の接続を再確認"
+  },
+  "알림 설정을 저장하지 못했습니다.": {
+    "en": "Could not save notification settings.",
+    "ja": "通知設定を保存できませんでした。"
+  },
+  "이 기기에서 알림을 설정할 수 없습니다.": {
+    "en": "Notifications are unavailable on this device.",
+    "ja": "この端末では通知を設定できません。"
+  },
+  "기기 설정에서 알림을 허용해 주세요.": {
+    "en": "Allow notifications in device settings.",
+    "ja": "端末の設定で通知を許可してください。"
+  },
+  "알림 연결을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.": {
+    "en": "Notification setup is not ready. Please try again shortly.",
+    "ja": "通知の準備ができませんでした。しばらくしてからお試しください。"
+  },
+  "현재 공개된 글을 찾을 수 없습니다.": {
+    "en": "This story is currently unavailable.",
+    "ja": "現在公開中のお話が見つかりません。"
+  },
+  "다운로드를 취소했습니다.": {
+    "en": "Download cancelled.",
+    "ja": "ダウンロードをキャンセルしました。"
+  },
+  "대기 {0}권": {
+    "en": "{0} queued",
+    "ja": "{0}冊待機中"
+  },
+  "데이터 관리": {
+    "en": "Your data",
+    "ja": "データ管理"
+  },
+  "알림·개인정보": {
+    "en": "Notifications and privacy",
+    "ja": "通知・プライバシー"
+  },
+  "알림": {
+    "en": "Notice",
+    "ja": "お知らせ"
   }
 }

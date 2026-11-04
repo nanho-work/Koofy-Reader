@@ -112,16 +112,18 @@ test('TXT upload, format replacement, publishing and legacy catalog compatibilit
   published = await api('publish', { id: item.id, revision: item.revision });
   assert.equal(published.status, 200); item = published.body;
   catalog = await (await fetch(base + 'readerCatalog?kind=book')).json();
-  assert(!catalog.items.some(book => book.id === item.id));
+  // Standalone TXT + illustration is published as EPUB, including for old apps.
+  assert(catalog.items.some(book => book.id === item.id && book.assets.epub));
   catalog = await (await fetch(base + 'readerCatalog?kind=book&supportsTxt=1')).json();
   const visible = catalog.items.find(book => book.id === item.id);
-  assert.equal(visible.assets.txt.extension, 'txt');
-  assert.equal(visible.assets.epub, undefined);
-  assert.equal('path' in visible.assets.txt, false);
-  const download = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=txt&version=${visible.version}`);
+  assert.equal(visible.assets.epub.extension, 'epub');
+  assert.equal(visible.assets.txt, undefined);
+  assert.equal('sourceTxt' in visible, false);
+  assert.equal('path' in visible.assets.epub, false);
+  const download = await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=epub&version=${visible.version}`);
   assert.equal(download.status, 200);
-  assert.equal((await download.json()).sha256, item.assets.txt.sha256);
-  assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=epub&version=${visible.version}`)).status, 400);
+  assert.equal((await download.json()).sha256, item.publishedContent.assets.epub.sha256);
+  assert.equal((await fetch(base + `readerCatalog?action=download&id=${item.id}&slot=txt&version=${visible.version}`)).status, 400);
 });
 
 test('delete blocks downloads, removes all versions and safely retries books and fonts', async t => {
@@ -471,4 +473,32 @@ test('multilingual monthly creation retains legacy records and concurrent retrie
     await Promise.all(ids.filter(Boolean).map(id => db.collection('readerContent').doc(id).delete()));
     await db.collection('readerEpisodeNumbers').doc(`${legacy.id}_1`).delete();
   }
+});
+
+test('scheduled chapter previews opt in and cannot expose future body downloads', async () => {
+  const { getFirestore } = require('firebase-admin/firestore');
+  const { randomUUID } = require('node:crypto');
+  const { publish } = require('../lib/src/content.js');
+  const db = getFirestore();
+  const id = () => randomUUID().replaceAll('-', '');
+  const parentId = id(), chapterId = id();
+  const cover = { path: `readerContent/${parentId}/fixture/cover.webp`, sha256: 'a'.repeat(64), size: 10, extension: 'webp', contentType: 'image/webp' };
+  const parent = { id: parentId, kind: 'series', collectionType: 'general', title: '예정 도서', author: '테스트', description: '', license: '테스트', category: '소설', revision: 1, assets: { cover }, published: true, updatedAt: new Date().toISOString() };
+  parent.publishedContent = publish(parent);
+  const chapter = { ...parent, id: chapterId, kind: 'book', title: '미래 회차', seriesId: parentId, seriesTitle: parent.title, episodeNumber: 1, releaseAt: '2099-11-04T09:00:00+09:00', releaseDate: '2099-11-04', assets: { txt: { ...cover, path: `readerContent/${chapterId}/private/body.txt`, extension: 'txt' } } };
+  chapter.publishedContent = publish(chapter, parent);
+  const batch = db.batch();
+  batch.create(db.collection('readerContent').doc(parentId), parent);
+  batch.create(db.collection('readerContent').doc(chapterId), chapter);
+  await batch.commit();
+  const query = `kind=book&seriesId=${parentId}&supportsTxt=1`;
+  assert.equal((await (await fetch(base + 'readerCatalog?' + query)).json()).items.length, 0);
+  const previews = await (await fetch(base + 'readerCatalog?' + query + '&supportsUpcoming=1')).json();
+  assert.equal(previews.items.length, 1);
+  assert.equal(previews.items[0].upcoming, true);
+  assert.deepEqual(Object.keys(previews.items[0].assets), ['cover']);
+  assert.equal(JSON.stringify(previews).includes('/private/'), false);
+  const download = `readerCatalog?action=download&id=${chapterId}&version=${chapter.publishedContent.version}`;
+  assert.equal((await fetch(base + download + '&slot=txt')).status, 400);
+  assert.equal((await fetch(base + download + '&slot=cover')).status, 200);
 });

@@ -116,6 +116,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        diaryVisibilityTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.updateDiaryVisibility()
+        }
         title = request.title
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "rectangle.portrait.and.arrow.right"), style: .plain, target: self, action: #selector(closeTapped))
@@ -250,7 +253,20 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
 
     func updateAdHiddenUntil(_ epochMs: Int64?) { bannerFooter?.updateHiddenUntil(epochMs) }
 
+    private var diaryVisibilityTimer: Timer?
+    private var diaryUncovered: Bool?
+    private func updateDiaryVisibility() {
+        guard hasSentReady, !isClosing else { return }
+        let uncovered = presentedViewController == nil && navigationController?.presentedViewController == nil && viewIfLoaded?.window != nil &&
+            viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive
+        if uncovered != diaryUncovered {
+            diaryUncovered = uncovered
+            usage(uncovered ? "reading_overlay_resume" : "reading_overlay_pause")
+        }
+    }
+
     deinit {
+        diaryVisibilityTimer?.invalidate()
         autoTurnTask?.cancel()
         speech?.close()
         speechFollowTask?.cancel()
@@ -625,6 +641,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                     try self.persist(kind: kind)
                 }
                 self.hasSentReady = true
+                self.updateDiaryVisibility()
                 let completion = self.settingsCompletion
                 self.settingsCompletion = nil
                 completion?(.success(()))
@@ -686,6 +703,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 self.readyTimeout?.cancel()
                 self.settingsCompletion?(.failure(failure("reader_closed", L("독서 화면이 종료되었습니다."))))
                 self.settingsCompletion = nil
+                ReaderAlertController.dismissAll(presentedBy: self)
                 self.navigationController?.dismiss(animated: true) {
                     self.onClosed?()
                     self.sendEvent(closedEvent)
@@ -774,10 +792,10 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             spinner.stopAnimating()
             statusLabel.text = message
             progress.text = L("책을 열지 못함")
-        } else if presentedViewController == nil {
-            let alert = UIAlertController(title: code == "checkpoint_failed" ? L("읽기 기록 저장 실패") : L("독서 화면"), message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: L("확인"), style: .default))
-            present(alert, animated: true)
+        } else {
+            let alert = ReaderAlertController(title: code == "checkpoint_failed" ? L("읽기 기록 저장 실패") : L("독서 화면"), message: message, preferredStyle: .alert, palette: ReaderPalette.forTheme(preferences.theme))
+            alert.addAction(ReaderAlertAction(title: L("확인"), style: .default))
+            alert.present(from: self)
         }
     }
 
@@ -791,9 +809,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
             close(downloadSeries: true) { _ in }
             return
         }
-        let alert = UIAlertController(title: L("외부 링크"), message: L("책 밖의 링크는 이 독서 화면에서 열지 않습니다."), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: L("확인"), style: .default))
-        if presentedViewController == nil { present(alert, animated: true) }
+        let alert = ReaderAlertController(title: L("외부 링크"), message: L("책 밖의 링크는 이 독서 화면에서 열지 않습니다."), preferredStyle: .alert, palette: ReaderPalette.forTheme(preferences.theme))
+        alert.addAction(ReaderAlertAction(title: L("확인"), style: .default))
+        alert.present(from: self)
     }
 
     @objc private func sceneWillDeactivate(_ notification: Notification) {
@@ -1187,9 +1205,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     }
     private func speechMessage(_ message: String) {
         guard !isClosing, UIApplication.shared.applicationState == .active else { return }
-        let alert = UIAlertController(title: L("책 읽어주기"), message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: L("확인"), style: .cancel))
-        (presentedViewController ?? self).present(alert, animated: true)
+        let alert = ReaderAlertController(title: L("책 읽어주기"), message: message, preferredStyle: .alert, palette: ReaderPalette.forTheme(preferences.theme))
+        alert.addAction(ReaderAlertAction(title: L("확인"), style: .cancel))
+        alert.present(from: presentedViewController ?? self)
     }
     private func followSpeech(_ locator: Locator?) {
         guard let navigator else { return }
@@ -1235,12 +1253,12 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         stopAutoTurn()
         speech?.pause()
         guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let title = request.nextBookTitle else { return }
-        let alert = UIAlertController(title: L("다음 권 읽기"), message: title, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: L("취소"), style: .cancel))
-        alert.addAction(UIAlertAction(title: L("열기"), style: .default) { [weak self] _ in
+        let alert = ReaderAlertController(title: L("다음 권 읽기"), message: title, preferredStyle: .alert, palette: ReaderPalette.forTheme(preferences.theme))
+        alert.addAction(ReaderAlertAction(title: L("취소"), style: .cancel))
+        alert.addAction(ReaderAlertAction(title: L("열기"), style: .default) { [weak self] _ in
             self?.close(nextBook: true) { _ in }
         })
-        present(alert, animated: true)
+        alert.present(from: self)
     }
 
     @objc private func preferencesTapped(_ sender: UIBarButtonItem) {

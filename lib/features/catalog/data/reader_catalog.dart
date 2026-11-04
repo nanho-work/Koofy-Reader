@@ -130,7 +130,14 @@ final catalogInstalledProvider = FutureProvider.family<Set<String>, String>((
 });
 
 class CatalogDownloadState {
-  const CatalogDownloadState({this.itemKey, this.progress = 0});
+  const CatalogDownloadState({
+    this.itemKey,
+    this.progress = 0,
+    this.title = '',
+    this.queued = 0,
+  });
+  final String title;
+  final int queued;
   final String? itemKey;
   final double progress;
   bool get busy => itemKey != null;
@@ -144,10 +151,44 @@ final catalogDownloadProvider =
 class CatalogDownloadController extends Notifier<CatalogDownloadState> {
   @override
   CatalogDownloadState build() => const CatalogDownloadState();
-  Future<void> download(CatalogItem item) async {
-    if (state.busy) throw const CatalogException('진행 중인 다운로드를 기다려 주세요.');
+  Future<void> _tail = Future.value();
+  final _jobs = <String, Future<void>>{};
+  void cancel() => ref.read(readerCatalogProvider).cancelInstall();
+  Future<void> download(CatalogItem item) {
     final key = catalogItemKey(item);
-    state = CatalogDownloadState(itemKey: key);
+    if (_jobs.containsKey(key)) return _jobs[key]!;
+    final job = _tail
+        .catchError((Object _) {})
+        .then((_) => _performDownload(item));
+    _jobs[key] = job;
+    if (state.busy) {
+      state = CatalogDownloadState(
+        itemKey: state.itemKey,
+        title: state.title,
+        progress: state.progress,
+        queued: _jobs.length - 1,
+      );
+    }
+    _tail = job.then<void>(
+      (_) {
+        _jobs.remove(key);
+      },
+      onError: (Object _, StackTrace __) {
+        _jobs.remove(key);
+      },
+    );
+    return job;
+  }
+
+  Future<void> _performDownload(CatalogItem item) async {
+    if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
+
+    final key = catalogItemKey(item);
+    state = CatalogDownloadState(
+      itemKey: key,
+      title: item.title,
+      queued: (_jobs.length - 1).clamp(0, 999),
+    );
     ReaderAnalytics.instance.download(
       kind: item.kind,
       id: item.id,
@@ -161,6 +202,8 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
             progress: (value) {
               state = CatalogDownloadState(
                 itemKey: key,
+                title: item.title,
+                queued: (_jobs.length - 1).clamp(0, 999),
                 progress: value.clamp(0, 1),
               );
             },
@@ -278,6 +321,8 @@ class CatalogItem {
       preview = json['preview'] is Map<String, dynamic>
           ? CatalogAsset.fromJson(json['preview'] as Map<String, dynamic>)
           : null,
+      upcoming = json['upcoming'] == true,
+      releaseAt = json['releaseAt'] as String? ?? '',
       version = json['version'] as int,
       assets = (json['assets'] as Map<String, dynamic>).map(
         (key, value) =>
@@ -323,6 +368,7 @@ class CatalogItem {
       if (!valid) throw const FormatException('지원하지 않는 파일 정보입니다.');
     }
     if (kind == 'book' &&
+        !upcoming &&
         (assets.containsKey('epub') == assets.containsKey('txt') ||
             !assets.containsKey('cover'))) {
       throw const FormatException('책 파일은 EPUB 또는 TXT 한 개와 표지가 필요합니다.');
@@ -330,6 +376,8 @@ class CatalogItem {
   }
   final Map<String, dynamic> json;
   final String id, kind, title, author, description, license, category, source;
+  final bool upcoming;
+  final String releaseAt;
   final int version;
   final Map<String, CatalogAsset> assets;
   final CatalogAsset? preview;
@@ -370,6 +418,20 @@ class ReaderCatalog {
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 20);
   bool _installing = false;
+  bool _cancelInstall = false;
+  String? _installKey;
+  HttpClientRequest? _installRequest;
+  void cancelInstall() {
+    _cancelInstall = true;
+    _installRequest?.abort(const CatalogException('다운로드를 취소했습니다.'));
+  }
+
+  void _checkCancelled(CatalogItem item) {
+    if (_installing && _installKey == catalogItemKey(item) && _cancelInstall) {
+      throw const CatalogException('다운로드를 취소했습니다.');
+    }
+  }
+
   final CatalogCache? _cacheOverride;
   late final _cache = _cacheOverride ?? CatalogCache(_directory);
   final _forced = <String>{};
@@ -487,6 +549,7 @@ class ReaderCatalog {
     Map<String, dynamic>? fonts;
     Directory? fontRoot;
     for (final item in items) {
+      if (item.upcoming) continue;
       if (item.kind == 'book') {
         final path = local[item.bookId]?.localPath;
         if (path != null && await File(path).exists()) {
@@ -584,6 +647,7 @@ class ReaderCatalog {
       if (kind == 'book') 'supportsSeries': '1',
       if (kind != 'font') 'language': language ?? AppLanguage.instance.code,
       if (seriesId != null) 'seriesId': seriesId,
+      if (seriesId != null) 'supportsUpcoming': '1',
       if (after != null) 'after': after,
     });
     return CatalogPage(
@@ -610,6 +674,7 @@ class ReaderCatalog {
   }
 
   Future<bool> isInstalled(CatalogItem item) async {
+    if (item.upcoming) return false;
     if (item.kind == 'series') return false;
     if (item.kind == 'book') {
       final matches = (await books.getBooks()).where(
@@ -699,6 +764,8 @@ class ReaderCatalog {
       final request = await _client
           .getUrl(url)
           .timeout(const Duration(seconds: 20));
+      _checkCancelled(item);
+      if (_installKey == catalogItemKey(item)) _installRequest = request;
       request.followRedirects = false;
       final response = await request.close().timeout(
         const Duration(seconds: 30),
@@ -710,6 +777,7 @@ class ReaderCatalog {
       sink = temporary.openWrite();
       var count = 0;
       await for (final chunk in response.timeout(const Duration(seconds: 30))) {
+        _checkCancelled(item);
         count += chunk.length;
         if (count > asset.size) {
           throw const CatalogException('파일 크기가 일치하지 않습니다.');
@@ -781,11 +849,14 @@ class ReaderCatalog {
     CatalogItem item, {
     void Function(double)? progress,
   }) async {
+    if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
     if (item.kind == 'series') {
       throw const CatalogException('작품 안에서 내려받을 회차를 선택해 주세요.');
     }
     if (_installing) throw const CatalogException('진행 중인 다운로드를 기다려 주세요.');
     _installing = true;
+    _cancelInstall = false;
+    _installKey = catalogItemKey(item);
     try {
       final root = await _root();
       final folder = Directory(
@@ -794,11 +865,13 @@ class ReaderCatalog {
       var count = 0;
       final files = <String, File>{};
       for (final slot in item.assets.keys) {
+        _checkCancelled(item);
         files[slot] = await _download(item, slot, folder, (bytes) {
           count += bytes;
           progress?.call(count / item.totalSize);
         });
       }
+      _checkCancelled(item);
       if (item.kind == 'book') {
         await books.saveDownloadedBook(
           Book.localFile(
@@ -844,6 +917,8 @@ class ReaderCatalog {
       throw const CatalogException('다운로드 시간이 초과되었습니다. 다시 시도해 주세요.');
     } finally {
       _installing = false;
+      _installKey = null;
+      _installRequest = null;
     }
   }
 }

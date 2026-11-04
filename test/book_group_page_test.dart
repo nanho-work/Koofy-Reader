@@ -104,6 +104,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BookTile), findsNWidgets(2));
       expect(find.text('2권 묶음'), findsOneWidget);
+      // Group changes retain undo in the shared acknowledgement dialog.
+      await tester.tap(find.widgetWithText(TextButton, '확인'));
+      await tester.pumpAndSettle();
       await openGroup(tester);
       expect(find.byKey(const ValueKey('group-book-b0')), findsOneWidget);
       expect(find.byKey(const ValueKey('group-book-b1')), findsOneWidget);
@@ -286,6 +289,8 @@ void main() {
     await tester.tap(find.widgetWithText(ListTile, '소설 묶음'));
     await tester.pumpAndSettle();
     expect((await repository.load()).single.bookIds, ['b0', 'b1', 'b2']);
+    await tester.tap(find.widgetWithText(TextButton, '확인'));
+    await tester.pumpAndSettle();
     await openGroup(tester);
     final handles = find.byType(ReorderableDragStartListener);
     await tester.drag(handles.first, const Offset(0, 175));

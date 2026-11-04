@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'promotion_carousel.dart';
 import 'editorial_story.dart';
 import 'catalog_cover.dart';
@@ -101,9 +102,9 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
       if (mounted) setState(() => _dismissed = next);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        ReaderAlerts.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
+        ).show(ReaderNotice(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
       }
     }
   }
@@ -123,9 +124,9 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
     } catch (_) {
       if (mounted) {
         setState(() => _expanded = !next);
-        ScaffoldMessenger.of(
+        ReaderAlerts.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
+        ).show(ReaderNotice(content: Text(tr('저장하지 못했습니다. 다시 시도해 주세요.'))));
       }
     } finally {
       if (mounted) setState(() => _savingExpansion = false);
@@ -173,21 +174,17 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                   overlayTitle: true,
                   eyebrow: issue.title,
                   item: episode,
-                  onTap: download.busy || _opening
-                      ? null
-                      : () => _read(episode),
+                  onTap: _opening ? null : () => _read(episode),
                   overlayActions: Wrap(
                     alignment: WrapAlignment.end,
                     spacing: 12,
                     children: [
                       TextButton(
-                        onPressed: download.busy || _opening
-                            ? null
-                            : () => _read(episode),
+                        onPressed: _opening ? null : () => _read(episode),
                         child: Text(tr('읽기')),
                       ),
                       TextButton(
-                        onPressed: download.busy || _opening
+                        onPressed: _opening
                             ? null
                             : () => Navigator.of(context).push(
                                 MaterialPageRoute<void>(
@@ -209,7 +206,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
               onPressed: () => _refresh(force: true),
               child: Text(tr('다시 시도')),
             ),
-          if (_preferencesLoaded)
+          if (!widget.editorial && _preferencesLoaded)
             for (final book in compilations)
               Card(
                 child: Padding(
@@ -226,9 +223,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                         spacing: 8,
                         children: [
                           TextButton(
-                            onPressed: download.busy || _opening
-                                ? null
-                                : () => _read(book),
+                            onPressed: _opening ? null : () => _read(book),
                             child: Text(tr('합본 읽기')),
                           ),
                           TextButton(
@@ -476,13 +471,13 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                                   spacing: 8,
                                   children: [
                                     FilledButton(
-                                      onPressed: download.busy || _opening
+                                      onPressed: _opening
                                           ? null
                                           : () => _read(episode),
                                       child: Text(tr('읽기')),
                                     ),
                                     TextButton(
-                                      onPressed: download.busy || _opening
+                                      onPressed: _opening
                                           ? null
                                           : () {
                                               ref.invalidate(
@@ -516,7 +511,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                 ],
               ),
             ),
-          if (_preferencesLoaded)
+          if (!widget.editorial && _preferencesLoaded)
             for (final book in compilations)
               Card(
                 child: Padding(
@@ -533,9 +528,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
                         spacing: 8,
                         children: [
                           TextButton(
-                            onPressed: download.busy || _opening
-                                ? null
-                                : () => _read(book),
+                            onPressed: _opening ? null : () => _read(book),
                             child: Text(tr('합본 읽기')),
                           ),
                           TextButton(

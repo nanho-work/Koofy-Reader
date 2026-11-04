@@ -1,5 +1,7 @@
+import 'package:koofy_reader/features/catalog/presentation/download_status_bar.dart';
+import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:koofy_reader/features/reading_diary/presentation/reading_diary_page.dart';
 import 'package:koofy_reader/features/settings/presentation/settings_page.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
@@ -17,51 +19,12 @@ class MainTabsPage extends StatefulWidget {
 
 class _MainTabsPageState extends State<MainTabsPage> {
   int _selected = 0;
-  bool _restored = false;
   final _visited = <int>{0};
-  Future<void> _writes = Future.value();
-
-  @override
-  void initState() {
-    super.initState();
-    _restore();
-  }
-
-  Future<void> _restore() async {
-    int value = 0;
-    try {
-      value =
-          (await SharedPreferences.getInstance()).getInt(
-            MainTabsPage.selectionKey,
-          ) ??
-          0;
-    } catch (_) {
-      /* Start at home if preferences are unavailable. */
-    }
-    if (!mounted) return;
-    setState(() {
-      _selected = value >= 0 && value < 4 ? value : 0;
-      _visited.add(_selected);
-      _restored = true;
-    });
-  }
-
   void _select(int value) {
     if (_selected == value) return;
     setState(() {
       _selected = value;
       _visited.add(value);
-    });
-    // Preserve tap order even if storage is temporarily slow.
-    _writes = _writes.then((_) async {
-      try {
-        await (await SharedPreferences.getInstance()).setInt(
-          MainTabsPage.selectionKey,
-          value,
-        );
-      } catch (_) {
-        /* Navigation remains usable without persistence. */
-      }
     });
   }
 
@@ -82,7 +45,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
     // NavigationBar keeps a 32px icon slot and caps label scaling at 1.3.
     // Measure translated labels so the bar fits its content instead of 80px.
     var labelHeight = 0.0;
-    for (final label in ['홈', '도서', '서재', '설정']) {
+    for (final label in ['홈', '도서', '서재', '기록', '설정']) {
       final painter = TextPainter(
         text: TextSpan(
           text: tr(label),
@@ -90,7 +53,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
         ),
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3),
-      )..layout(maxWidth: (MediaQuery.sizeOf(context).width - 32) / 4);
+      )..layout(maxWidth: (MediaQuery.sizeOf(context).width - 32) / 5);
       if (painter.height > labelHeight) labelHeight = painter.height;
       painter.dispose();
     }
@@ -99,88 +62,106 @@ class _MainTabsPageState extends State<MainTabsPage> {
             .clamp(48.0, double.infinity)
             .toDouble();
 
-    return Scaffold(
-      body: !_restored
-          ? const SizedBox.expand()
-          : IndexedStack(
-              index: _selected,
-              children: [
-                TickerMode(
-                  enabled: _selected == 0,
-                  child: const _DiscoveryPage(),
+    return NotificationEntry(
+      child: Scaffold(
+        body: Column(
+          children: [
+            Expanded(
+              child: IndexedStack(
+                index: _selected,
+                children: [
+                  TickerMode(
+                    enabled: _selected == 0,
+                    child: const _DiscoveryPage(),
+                  ),
+                  TickerMode(
+                    enabled: _selected == 1,
+                    child: _visited.contains(1)
+                        ? const _BookstorePage()
+                        : const SizedBox.shrink(),
+                  ),
+                  TickerMode(
+                    enabled: _selected == 2,
+                    child: _visited.contains(2)
+                        ? const LibraryPage()
+                        : const SizedBox.shrink(),
+                  ),
+                  TickerMode(
+                    enabled: _selected == 3,
+                    child: _visited.contains(3)
+                        ? const ReadingDiaryPage()
+                        : const SizedBox.shrink(),
+                  ),
+                  TickerMode(
+                    enabled: _selected == 4,
+                    child: _visited.contains(4)
+                        ? const SettingsPage(embedded: true)
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+            const DownloadStatusBar(),
+          ],
+        ),
+        // The existing global banner reserves its own strip; never cover menu taps.
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.only(bottom: adBottom),
+          child: NavigationBarTheme(
+            data: navigationTheme.copyWith(
+              indicatorColor: Colors.transparent,
+              iconTheme: WidgetStateProperty.resolveWith(
+                (states) => IconThemeData(
+                  size: iconSize,
+                  color: states.contains(WidgetState.selected)
+                      ? selectedColor
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
-                TickerMode(
-                  enabled: _selected == 1,
-                  child: _visited.contains(1)
-                      ? const _BookstorePage()
-                      : const SizedBox.shrink(),
+              ),
+              labelTextStyle: WidgetStateProperty.resolveWith(
+                (states) => labelStyle.copyWith(
+                  fontWeight: states.contains(WidgetState.selected)
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                  color: states.contains(WidgetState.selected)
+                      ? selectedColor
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
-                TickerMode(
-                  enabled: _selected == 2,
-                  child: _visited.contains(2)
-                      ? const LibraryPage()
-                      : const SizedBox.shrink(),
+              ),
+            ),
+            child: NavigationBar(
+              height: navigationHeight,
+              labelPadding: const EdgeInsets.only(top: 4),
+              selectedIndex: _selected,
+              onDestinationSelected: _select,
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: tr('홈'),
                 ),
-                TickerMode(
-                  enabled: _selected == 3,
-                  child: _visited.contains(3)
-                      ? const SettingsPage(embedded: true)
-                      : const SizedBox.shrink(),
+                NavigationDestination(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: tr('도서'),
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.library_books_outlined),
+                  selectedIcon: const Icon(Icons.library_books),
+                  label: tr('서재'),
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  selectedIcon: const Icon(Icons.calendar_month),
+                  label: tr('기록'),
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings),
+                  label: tr('설정'),
                 ),
               ],
             ),
-      // The existing global banner reserves its own strip; never cover menu taps.
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.only(bottom: adBottom),
-        child: NavigationBarTheme(
-          data: navigationTheme.copyWith(
-            indicatorColor: Colors.transparent,
-            iconTheme: WidgetStateProperty.resolveWith(
-              (states) => IconThemeData(
-                size: iconSize,
-                color: states.contains(WidgetState.selected)
-                    ? selectedColor
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            labelTextStyle: WidgetStateProperty.resolveWith(
-              (states) => labelStyle.copyWith(
-                fontWeight: states.contains(WidgetState.selected)
-                    ? FontWeight.w700
-                    : FontWeight.w400,
-                color: states.contains(WidgetState.selected)
-                    ? selectedColor
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          child: NavigationBar(
-            height: navigationHeight,
-            labelPadding: const EdgeInsets.only(top: 4),
-            selectedIndex: _selected,
-            onDestinationSelected: _restored ? _select : null,
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home_outlined),
-                selectedIcon: const Icon(Icons.home),
-                label: tr('홈'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.menu_book_outlined),
-                selectedIcon: const Icon(Icons.menu_book),
-                label: tr('도서'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.library_books_outlined),
-                selectedIcon: const Icon(Icons.library_books),
-                label: tr('서재'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.settings_outlined),
-                selectedIcon: const Icon(Icons.settings),
-                label: tr('설정'),
-              ),
-            ],
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/data/library_trash_service.dart';
 import 'package:koofy_reader/features/library/data/library_reading_repository.dart';
@@ -54,14 +55,18 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
       ref.invalidate(bookGroupsProvider);
       if (mounted) {
         _reload();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr("복원했습니다. 다른 묶음에 배치한 책의 현재 소속은 유지합니다."))),
+        ReaderAlerts.of(context).show(
+          ReaderNotice(
+            content: Text(tr("복원했습니다. 다른 묶음에 배치한 책의 현재 소속은 유지합니다.")),
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr("복원하지 못했습니다. 기록은 보존했습니다. 다시 시도해 주세요."))),
+        ReaderAlerts.of(context).show(
+          ReaderNotice(
+            content: Text(tr("복원하지 못했습니다. 기록은 보존했습니다. 다시 시도해 주세요.")),
+          ),
         );
       }
     } finally {
@@ -71,9 +76,9 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
 
   Future<void> purge(Set<String> ids, {bool all = false}) async {
     if (busy || ids.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showReaderDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(all ? tr("휴지통 비우기") : tr("영구 삭제")),
         content: Text(
           tr(
@@ -118,9 +123,7 @@ class _LibraryTrashPageState extends ConsumerState<LibraryTrashPage> {
         entries = store.load();
         _size = null;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ReaderAlerts.of(context).show(ReaderNotice(content: Text(message)));
     }
   }
 

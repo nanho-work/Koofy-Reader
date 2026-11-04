@@ -89,14 +89,13 @@ extension _LibraryGroups on _LibraryPageState {
       await _createGroup(initialIds: [book.id], title: book.title);
       return;
     }
-    final id = await showModalBottomSheet<String>(
+    final id = await showReaderDialog<String>(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(
+      builder: (context) => ReaderAlertDialog(
+        title: Text(tr("추가할 묶음 선택")),
+        content: ListView(
           shrinkWrap: true,
           children: [
-            ListTile(title: Text(tr("추가할 묶음 선택"))),
             for (final group in groups)
               ListTile(
                 title: Text(group.title),
@@ -129,19 +128,15 @@ extension _LibraryGroups on _LibraryPageState {
   }
 
   Future<void> _groupMenu(BookGroup group, {bool inside = false}) async {
-    final action = await showModalBottomSheet<String>(
+    final action = await showReaderDialog<String>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
+      builder: (context) => ReaderAlertDialog(
+        title: Text(group.title),
+        content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                title: Text(group.title),
-                subtitle: Text(tr("{0}권의 책 묶음", [group.bookIds.length])),
-              ),
+              Text(tr("{0}권의 책 묶음", [group.bookIds.length])),
               ListTile(
                 leading: const Icon(Icons.add),
                 title: Text(tr("묶음에 책 추가")),
@@ -195,9 +190,9 @@ extension _LibraryGroups on _LibraryPageState {
       case 'trash':
       case 'empty':
         final keepShelf = action == 'empty';
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showReaderDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (context) => ReaderAlertDialog(
             title: Text(keepShelf ? tr("묶음책장 비우기") : tr("묶음책 삭제")),
             content: Text(
               tr("“{0}”의 책 {1}권을 휴지통으로 옮길까요?\n{2} 설정의 휴지통에서 한 번에 복원할 수 있습니다.", [
@@ -243,9 +238,9 @@ extension _LibraryGroups on _LibraryPageState {
       case 'reset':
         await _groupCover(group, reset: true);
       case 'dissolve':
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showReaderDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (context) => ReaderAlertDialog(
             title: Text(tr("묶음 해제")),
             content: Text(
               tr("“{0}”의 책 {1}권을 서재로 꺼낼까요? 책과 읽던 위치는 유지됩니다.", [
@@ -275,10 +270,10 @@ extension _LibraryGroups on _LibraryPageState {
 
   Future<String?> _groupName(String name) {
     var value = name;
-    return showDialog<String>(
+    return showReaderDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
+        builder: (context, update) => ReaderAlertDialog(
           title: Text(tr("묶음 이름 변경")),
           content: TextFormField(
             initialValue: name,
@@ -347,13 +342,11 @@ extension _LibraryGroups on _LibraryPageState {
       final change = await action();
       if (!mounted) return;
       ref.invalidate(bookGroupsProvider);
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
+      final messenger = ReaderAlerts.of(context);
+      messenger.show(
+        ReaderNotice(
           content: Text(message),
-          duration: const Duration(seconds: 6),
-          action: SnackBarAction(
+          action: ReaderNoticeAction(
             label: tr("실행 취소"),
             onPressed: () async {
               try {
@@ -402,9 +395,9 @@ extension _LibraryGroups on _LibraryPageState {
             title: book.title,
           );
         } else {
-          final confirmed = await showDialog<bool>(
+          final confirmed = await showReaderDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
+            builder: (context) => ReaderAlertDialog(
               title: Text(tr("묶음에 추가")),
               content: Text(
                 tr("“{0}”을 “{1}”에 추가할까요?", [details.data.title, group.title]),

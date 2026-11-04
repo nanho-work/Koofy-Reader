@@ -1,6 +1,7 @@
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
@@ -45,7 +46,7 @@ void main() {
       expect(find.text('독서 가능'), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(ReaderAlertDialog), findsNothing);
       expect(platform.requests, 0);
       expect(consent.prepares, 1);
       expect(service.state.canRequestAds, true);
@@ -154,7 +155,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.text('main ready'), findsOneWidget);
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(ReaderAlertDialog), findsNothing);
       expect(analytics.choice, false);
       expect(service.state.choice, AdvertisingChoice.standard);
       await tester.pumpWidget(const SizedBox.shrink());

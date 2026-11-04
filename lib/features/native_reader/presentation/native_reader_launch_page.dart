@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
@@ -96,12 +98,14 @@ class _NativeReaderLaunchPageState
       );
       if (!mounted || _leaveRequested) return;
       _nextBook = null;
+      Book? diaryGroup;
       try {
         final groups = await ref.read(bookGroupsProvider.future);
         if (!mounted || _leaveRequested) return;
         final books = await ref.read(booksProvider.future);
         for (final group in groups) {
           final index = group.bookIds.indexOf(_book.id);
+          if (index >= 0) diaryGroup ??= group.displayBook;
           if (index >= 0 && index + 1 < group.bookIds.length) {
             final nextId = group.bookIds[index + 1];
             _nextBook = books.where((b) => b.id == nextId).firstOrNull;
@@ -121,7 +125,10 @@ class _NativeReaderLaunchPageState
           .refresh(levelPlayReadyProvider.future)
           .timeout(const Duration(seconds: 1), onTimeout: () => false);
       if (!mounted || _leaveRequested) return;
+      final diaryBook = await DiaryBook.snapshot(_book, group: diaryGroup);
+      if (!mounted || _leaveRequested) return;
       await services.coordinator.open(
+        diaryBook: diaryBook,
         publicationId: publication.publicationId,
         contentRevision: publication.contentRevision,
         filePath: publication.filePath,
@@ -170,9 +177,9 @@ class _NativeReaderLaunchPageState
       return publication.restoreLocator(position.locatorJson);
     }
     if (position.previousRevisionExists) {
-      final start = await showDialog<bool>(
+      final start = await showReaderDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => ReaderAlertDialog(
           title: Text(tr("책의 내용이 변경되었습니다")),
           content: Text(
             tr(
@@ -206,10 +213,10 @@ class _NativeReaderLaunchPageState
     final candidate = offset == null ? null : map?.locatorAt(offset);
     if (candidate != null && record.cachedText == map?.text) return candidate;
     final ratio = record.progress?.positionRatio;
-    final choice = await showDialog<String>(
+    final choice = await showReaderDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(tr("이전 읽기 위치 확인")),
         content: SingleChildScrollView(
           child: Text(
@@ -297,9 +304,8 @@ class _NativeReaderLaunchPageState
       if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute(
-          builder: (_) => ReaderCatalogPage(
-            initialBookQuery: BundledBooks.mermaidSeries,
-          ),
+          builder: (_) =>
+              ReaderCatalogPage(initialBookQuery: BundledBooks.mermaidSeries),
         ),
       );
     });

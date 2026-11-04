@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'open_catalog_book.dart';
 export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
@@ -65,9 +67,9 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
       canPop: !busy,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr("다운로드가 끝날 때까지 잠시 기다려 주세요."))),
-          );
+          ReaderAlerts.of(
+            context,
+          ).show(ReaderNotice(content: Text(tr("다운로드가 끝날 때까지 잠시 기다려 주세요."))));
         }
       },
       child: widget.fontsOnly
@@ -201,21 +203,11 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
   Future<void> _download(CatalogItem item) async {
     try {
       await ref.read(catalogDownloadProvider.notifier).download(item);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _books
-                ? tr("내 서재에 책을 추가했습니다.")
-                : tr("글꼴을 내려받았습니다. 책의 독서 설정에서 선택해 주세요."),
-          ),
-        ),
-      );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        ReaderAlerts.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(_message(error))));
+        ).show(ReaderNotice(content: Text(_message(error))));
       }
     }
   }
@@ -430,15 +422,16 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                       key: ValueKey(key),
                       item: item,
                       installed: downloaded,
+                      onOpen: downloaded
+                          ? () => openCatalogBook(context, ref, item)
+                          : null,
                       progress: download.itemKey == key
                           ? download.progress
                           : null,
                       onDownload:
-                          download.busy ||
-                              !installed.hasValue ||
+                          !installed.hasValue ||
                               installed.isLoading ||
-                              installed.hasError ||
-                              downloaded
+                              installed.hasError
                           ? null
                           : () => _download(item),
                     );

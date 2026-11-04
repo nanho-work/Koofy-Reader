@@ -1,3 +1,4 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/library/application/book_import.dart';
 import 'package:flutter/material.dart';
@@ -21,9 +22,9 @@ Future<Book?> importWithTextPreview(
     }
     final text = await LegacyTextImport.preview(path);
     if (!context.mounted) return null;
-    final accept = await showDialog<bool>(
+    final accept = await showReaderDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ReaderAlertDialog(
         title: Text(tr("한글 텍스트 확인")),
         content: SizedBox(
           width: 480,

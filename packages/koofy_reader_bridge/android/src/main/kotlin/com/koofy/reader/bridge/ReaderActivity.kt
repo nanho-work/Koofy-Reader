@@ -12,9 +12,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -225,7 +223,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             nextBookButton = button(L("다음 권")) {
                 stopAutoTurn()
                 if (toolsReady()) {
-                    AlertDialog.Builder(this).setTitle(L("다음 권 읽기"))
+                    ReaderAlert.Builder(this, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("다음 권 읽기"))
                         .setMessage(title)
                         .setPositiveButton(L("열기")) { _, _ -> closeReader(nextBook = true) }
                         .setNegativeButton(L("취소"), null).show()
@@ -370,7 +368,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             navigator = reader
             speech = ReaderSpeech(this, opened, session.request,
                 { lastLocator ?: reader.firstVisibleElementLocator() },
-                { toolsReady() }, { updateSpeechControls() }, { followSpeech(it) }).also {
+                { toolsReady() }, { updateSpeechControls() }, { followSpeech(it) },
+                palette = { ReaderPalette.forTheme(session.preferences.theme) }).also {
                     it.foreground(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
                 }
             supportFragmentManager.beginTransaction().replace(container.id, reader, "koofy.epub").commitNow()
@@ -497,6 +496,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 } else nextBookButton?.contentDescription = L("다음 권 {0}", session.request.nextBookTitle)
                 if (autoRunning) scheduleAutoTurn()
                 emit(kind)
+                if (kind == "ready") usage(if (hasWindowFocus()) "reading_overlay_resume" else "reading_overlay_pause")
                 if (target != null) {
                     val completed = toolsNavigationCompleted
                     toolsNavigationCompleted = null
@@ -517,7 +517,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             closeReader(downloadSeries = true)
             return
         }
-        Toast.makeText(this, L("외부 링크는 독서 화면에서 열지 않습니다."), Toast.LENGTH_SHORT).show()
+        notice(L("외부 링크는 독서 화면에서 열지 않습니다."))
     }
 
     override fun onResourceLoadFailed(href: Url, error: ReadError) {
@@ -818,7 +818,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     private fun toolsReady() = session.ready && !session.closing && restoreTarget == null && captureJob?.isActive != true
     private fun jumpFromTools(target: Locator) {
-        if (!toolsReady()) { Toast.makeText(this, L("본문 위치 확인 후 다시 눌러 주세요."), Toast.LENGTH_SHORT).show(); return }
+        if (!toolsReady()) { notice(L("본문 위치 확인 후 다시 눌러 주세요.")); return }
         val source = lastLocator ?: return
         try {
             goToLocator(target.toJSON().toString())
@@ -828,7 +828,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 returnButton.isEnabled = true
                 returnButton.visibility = View.VISIBLE
             }
-        } catch (_: Exception) { Toast.makeText(this, L("해당 위치로 이동하지 못했습니다."), Toast.LENGTH_SHORT).show() }
+        } catch (_: Exception) { notice(L("해당 위치로 이동하지 못했습니다.")) }
     }
     private fun returnToReading() {
         if (!toolsReady() || navigationHistory.isEmpty()) return
@@ -838,7 +838,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 navigationHistory.removeLast()
                 returnButton.isEnabled = navigationHistory.isNotEmpty(); returnButton.visibility = if (returnButton.isEnabled) View.VISIBLE else View.GONE
             }
-        } catch (_: Exception) { Toast.makeText(this, L("이전 위치로 돌아가지 못했습니다."), Toast.LENGTH_SHORT).show() }
+        } catch (_: Exception) { notice(L("이전 위치로 돌아가지 못했습니다.")) }
     }
     private fun createReaderTools(selected: Locator? = null): ReaderTools? {
         stopAutoTurn()
@@ -883,18 +883,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             val detail = publication?.locatorFromLink(link)?.let { locationInfo.detail(it, approximate = link.href.toString().substringAfter("#", "").isNotEmpty()) }.orEmpty()
             if (detail.isBlank()) title else "$title\n$detail"
         }
-        AlertDialog.Builder(this).setTitle(L("목차"))
+        ReaderAlert.Builder(this, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("목차"))
             .setAdapter(ReaderTextListAdapter(this, rows, colors)) { _, index ->
                 publication?.locatorFromLink(flattened[index])?.let { jumpFromTools(it) }
-            }.setNegativeButton(L("닫기"), null).show().also { dialog ->
-                dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.background))
-                dialog.listView.setBackgroundColor(colors.background)
-                fun tint(view: View) {
-                    if (view is TextView) view.setTextColor(colors.foreground)
-                    if (view is ViewGroup) for (i in 0 until view.childCount) tint(view.getChildAt(i))
-                }
-                dialog.window?.decorView?.let { tint(it) }
-            }
+            }.setNegativeButton(L("닫기"), null).show()
     }
 
     private fun observeFold() {
@@ -943,6 +935,11 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
 
     fun updateAdHiddenUntil(epochMs: Long?) { bannerFooter?.updateHiddenUntil(epochMs) }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        usage(if (hasFocus) "reading_overlay_resume" else "reading_overlay_pause")
+    }
+
     override fun onPause() {
         usage("reading_pause")
         stopAutoTurn()
@@ -977,7 +974,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         mode.menu.add(L("선택 문장에 책갈피")).setShowAsActionFlags(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM).setOnMenuItemClickListener {
             lifecycleScope.launch {
                 val selected = navigator?.currentSelection()?.locator
-                if (selected == null) { Toast.makeText(this@ReaderActivity, L("문장을 먼저 선택해 주세요."), Toast.LENGTH_SHORT).show(); return@launch }
+                if (selected == null) { notice(L("문장을 먼저 선택해 주세요.")); return@launch }
                 mode.finish()
                 showReaderTools(selected)
             }
@@ -1011,13 +1008,18 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     finish()
                 } else {
                     session.closing = false
-                    AlertDialog.Builder(this@ReaderActivity).setTitle(L("읽기 기록 저장 실패"))
+                    ReaderAlert.Builder(this@ReaderActivity, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("읽기 기록 저장 실패"))
                         .setMessage(L("기기 저장 공간을 확인한 뒤 다시 시도해 주세요."))
                         .setPositiveButton(L("다시 저장")) { _, _ -> closeReader(nextBook, manageFonts, downloadSeries) }
                         .setNegativeButton(L("계속 읽기"), null).show()
                 }
             }
         }
+    }
+
+    private fun notice(message: String) {
+        if (!session.closing) ReaderAlert.Builder(this, ReaderPalette.forTheme(session.preferences.theme))
+            .setTitle(L("독서 화면")).setMessage(message).setPositiveButton(L("확인"), null).show()
     }
 
     private fun usage(name: String) {
@@ -1044,12 +1046,13 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         openingTimeout?.cancel()
         status.text = message
         ReaderRuntime.emit(session.event("error", code, message))
-        AlertDialog.Builder(this).setTitle(L("책을 표시할 수 없습니다"))
+        ReaderAlert.Builder(this, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("책을 표시할 수 없습니다"))
             .setMessage(message).setCancelable(false)
             .setPositiveButton(L("서재로")) { _, _ -> closeReader() }.show()
     }
 
     override fun onDestroy() {
+        ReaderAlert.dismissAll(this)
         stopAutoTurn()
         translation?.close()
         speech?.close()

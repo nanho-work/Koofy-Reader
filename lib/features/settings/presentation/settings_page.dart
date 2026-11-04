@@ -1,3 +1,5 @@
+import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:koofy_reader/core/theme/app_background.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart'
@@ -114,8 +116,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   await AppAppearance.instance.selectBackground(mode);
                 } catch (_) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                    ReaderAlerts.of(context).show(
+                      ReaderNotice(
                         content: Text(tr('테마를 저장하지 못했습니다. 다시 시도해 주세요.')),
                       ),
                     );
@@ -149,8 +151,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ref.invalidate(readerCoverEnabledProvider);
                     } catch (_) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
+                        ReaderAlerts.of(context).show(
+                          ReaderNotice(
                             content: Text(tr("표지 설정을 저장하지 못했습니다. 다시 시도해 주세요.")),
                           ),
                         );
@@ -225,8 +227,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       onTap: () async {
         final opened = await ReaderReviewService.instance.openStore();
         if (!opened && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr("스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요."))),
+          ReaderAlerts.of(context).show(
+            ReaderNotice(content: Text(tr("스토어를 열지 못했습니다. 잠시 후 다시 시도해 주세요."))),
           );
         }
       },
@@ -296,6 +298,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       '진단정보',
       '평가 남기기',
       '글꼴추가',
+      '새 글 알림',
     ];
     final detailWidgets = <List<Widget>>[
       [_languageOptions()],
@@ -309,19 +312,42 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       [diagnosticsTile],
       [reviewTile],
       [fontTile],
+      [],
     ];
+    Widget sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        tr(text),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
     final phoneWidgets = <Widget>[
+      sectionLabel('독서 설정'),
       languageTile,
       themeTile,
       fontTile,
-      versionTile,
+      coverTile,
+      sectionLabel('데이터 관리'),
       backupTile,
       trashTile,
+      sectionLabel('알림·개인정보'),
+      ListTile(
+        leading: const Icon(Icons.notifications_none),
+        title: Text(tr('새 글 알림')),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const NotificationSettingsPage(),
+          ),
+        ),
+      ),
       privacyTile,
-      coverTile,
+      ...rewardDetails,
+      sectionLabel('앱 정보'),
+      versionTile,
       diagnosticsTile,
       reviewTile,
-      ...rewardDetails,
     ];
     final detailPages = <int, Widget>{
       3: const BackupPage(),
@@ -329,6 +355,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       5: const PrivacySettingsPage(),
       8: const DiagnosticsPage(),
       10: const FontCatalogPage(),
+      11: const NotificationSettingsPage(),
     };
     return DisplayFeatureSubScreen(
       anchorPoint: Offset.zero,
@@ -394,6 +421,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 2,
                                 3,
                                 4,
+                                11,
                                 5,
                                 6,
                                 7,
@@ -444,8 +472,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 );
               } catch (_) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(tr('언어를 저장하지 못했습니다. 다시 시도해 주세요.'))),
+                  ReaderAlerts.of(context).show(
+                    ReaderNotice(
+                      content: Text(tr('언어를 저장하지 못했습니다. 다시 시도해 주세요.')),
+                    ),
                   );
                 }
               }
@@ -468,8 +498,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
       final result = await ref.read(rewardedAdServiceProvider).show();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ReaderAlerts.of(context).show(
+        ReaderNotice(
           content: Text(
             result == true
                 ? tr("4시간 동안 배너 광고를 숨깁니다.")
@@ -481,8 +511,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr("광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."))),
+        ReaderAlerts.of(context).show(
+          ReaderNotice(
+            content: Text(tr("광고 보상을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.")),
+          ),
         );
       }
     } finally {

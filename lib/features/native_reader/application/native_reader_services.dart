@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -27,6 +28,7 @@ final nativeReaderServicesProvider = FutureProvider<NativeReaderServices>((
   final directory = Directory('${support.path}/native_reader_v1');
   await directory.create(recursive: true);
   final coordinator = NativeReaderCoordinator(
+    diary: ref.watch(readingDiaryProvider),
     gateway: NativeReaderGateway(),
     store: NativeReaderStore.open(File('${directory.path}/reader.sqlite')),
   );
