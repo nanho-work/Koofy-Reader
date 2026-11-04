@@ -99,7 +99,7 @@ export function monthlyPublisher(db: Firestore, bucket: Bucket) {
         const bookRef = contents.doc(bookId);
         if ((await transaction.get(bookRef)).exists) throw new ApiError(409, '이미 생성된 합본이 있습니다. 관리자에서 연결 상태를 확인해 주세요.');
         const now = new Date().toISOString();
-        const book: Content = { id: bookId, kind: 'book', revision: 1, updatedAt: now, title: snapshot.title, author: MONTHLY_DEFAULTS[snapshot.language || 'ko'].author, license: monthlyLicense(snapshot.license, snapshot.language || 'ko'), description: snapshot.description, language: snapshot.language || 'ko', issueMonth: snapshot.issueMonth, assets: { epub, cover: snapshot.assets.cover }, published: true, publishedContent: null };
+        const book: Content = { id: bookId, kind: 'book', revision: 1, updatedAt: now, title: snapshot.title, author: MONTHLY_DEFAULTS[snapshot.language || 'ko'].author, license: monthlyLicense(snapshot.license, snapshot.language || 'ko'), description: snapshot.description, category: '월간 쿠피', language: snapshot.language || 'ko', issueMonth: snapshot.issueMonth, assets: { epub, cover: snapshot.assets.cover }, published: true, publishedContent: null };
         book.publishedContent = publish(book);
         book.revision = book.publishedContent.version;
         const linked: Content = { ...current, revision: current.revision + 1, updatedAt: now, compilationId: bookId, seriesStatus: 'completed', compilationError: '', publishedContent: { ...snapshot, version: current.revision + 1, compilationId: bookId, seriesStatus: 'completed', compilationLinkedAt: now } };

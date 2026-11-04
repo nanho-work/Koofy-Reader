@@ -1,3 +1,4 @@
+import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
 import {releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
 import { changeSeriesStatus, pendingEpisodes } from './series-status';
@@ -205,25 +206,55 @@ async function monthly(language: 'ko' | 'en' | 'ja') {
 // translation groups before returning them, so pagination never splits a work.
 async function adminWorks(contentKind: unknown, after: unknown, scope: unknown) {
   requireValue(scope === undefined || ['general','monthly','novel'].includes(String(scope)), '목록 구분을 확인해 주세요.');
-  const page = await list(contentKind, after, false, true, undefined, true);
-  const inScope = (item: Content) => !item.seriesId && !item.deleting &&
-    (scope === 'general' ? item.collectionType === 'general' && !item.issueMonth && !item.publishedContent?.issueMonth : scope === 'monthly' ? !!(item.issueMonth || item.publishedContent?.issueMonth) : scope === 'novel' ? !item.collectionType && !item.issueMonth && !item.publishedContent?.issueMonth : true);
-  const seeds = page.items.filter((item): item is Content => !!item && inScope(item as Content));
-  const groupIds = [...new Set(seeds.map(item => item.translationGroupId).filter((value): value is string => !!value))];
-  const items = new Map(seeds.map(item => [item.id, item]));
-  for (let offset = 0; offset < groupIds.length; offset += 30) {
-    const linked = await contents.where('translationGroupId','in',groupIds.slice(offset,offset + 30)).get();
-    for (const doc of linked.docs) { const item = doc.data() as Content; if(item.kind === kind(contentKind) && inScope(item)) items.set(item.id,item); }
-  }
-  if (scope === 'monthly') {
-    const months = [...new Set(seeds.map(item=>item.issueMonth || item.publishedContent?.issueMonth).filter((value):value is string=>!!value))];
-    for(let offset=0;offset<months.length;offset+=10){
-      const slice=months.slice(offset,offset+10);
-      const versions=await Promise.all(['issueMonth','publishedContent.issueMonth'].map(field=>contents.where('kind','==','series').where(field,'in',slice).get()));
-      for(const version of versions)for(const doc of version.docs){const item=doc.data() as Content;if(inScope(item))items.set(item.id,item);}
-    }
-  }
-  return {...page, items:[...items.values()]};
+  const selectedKind = kind(contentKind);
+  const selectedScope = scope as AdminWorkScope;
+  const expansions = new Map<string, Promise<Content[]>>();
+  return adminWorkPage({
+    scope: selectedScope, after: cursor(after),
+    read: async next => {
+      const page = await list(selectedKind, next, false, true, undefined, true);
+      const seeds = (page.items as Content[]).filter(item => inAdminWorkScope(item, selectedScope));
+      // Batch translation lookups instead of one network request per visible work.
+      if (selectedScope === 'monthly') {
+        const months = [...new Set(seeds.map(item => item.issueMonth || item.publishedContent?.issueMonth))]
+          .filter((month): month is string => !!month && !expansions.has(`month:${month}`));
+        for (let offset = 0; offset < months.length; offset += 10) {
+          const slice = months.slice(offset, offset + 10);
+          const versions = await Promise.all(['issueMonth', 'publishedContent.issueMonth'].map(field =>
+            contents.where('kind', '==', selectedKind).where(field, 'in', slice).get()));
+          const linked = [...new Map(versions.flatMap(version => version.docs.map(doc => [doc.id, doc.data() as Content] as const))).values()];
+          for (const month of slice) expansions.set(`month:${month}`, Promise.resolve(linked.filter(item => (item.issueMonth || item.publishedContent?.issueMonth) === month)));
+        }
+      } else {
+        const groups = [...new Set(seeds.map(item => item.translationGroupId))]
+          .filter((group): group is string => !!group && !expansions.has(group));
+        for (let offset = 0; offset < groups.length; offset += 30) {
+          const slice = groups.slice(offset, offset + 30);
+          const linked = (await contents.where('translationGroupId', 'in', slice).get()).docs.map(doc => doc.data() as Content);
+          for (const group of slice) expansions.set(group, Promise.resolve(linked.filter(item => item.translationGroupId === group)));
+        }
+      }
+      return { items: page.items as Content[], nextCursor: page.nextCursor };
+    },
+    expand: item => {
+      const key = adminWorkKey(item, selectedScope);
+      let result = expansions.get(key);
+      if (!result) {
+        result = (async () => {
+          const month = item.issueMonth || item.publishedContent?.issueMonth;
+          if (selectedScope === 'monthly' && month) {
+            const versions = await Promise.all(['issueMonth', 'publishedContent.issueMonth'].map(field =>
+              contents.where('kind', '==', selectedKind).where(field, '==', month).get()));
+            return [...new Map(versions.flatMap(version => version.docs.map(doc => [doc.id, doc.data() as Content] as const))).values()];
+          }
+          if (!item.translationGroupId) return [item];
+          return (await contents.where('translationGroupId', '==', item.translationGroupId).get()).docs.map(doc => doc.data() as Content);
+        })();
+        expansions.set(key, result);
+      }
+      return result;
+    },
+  });
 }
 
 export const readerAdmin = onRequest(options, async (request, response) => {

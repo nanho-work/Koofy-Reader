@@ -109,9 +109,10 @@ export function metadata(input: unknown): Metadata {
     return value.trim();
   }
   requireValue(data.collectionType === undefined || data.collectionType === 'general', '작품 관리 분류를 확인해 주세요.');
-  const category = data.category === undefined ? '기타' : categoryName(data.category);
+  const monthly = monthlyMetadata(data);
+  const category = monthly.issueMonth ? '월간 쿠피' : data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { ...(data.collectionType === 'general' ? { collectionType: 'general' as const } : {}), ...monthlyMetadata(data), language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) };
+  return { ...(data.collectionType === 'general' ? { collectionType: 'general' as const } : {}), ...monthly, language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -165,6 +166,7 @@ export function publicItem(item: Content) {
   const assets = Object.fromEntries(Object.entries(snapshot.assets).map(([key, { path: _path, ...asset }]) => [key, asset]));
   const { preview, sourceTxt: _sourceTxt, autoCompile: _autoCompile, expectedEpisodes: _expectedEpisodes, ...fields } = snapshot;
   return { id: item.id, kind: item.kind, ...fields,
+    ...(snapshot.issueMonth ? { category: '월간 쿠피' } : {}),
     ...(item.translationGroupId ? { translationGroupId: item.translationGroupId } : {}),
     ...(snapshot.issueMonth ? { author: snapshot.byline || '' } : {}),
     ...(snapshot.seriesId ? { title: `${snapshot.seriesTitle} ${snapshot.language === 'en' ? `Chapter ${snapshot.episodeNumber}` : snapshot.language === 'ja' ? `第${snapshot.episodeNumber}話` : `${snapshot.episodeNumber}화`} — ${snapshot.title}`, episodeTitle: snapshot.title } : {}),
@@ -423,6 +425,6 @@ export function upcomingItem(item: Content) {
   requireValue(cover,'표지가 없습니다.');
   const {path: _path,...asset}=cover;
   return {id:item.id,kind:'book',title:s.title,episodeTitle:s.title,seriesId:s.seriesId,seriesTitle:s.seriesTitle,episodeNumber:s.episodeNumber,
-    author:s.byline||s.author||'',description:'',license:'',category:s.category||'기타',language:s.language||'ko',version:s.version,
+    author:s.byline||s.author||'',description:'',license:'',category:s.issueMonth?'월간 쿠피':s.category||'기타',language:s.language||'ko',version:s.version,
     releaseAt:s.releaseAt,releaseDate:s.releaseDate,issueMonth:s.issueMonth||'',upcoming:true,assets:{cover:asset}};
 }

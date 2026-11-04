@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Content, Asset, metadata, seriesMetadata, episodeMetadata, publish, isReleased, compilationReady, publicationDay } from '../src/content';
+import { Content, Asset, metadata, seriesMetadata, episodeMetadata, publish, publicItem, isReleased, compilationReady, publicationDay } from '../src/content';
 const base = { title: '월간 쿠피', author: '쿠피랩', description: '', license: '허가', language: 'ko' as const, issueMonth: '2026-02' };
 const cover: Asset = { path: 'cover', extension: 'webp', contentType: 'image/webp', size: 1, sha256: 'a'.repeat(64) };
+test('monthly categories are automatic in every language, including old published snapshots', () => {
+  for (const language of ['ko', 'en', 'ja'] as const) {
+    assert.equal(metadata({ ...base, language, category: '소설' }).category, '월간 쿠피');
+    const legacy = content('book', { language });
+    legacy.publishedContent = { ...legacy.publishedContent!, category: '기타' };
+    assert.equal(publicItem(legacy).category, '월간 쿠피');
+    assert.equal(legacy.publishedContent.category, '기타'); // Read normalization never edits the stored book.
+  }
+  assert.equal(metadata({ ...base, issueMonth: '', category: '시' }).category, '시');
+});
 function content(kind: 'book' | 'series', extra: Record<string, unknown> = {}): Content {
   const item: Content = { ...base, id: (kind === 'book' ? 'b' : 'a').repeat(32), kind, revision: 1, assets: kind === 'book' ? { cover, epub: { ...cover, extension: 'epub' } } : { cover }, published: true, publishedContent: null, updatedAt: '2026-02-01', ...extra };
   item.publishedContent = publish(item);
