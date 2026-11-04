@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:koofy_reader/features/library/data/book_repository.dart';
@@ -47,8 +48,23 @@ final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
 ) async {
   final language = ref.watch(appContentLanguageProvider);
   var active = true;
-  ref.onDispose(() => active = false);
+  Timer? refreshTimer;
+  ref.onDispose(() {
+    active = false;
+    refreshTimer?.cancel();
+  });
   final repository = ref.watch(readerCatalogProvider);
+  void schedule(Duration delay) {
+    refreshTimer = Timer(delay, () {
+      if (!active) return;
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        schedule(CatalogCache.lifetime);
+        return;
+      }
+      ref.invalidateSelf();
+    });
+  }
+
   var last = <CatalogItem>[];
   await for (final items in repository.watchItems(
     kind,
@@ -62,6 +78,8 @@ final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
     last = items;
     if (active) ref.state = AsyncData(items);
   }
+  final delay = await repository.refreshDelay(kind, language: language);
+  if (active) schedule(delay);
   return last;
 });
 
@@ -446,6 +464,10 @@ class ReaderCatalog {
 
   final _downloads = <String, Future<File>>{};
   String _listKey(String kind, String language) => '$endpoint|$language|$kind';
+  Future<Duration> refreshDelay(
+    String kind, {
+    required String language,
+  }) async => _cache.refreshDelay(await _cache.read(_listKey(kind, language)));
   void forceRefresh(String kind, {String? language}) =>
       _forced.add(_listKey(kind, language ?? AppLanguage.instance.code));
 

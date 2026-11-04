@@ -2,7 +2,6 @@ import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'promotion_carousel.dart';
 import 'editorial_story.dart';
 import 'catalog_cover.dart';
-import 'dart:async';
 import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,7 +28,6 @@ class MonthlyKoofySection extends ConsumerStatefulWidget {
 
 class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
     with WidgetsBindingObserver {
-  Timer? _timer;
   Set<String> _dismissed = {};
   bool _preferencesLoaded = false;
   bool _opening = false;
@@ -39,11 +37,6 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(const Duration(minutes: 5), (_) {
-      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        _refresh();
-      }
-    });
     _loadDismissed();
   }
 
@@ -84,7 +77,6 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
 
   @override
   void dispose() {
-    _timer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

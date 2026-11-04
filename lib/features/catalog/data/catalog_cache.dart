@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 /// Only complete, public metadata snapshots are persisted. No signed URLs or
 /// administrator drafts belong here. A failed refresh never overwrites a cache.
 class CatalogCache {
+  static const lifetime = Duration(minutes: 30);
   CatalogCache(this.directory);
   CatalogCache.memory() : directory = null;
   final Future<Directory> Function()? directory;
@@ -62,7 +63,17 @@ class CatalogCache {
     final now = DateTime.now().millisecondsSinceEpoch;
     final next = value['nextChange'] as int?;
     return now >= (value['at'] as int) &&
-        now - (value['at'] as int) < 60 * 1000 &&
+        now - (value['at'] as int) < lifetime.inMilliseconds &&
         (next == null || next > now);
+  }
+
+  Duration refreshDelay(Map<String, dynamic>? value) {
+    if (value == null) return lifetime;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    var due = (value['at'] as int) + lifetime.inMilliseconds;
+    final next = value['nextChange'] as int?;
+    if (next != null && next < due) due = next;
+    // A failed refresh retains stale data. Avoid a tight retry loop in that case.
+    return due > now ? Duration(milliseconds: due - now) : lifetime;
   }
 }

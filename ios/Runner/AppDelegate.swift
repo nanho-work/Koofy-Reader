@@ -8,6 +8,19 @@ import UserMessagingPlatform
 @objc class AppDelegate: FlutterAppDelegate, FlutterPluginRegistrant {
   private let adConsent = ReaderAdConsent()
 
+  override func application(_ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    NSLog("KoofyNotifications apns=registered")
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  override func application(_ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    let detail = error as NSError
+    NSLog("KoofyNotifications apns=failed domain=%@ code=%ld", detail.domain, detail.code)
+    super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+  }
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?

@@ -51,6 +51,41 @@ class FakeNotificationPlatform implements ReaderNotificationPlatform {
 const work = 'work_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'waits for asynchronous APNs registration before subscriptions',
+    () async {
+      var checks = 0, pauses = 0;
+      expect(
+        await waitForReaderApns(
+          () async => ++checks == 3,
+          pause: (_) async {
+            pauses++;
+          },
+        ),
+        true,
+      );
+      expect(checks, 3);
+      expect(pauses, 2);
+    },
+  );
+  test('APNs wait is bounded and does not hide SDK failures', () async {
+    var pauses = 0;
+    expect(
+      await waitForReaderApns(
+        () async => false,
+        attempts: 3,
+        pause: (_) async {
+          pauses++;
+        },
+      ),
+      false,
+    );
+    expect(pauses, 2);
+    await expectLater(
+      waitForReaderApns(() async => throw StateError('offline')),
+      throwsStateError,
+    );
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await AppLanguage.instance.initialize();

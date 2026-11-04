@@ -125,6 +125,24 @@ void main() {
       expect(cache.fresh((await cache.read('scheduled'))!), isFalse);
       await cache.save('current', []);
       expect(cache.fresh((await cache.read('current'))!), isTrue);
+      final current = (await cache.read('current'))!;
+      current['at'] = DateTime.now()
+          .subtract(const Duration(minutes: 29))
+          .millisecondsSinceEpoch;
+      expect(cache.fresh(current), isTrue);
+      current['at'] = DateTime.now()
+          .subtract(const Duration(minutes: 30))
+          .millisecondsSinceEpoch;
+      expect(cache.fresh(current), isFalse);
+      expect(cache.refreshDelay(current), CatalogCache.lifetime);
+      await cache.save(
+        'reserved',
+        [],
+        nextChange: DateTime.now().add(const Duration(minutes: 4)),
+      );
+      final delay = cache.refreshDelay((await cache.read('reserved'))!);
+      expect(delay, greaterThan(const Duration(minutes: 3)));
+      expect(delay, lessThanOrEqualTo(const Duration(minutes: 4)));
       final dir = await Directory.systemTemp.createTemp(
         'koofy-catalog-corrupt-',
       );

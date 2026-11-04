@@ -1,5 +1,4 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
-import 'dart:async';
 import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'catalog_cover.dart';
@@ -40,16 +39,12 @@ class ReaderSeriesPage extends ConsumerStatefulWidget {
 class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
-  Timer? _refreshTimer;
   bool _newest = false;
   bool _opening = false;
   @override
   void initState() {
     super.initState();
     ReaderAnalytics.instance.seriesOpened(widget.series.id);
-    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) _refresh();
-    });
   }
 
   Future<void> _read(CatalogItem item) async {
@@ -65,7 +60,6 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
   String get _key => 'series:${widget.series.id}';
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     _search.dispose();
     _scroll.dispose();
     super.dispose();

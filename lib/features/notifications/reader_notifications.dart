@@ -23,6 +23,23 @@ bool _validBase(String value) =>
 
 enum ReaderNotificationPermission { unknown, allowed, denied }
 
+// APNs registration completes asynchronously after auto-init is enabled.
+// Never request an FCM subscription until Apple has returned the device token.
+@visibleForTesting
+Future<bool> waitForReaderApns(
+  Future<bool> Function() ready, {
+  Future<void> Function(Duration)? pause,
+  int attempts = 21,
+}) async {
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    if (await ready()) return true;
+    if (attempt + 1 < attempts) {
+      await (pause ?? Future<void>.delayed)(const Duration(milliseconds: 500));
+    }
+  }
+  return false;
+}
+
 abstract class ReaderNotificationPlatform {
   bool get available;
   Future<ReaderNotificationPermission> permission({bool request = false});
@@ -67,7 +84,9 @@ class DeviceReaderNotifications implements ReaderNotificationPlatform {
   @override
   Future<bool> apnsReady() async =>
       defaultTargetPlatform != TargetPlatform.iOS ||
-      await FirebaseMessaging.instance.getAPNSToken() != null;
+      await waitForReaderApns(
+        () async => await FirebaseMessaging.instance.getAPNSToken() != null,
+      );
   @override
   Future<void> openSettings() => const MethodChannel(
     'com.koofylab.koofyreader/privacy',
@@ -362,6 +381,7 @@ class ReaderNotifications extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> sync() {
     final next = _syncQueue.catchError((Object _) {}).then((_) async {
       if (!available || !_initialized) return;
+      var stage = 'permission';
       try {
         permission = await _platform.permission();
         final bases = enabled && allowed
@@ -371,25 +391,36 @@ class ReaderNotifications extends ChangeNotifier with WidgetsBindingObserver {
             .map((k) => notificationTopic(k, AppLanguage.instance.code))
             .toSet();
         if (desired.isNotEmpty || _actual.isNotEmpty) {
+          stage = 'auto_init';
           await _platform.autoInit(true);
+          stage = 'apns_registration';
           if (!await _platform.apnsReady()) {
             throw StateError(tr('알림 연결을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
           }
         }
         for (final topic in _actual.difference(desired).toList()) {
+          stage = 'unsubscribe';
           await _platform.unsubscribe(topic);
           _actual.remove(topic);
           await _save();
         }
         for (final topic in desired.difference(_actual).toList()) {
+          stage = 'subscribe';
           await _platform.subscribe(topic);
           _actual.add(topic);
           await _save();
         }
+        stage = 'auto_init_finish';
         await _platform.autoInit(desired.isNotEmpty);
         connectionError = null;
+        debugPrint(
+          'KoofyNotifications sync=ready subscriptions=${_actual.length}',
+        );
         notifyListeners();
       } catch (e) {
+        // Keep identifiers, topic names and token values out of diagnostic logs.
+        final code = e is FirebaseException ? e.code : e.runtimeType;
+        debugPrint('KoofyNotifications sync=failed stage=$stage code=$code');
         connectionError = tr('알림 연결을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         notifyListeners();
         rethrow;
