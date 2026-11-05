@@ -1,0 +1,146 @@
+[
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/07-reading-journal.png",
+    "width": 1320,
+    "height": 2868,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/07-reading-journal.png",
+    "width": 1206,
+    "height": 2622,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/07-reading-journal.png",
+    "width": 2064,
+    "height": 2752,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ko/iPhone-Duo-2853x2007/07-reading-journal.png",
+    "width": 2853,
+    "height": 2007,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/07-reading-journal.png",
+    "width": 1320,
+    "height": 2868,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/07-reading-journal.png",
+    "width": 1206,
+    "height": 2622,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/07-reading-journal.png",
+    "width": 2064,
+    "height": 2752,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "en",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "en/iPhone-Duo-2853x2007/07-reading-journal.png",
+    "width": 2853,
+    "height": 2007,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/07-reading-journal.png",
+    "width": 1080,
+    "height": 1920,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/07-reading-journal.png",
+    "width": 1320,
+    "height": 2868,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/07-reading-journal.png",
+    "width": 1206,
+    "height": 2622,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/07-reading-journal.png",
+    "width": 2064,
+    "height": 2752,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ja/iPhone-Duo-2853x2007/07-reading-journal.png",
+    "width": 2853,
+    "height": 2007,
+    "source": "Actual Flutter widgets rendered with illustrative local reading history; no production data modified."
+  }
+]
