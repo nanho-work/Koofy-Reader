@@ -358,7 +358,7 @@ class CatalogItem {
             (kind != 'book' ||
                 !RegExp(r'^[a-f0-9]{32}$').hasMatch(seriesId!) ||
                 episodeNumber == null ||
-                episodeNumber! < 1 ||
+                episodeNumber! < 0 ||
                 episodeTitle == null ||
                 episodeTitle!.trim().isEmpty)) ||
         (seriesId == null && episodeNumber != null) ||
@@ -664,6 +664,7 @@ class ReaderCatalog {
     final seriesId = kind.startsWith('series:') ? kind.substring(7) : null;
     final data = await _json({
       'kind': seriesId != null || kind == 'monthly' ? 'book' : kind,
+      'supportsPrologue': '1',
       if (kind == 'monthly') 'action': 'monthly',
       if (kind == 'book' || seriesId != null) 'supportsTxt': '1',
       if (kind == 'book') 'supportsSeries': '1',

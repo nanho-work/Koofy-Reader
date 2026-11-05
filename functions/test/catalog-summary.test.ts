@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {Content} from '../src/content';
-import {nextCatalogChange,releasedEpisodeCounts} from '../src/catalog-summary';
+import {compatibleEpisode,nextCatalogChange,releasedEpisodeCounts} from '../src/catalog-summary';
 const now=new Date('2026-11-01T00:00:00Z');
 const base={id:'a',kind:'book',seriesId:'parent',title:'draft',author:'',description:'',license:'',revision:1,assets:{},published:true,updatedAt:'',publishedContent:{title:'live',author:'',description:'',license:'',version:1,assets:{},language:'ko',releaseAt:'2026-11-01T09:00:00+09:00'}} as Content;
 test('batch counts use published language and the exact scheduled instant',()=>{
@@ -18,4 +18,12 @@ test('cache expiration includes editorial month/date and ignores private or dele
  assert.equal(nextCatalogChange([monthly],now),'2026-11-30T15:00:00.000Z');
  assert.equal(nextCatalogChange([{...monthly,published:false},{...monthly,deleting:true}],now),null);
  assert.equal(releasedEpisodeCounts([monthly],'ko',now).size,0);
+});
+
+test('prologues are withheld from older apps without hiding other episodes or books',()=>{
+ const prologue={...base,publishedContent:{...base.publishedContent!,episodeNumber:0}};
+ assert.equal(compatibleEpisode(prologue,false),false);
+ assert.equal(compatibleEpisode(prologue,true),true);
+ assert.equal(compatibleEpisode({...prologue,publishedContent:{...prologue.publishedContent,episodeNumber:1}},false),true);
+ assert.equal(compatibleEpisode(base,false),true);
 });

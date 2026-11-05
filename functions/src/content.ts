@@ -125,7 +125,7 @@ export function episodeMetadata(input: unknown, series: Metadata, seriesId: stri
   const data = input as Record<string, unknown>;
   const number = data.episodeNumber;
   requireValue(!series.issueMonth || (!!data.releaseDate || !!data.releaseAt), '월간 회차의 발행일을 입력해 주세요.');
-  requireValue(typeof number === 'number' && Number.isSafeInteger(number) && number > 0 && number <= 100000, '회차 번호는 1~100000 사이의 정수로 입력해 주세요.');
+  requireValue(typeof number === 'number' && Number.isSafeInteger(number) && number >= 0 && number <= 100000, '회차 번호는 0~100000 사이의 정수로 입력해 주세요.');
   return {
     ...metadata({ ...series, title: data.title, description: data.description ?? '', compilationId: '', releaseDate: data.releaseDate ?? '', releaseAt: data.releaseAt ?? '', autoCompile: false, byline: data.byline ?? '' }),
     seriesId, seriesTitle: series.title, episodeNumber: number,

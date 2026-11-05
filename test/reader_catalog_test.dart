@@ -142,6 +142,22 @@ void main() {
       directory: () async => directory,
     );
   });
+  test(
+    'catalog accepts a prologue as episode zero and rejects negative episodes',
+    () {
+      final json = {
+        ...itemJson('book'),
+        'seriesId': 'b' * 32,
+        'episodeNumber': 0,
+        'episodeTitle': '프롤로그',
+      };
+      expect(CatalogItem.fromJson(json).episodeNumber, 0);
+      expect(
+        () => CatalogItem.fromJson({...json, 'episodeNumber': -1}),
+        throwsFormatException,
+      );
+    },
+  );
   tearDown(() async {
     catalog.close();
     await server.close(force: true);
@@ -168,6 +184,7 @@ void main() {
       expect(lastListQuery, {
         'kind': 'book',
         'supportsTxt': '1',
+        'supportsPrologue': '1',
         'seriesId': series.id,
         'supportsUpcoming': '1',
         'language': 'ko',

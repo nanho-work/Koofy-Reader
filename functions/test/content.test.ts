@@ -158,9 +158,10 @@ test('series and episode metadata validate status and numeric sequence', async (
   const { episodeMetadata, seriesMetadata } = await import('../src/content');
   assert.equal(seriesMetadata({ ...item, seriesStatus: 'completed' }).seriesStatus, 'completed');
   assert.throws(() => seriesMetadata({ ...item, seriesStatus: 'unknown' }));
-  for (const episodeNumber of [undefined, 0, -1, 1.5, '2', 100001]) {
+  for (const episodeNumber of [undefined, -1, 1.5, '2', 100001]) {
     assert.throws(() => episodeMetadata({ title: '회차', episodeNumber }, item, item.id));
   }
+  assert.equal(episodeMetadata({ title: '프롤로그', episodeNumber: 0 }, item, item.id).episodeNumber, 0);
   const fields = episodeMetadata({ title: '제목', episodeNumber: 40, author: 'forged', license: 'forged', source: 'forged' }, item, item.id);
   assert.equal(fields.author, item.author);
   assert.equal(fields.license, item.license);

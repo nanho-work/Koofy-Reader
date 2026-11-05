@@ -20,3 +20,8 @@ export function nextCatalogChange(items: Content[], now = new Date()): string | 
   });
   return times.length ? new Date(Math.min(...times)).toISOString() : null;
 }
+
+/** Older installed apps reject episode zero while parsing a whole catalog page. */
+export function compatibleEpisode(item: Content, supportsPrologue: boolean) {
+  return supportsPrologue || item.publishedContent?.episodeNumber !== 0;
+}

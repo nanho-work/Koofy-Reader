@@ -1,6 +1,6 @@
 import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
-import {releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
+import {compatibleEpisode, releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
 import { changeSeriesStatus, pendingEpisodes } from './series-status';
 import {adminCoverAsset} from './admin-cover';
 import { validateTranslationGroup } from './translation-groups';
@@ -119,7 +119,7 @@ async function deleteContent(contentId: string, expected: number, uid: string, d
   });
   return { id: contentId, deleted: true };
 }
-async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false, language: 'ko' | 'en' | 'ja' = 'ko', supportsUpcoming = false) {
+async function list(contentKind: unknown, after: unknown, publicOnly: boolean, supportsTxt = false, seriesId?: unknown, grouped = false, language: 'ko' | 'en' | 'ja' = 'ko', supportsUpcoming = false, supportsPrologue = false) {
   const selectedKind = kind(contentKind);
   let query = grouped && selectedKind === 'book' && publicOnly
     ? contents.where('kind', 'in', ['book', 'series']) : contents.where('kind', '==', selectedKind);
@@ -140,7 +140,8 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   const visible = docs.slice(0, 40).map(doc => doc.data() as Content).filter(item =>
     (!publicOnly || (visibleInLanguage(item, language) && (isReleased(item) || (supportsUpcoming && !!seriesId && !!item.publishedContent)))) &&
     (!grouped || selectedKind !== 'book' || !item.seriesId) &&
-    (!publicOnly || supportsTxt || !item.publishedContent?.assets.txt));
+    (!publicOnly || supportsTxt || !item.publishedContent?.assets.txt) &&
+    (!publicOnly || compatibleEpisode(item, supportsPrologue)));
   // Legacy apps still receive complete individual books. A private parent also
   // hides its episodes from legacy lists and blocks fresh download links.
   const parents = [...new Set(visible.flatMap(item => publicOnly && item.seriesId ? [item.seriesId] : []))];
@@ -170,7 +171,7 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null, nextChangeAt: publicOnly ? nextCatalogChange([...docs.map(doc => doc.data() as Content), ...countDocuments]) : null };
 }
 
-async function monthly(language: 'ko' | 'en' | 'ja') {
+async function monthly(language: 'ko' | 'en' | 'ja', supportsPrologue = false) {
   const documents = await contents.where('kind', '==', 'series').where('published', '==', true).get();
   const changes = documents.docs.map(doc => doc.data() as Content);
   const issues = changes.filter(item =>
@@ -192,7 +193,7 @@ async function monthly(language: 'ko' | 'en' | 'ja') {
     if (activeFound) continue;
     const episodeDocuments = (await contents.where('seriesId', '==', issue.id).where('published', '==', true).get()).docs.map(doc => doc.data() as Content);
     changes.push(...episodeDocuments);
-    const episodes = episodeDocuments.filter(item => !item.deleting && isReleased(item) && visibleInLanguage(item, language))
+    const episodes = episodeDocuments.filter(item => (compatibleEpisode(item, supportsPrologue)) && !item.deleting && isReleased(item) && visibleInLanguage(item, language))
       .sort((a, b) => (b.publishedContent!.releaseAt || `${b.publishedContent!.releaseDate || ''}T00:00:00+09:00`).localeCompare(a.publishedContent!.releaseAt || `${a.publishedContent!.releaseDate || ''}T00:00:00+09:00`) || b.episodeNumber! - a.episodeNumber!);
     if (!episodes.length) continue;
     items.push(publicItem(issue), publicItem(episodes[0]));
@@ -539,8 +540,8 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
       const [url] = await bucket.file(asset.path).getSignedUrl({ action: 'read', version: 'v4', expires: Date.now() + 5 * 60 * 1000 });
       response.json({ url, sha256: asset.sha256, size: asset.size }); return;
     }
-    if (request.query.action === 'monthly') { response.json(await monthly(catalogLanguage(request.query.language))); return; }
-    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language), request.query.supportsUpcoming === '1'));
+    if (request.query.action === 'monthly') { response.json(await monthly(catalogLanguage(request.query.language), request.query.supportsPrologue === '1')); return; }
+    response.json(await list(request.query.kind, request.query.after, true, request.query.supportsTxt === '1', request.query.seriesId, request.query.supportsSeries === '1' && request.query.seriesId === undefined, catalogLanguage(request.query.language), request.query.supportsUpcoming === '1', request.query.supportsPrologue === '1'));
   } catch (error) { sendError(error, response); }
 });
 
