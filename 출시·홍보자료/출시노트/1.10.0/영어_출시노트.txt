@@ -1,0 +1,4 @@
+Introducing your reading journal: view reading days and time in a calendar, revisit books by date, and explore daily and monthly graphs.
+Improved favorites and new-story notification flows.
+Reduced automatic catalog refreshes and improved caching.
+Refined app dialogs and privacy settings, and fixed notification registration timing.

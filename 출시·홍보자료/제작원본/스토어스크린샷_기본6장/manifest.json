@@ -1,0 +1,938 @@
+[
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "48f41ee19d9905ea2f2586db9c4d8549b8cfdb6ba6ef918c53f21eb4f07f4e6d"
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "f7278d12961724c1b66d5af704fa2d934d05dcc68c77a7385c27129ac10b8872"
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "18bb997a30e4573c34805f9bbc2eaef1e76e8c4dad2142effa6507d4a3fc45c5"
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "e3527c4cd964c2a08d1cf61573debbd1dac78ff64e32e3e915c42f6f782f82e6"
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "68dfd8b8006a60c31e42a597b4473f168dde5e08064003ff1026adcbf811d59e"
+  },
+  {
+    "language": "en",
+    "device": "Android-1080x1920",
+    "file": "en/Android-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "4063bf90e842aa9f9a9f3a0a97a2153050e895b7e88bb9a9064c60369703e6ca"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/01-reading.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "229f9656cd28687a50a6ffb772cd08fa9218b87642b3c42933558c6024b4d8f2"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/02-library.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "1758394eb3a741a3a1f6b69b767bafc5fcfe86b5b708ef2d2553889c4e483374"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/03-books.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "228f6423f8d34c3d4bbebc7b39303a35981a670404d286aafcd5fb3851956f6e"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/04-home.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "3884408b414e7497b20884f5de3ed82d33bb1b353ae5b71ca3eeea83814837e1"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/05-settings.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "a50cee6bba91a3d3d02c182a4fd1a4df82b0ceed12b7a7f47f87d1b0425db64c"
+  },
+  {
+    "language": "en",
+    "device": "Android-Fold-1768x2208",
+    "file": "en/Android-Fold-1768x2208/06-dark.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "bce7cfdea57e91efae05402e2313d1724b444c5ba3fb5861dc9e3445238fedee"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "7fc07860c12a1a8ab78115ff72d8d70cae8c3b8d7fa5d54a62fa593a69555958"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "92b11dc269454acc62521f71fe402870e569c00fe7485afd97325ce69607bd73"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "f43786cda13381a05538cedb17aea0b146be55accb090e3988cf74e72778c9bf"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "8ec47a27a7a988336b34b8f768e778490d88df31d0972d4523e19fb63b5dadc4"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "868186257bed8a527840329fdb6f3e6304213c7a1106ca67e38e72086403c09c"
+  },
+  {
+    "language": "en",
+    "device": "Android-Tablet-1080x1920",
+    "file": "en/Android-Tablet-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "cb1606a79eda202217039bcc7d339d3f406c11df42427581d4bc7d04f746ff16"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/01-reading.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "a7b477b3c6ccadfc74082e4d4fdc8a024838c4d6cdefc210bf2deb7f6b81c05f"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/02-library.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "90fae9cc129e1d608eff2c388e3109173886ee86c36d909258ab121282eeda4a"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/03-books.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "83e9e47ea1f87618c97f81c7f922e96167c38e5591eee3cfd3f1a354c1733c0a"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/04-home.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "347ca38ec532b4657d2d608a27d3680f56581892452d94baec2050cb0826ea89"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/05-settings.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "82ad4fe541dcb7015051dac8bb6e4f16c3c5e8be7e8a43fe3195f0954d09f450"
+  },
+  {
+    "language": "en",
+    "device": "iPad-2064x2752",
+    "file": "en/iPad-2064x2752/06-dark.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "bd52782f38cf7335ded00341e5b1e3b79790ac7de2e02daa4a30a59f4da997cf"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/01-reading.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "7333cea9566e823db46d440d0f675c3beb50b1214775cd507eb1499e86b76e40"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/02-library.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "e6c538b67ffd6e5a01ba49ffed8f5c7dade86d371d4d2dc09609be23f1ee3722"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/03-books.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "1da5c7ba0820b63118748d7e0d10855d6b1286ea98e8ecc9554030c5ff393272"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/04-home.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "e7da19c5a5f0cab93766ebb4d7d7f5dc47872f16f7d5a67d32cf88360ad871e6"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/05-settings.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "a56b1f8f3b5798e3334e7ca60d2ec82513d2dcca8479813c565f4d3297d983e0"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1206x2622",
+    "file": "en/iPhone-1206x2622/06-dark.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "42d62886881552ea356420f62f732f35d8e1d37b0516eb0c8a55235c55179b63"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/01-reading.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "640f66e6e93f60d617c64efc150d2ef074e541ea5869f717b183c0496603d1c1"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/02-library.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "1ccc5d0a3ba27a7f9b7786b16ea2ce5657139bb15f0045ceeba7c35b60eca42d"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/03-books.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "7a4fed0d7f7a13c4f6e06a4380d65db113aec1003468e58bf661633d28bc251a"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/04-home.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "e1d523b41d02256d3972daab5fdc09db53c80e3ef33fc8a912d5be141820e363"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/05-settings.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "dab23f52251fc258094e5bb98228e7017bd64576e9335f0eb0fcd84021a1086b"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-1320x2868",
+    "file": "en/iPhone-1320x2868/06-dark.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "c09ee09c94e2bfd1a2482a5b858acd970a4d0467fcb83227399b5f172cfe37be"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "en/iPhone-Duo-2853x2007/01-library.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "f1452e8ec4be16da6781e447e3f6214284d633cf86fdcc0fb2877a78d44e4ae8"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "en/iPhone-Duo-2853x2007/02-books.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "781e2b36078e1aef75493fee90a16dc9487c770a86e7a82e674d52fda7cace78"
+  },
+  {
+    "language": "en",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "en/iPhone-Duo-2853x2007/03-home.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "ac4b98a388acbb2235faf35177fba463e5e216f1bcc9b46de5f5836c758eb81d"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "852ece9f02c0053f9c4fec04356ab17b7e88a63f595d05c1f2247592034e8977"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "e001afc28728f2359b0c9e8946726c9ab73c05c032a90c85cc02ed0e29ed0d93"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "adb736372a9460326352ef328f00c055ed63dfed09b21057cf3944c88fc729fa"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "c3c51127127b450f821181a5ae531252ca7c50a686f4b220ebb595eafc17dd86"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "d8ecd20677668c5f795e9b0553f2b5ddf60d4217a0d237d3429e19b36cb336b9"
+  },
+  {
+    "language": "ja",
+    "device": "Android-1080x1920",
+    "file": "ja/Android-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "cd75131960e4cc93c569979bbe7a4da022f4d2f254db3751118ecd2a2afdc7fd"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/01-reading.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "2768448a745e08d40806cb3ebd0239db3865862555e6d73c00ee5988f5e07237"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/02-library.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "ed0c835c6f00ea8677d409ee9b9da95b367d59b14d9300af560d16c1e84312ac"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/03-books.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "c06f0efa82af898ced7bb24670b1afe078c8611d9fdb0e703a7ccd10e6f0eef8"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/04-home.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "9b610736c0bdd021104fe35bebe98c03bb242cc3a312b4526e77f8f5dcccf8b8"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/05-settings.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "934fcb345c03e220083281f40bbf055e3baa1be63c218432ddd7eed162596cf7"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Fold-1768x2208",
+    "file": "ja/Android-Fold-1768x2208/06-dark.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "f8bee5d8e270b93933f103900ca9338e58ddad0cc4ce37b53f9343bf828e622e"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "f3686d94c7ff90cd03f6da8ccaae7b22d9e8471dd8f0dd63d80d059675d95a4d"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "11438f9a5a5b0e905309d5097c80d5ec2962b7117ba38cf795b35003a4f9c2d5"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "3e644e5256b7d8863194a0624a9def494abf0976555d383ae88cd478df30c225"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "ea530f2265382be1cb1d5c0907d74318a2a1cf06cc209b8d9c366a55a9b0b0ab"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "30974066d17347c946a63c285df76eaa774c22f8e7ddae0ec2e5d044f2d59063"
+  },
+  {
+    "language": "ja",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ja/Android-Tablet-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "36de21ae400b0fe7d124694ec8b4c8c000e0d21ebd685893887e9d7c9c0c2c63"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/01-reading.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "d120bd6c6f70dc5ae8d9859480c30432c9ae9f3476ce48a99da839c5ccefd355"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/02-library.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "5f7093ae26d554f6b9d515ea7b8fab0f92f79001dcb50828b3d70dc19d02ac89"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/03-books.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "4b5a98454177f4f37542a4eef95d3a2c8e68b1b2e01c39d47bbcb167ca309360"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/04-home.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "285d55a4d0d8d0dfecbea9a5a6c2530dcadc2721ee37ed7cd6d94c0a9a24df6e"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/05-settings.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "168270e1b728c52c0c451b3262de5e68436eb350e450c0566e1f1d7fead20c26"
+  },
+  {
+    "language": "ja",
+    "device": "iPad-2064x2752",
+    "file": "ja/iPad-2064x2752/06-dark.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "75ca85d7483206b4875678e85c049120a24f43a6917f7b8cb2054b70e9fa2633"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/01-reading.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "ce1a51b2c24d91c491e715c735edffd53c556770f47d9c830c86a403f6700802"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/02-library.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "20901bdb3ea11f6fcf6de13c2317f7844d483500081dc080263295600ebe0d82"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/03-books.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "c03939c47bb068ca3abd916bd5e43b5f3f9266265193938dba17685b6a785cae"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/04-home.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "f9082a515f3757321f9375821caad05830c6e524dc14bfde87e08eb22d4a2084"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/05-settings.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "72d207ec6a00065a599ea7ef5085ce025af1481b502110ababd450f8d91720af"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1206x2622",
+    "file": "ja/iPhone-1206x2622/06-dark.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "ea6a477ba9c59434bc054c0d8f0e4e25b8719bc2ee13300ff05b13f3a912223c"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/01-reading.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "edb4bd5f1fbf424e4942f1888b6f52739407b606909c6ab288e4d45d8ab324a2"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/02-library.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "11b8b7356010bcbb962bd7cc5b1e1ff4693cc227cc01a25c3ea307dc9cb8e3a4"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/03-books.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "347e186aae16a7185248ee6ea3999a2b395c65c05da6d39f423689f545629d57"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/04-home.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "5ead4c5cd57c997d9f611e0a6aa672e511a2dadf65ea4bb178e2293351a96c95"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/05-settings.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "3b312c6126476f15a13e9f1ce5d31dc1d7dfda29764ed7aa6ec530ddbee879bf"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-1320x2868",
+    "file": "ja/iPhone-1320x2868/06-dark.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "663c4ef3f1d3f89954ed6dbde4d989d8f3a3dd3e0130466d7dc0ae49e926c07c"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ja/iPhone-Duo-2853x2007/01-library.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "eaa8405095191b78aeed5b04d38e7719321cec0c65f1b1a90c66899e7f1c5a8d"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ja/iPhone-Duo-2853x2007/02-books.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "f9353ac1f921b08bbb8b98d3e465b003eaffa90126b281a4c773153f18c6ed8b"
+  },
+  {
+    "language": "ja",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ja/iPhone-Duo-2853x2007/03-home.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "cabfbe6e5f466287655521c9c083b2e63c523504519260d016a765d3f2574f1a"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "c25ce64bd6b2e8c04201a681b633e8132d4a86d2b9f26e5ad780540d97b63e73"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "8959f78cb5c25bcc2b6bacc4f2bd772d3720f182e3dd12fd2abbc76053f07a91"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "c1bd013b6662b1a4338d38f8ca3018e166d7da5363ce1d55ad1acd752a57010d"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "f15135fcd97f45ad9bb474f50f691dfd723df57acd420e672cf492fb43238c02"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "9c895583a64b49db1e113795654b49bc5fddf37c553de66de8150a2ff659927e"
+  },
+  {
+    "language": "ko",
+    "device": "Android-1080x1920",
+    "file": "ko/Android-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "f42faf5a26311e4bc4c6fa0162b0225a014bf23da3b8b9858b6a435b2e0810c0"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/01-reading.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "72b556db4f6a6429093f3f101b8ad0768d7490bf2737e91fd4340e8bfdfaeaf7"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/02-library.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "3d3a02c3edca985a9467cde87fdd89b364f3fbf0a95560aa4e7ad3e9e4f8518d"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/03-books.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "f8dcbf2eec05209dca91977e412b3117d44f9f47015fa020f41c70b2d5eaeb96"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/04-home.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "2d9ded49f4fa1359e0281637e5e7e9b4f70bfab53a6fba4e19fba0d1034ca53e"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/05-settings.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "9047527f50fcbfcca01a1acdf01ffa8850436492d0242a31bc8208eb51c1406e"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Fold-1768x2208",
+    "file": "ko/Android-Fold-1768x2208/06-dark.png",
+    "width": 1768,
+    "height": 2208,
+    "sha256": "ee4dfd0ee92ea677cc143cb599713f570a422549776631e5f169ee0b5a7fc62f"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/01-reading.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "35bfe4670405fcab3a6f90987df20bfdbb7429746a04d71104afbc20510ea303"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/02-library.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "a1419b142ee669502f7007ad7f450759ac1116405e7a4e7b13841966c05844d0"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/03-books.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "61049ac3b87f362ba0c28f928d3021b1df8dcab972cc8073778fb66b9b10e1c4"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/04-home.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "b2ef217aa9356b3157f1014056cd048689a6910a4bec72b8761de32308de34e7"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/05-settings.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "ece7108784ff7532fd8eabed90628972fb516b48987499cf82abecc110becd05"
+  },
+  {
+    "language": "ko",
+    "device": "Android-Tablet-1080x1920",
+    "file": "ko/Android-Tablet-1080x1920/06-dark.png",
+    "width": 1080,
+    "height": 1920,
+    "sha256": "285bb7885132b90fe788cc1e5e8398de46c16389edd6a57829e32951435b61ab"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/01-reading.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "9d57e66ec467ff2db97d7208e55e030ce7f082431e277ad8c48ae1e340ba9dff"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/02-library.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "9b25a6e4d35eca4b6f5984ff3c1edd2764fc7edd98fc82debc528978d25d0fd2"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/03-books.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "5ba9ffd71e00a99938a154831e1e6f8c9e801cbd17fd8697053d28048d7bb573"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/04-home.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "67974eda2abe819ecb9e520239fe0ae5cff0ce9fa62a1e42be834097008e9399"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/05-settings.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "687954f11892332352ae1100cc9b8e3df2fbfc9e854bf9e01926525eeda8d4c5"
+  },
+  {
+    "language": "ko",
+    "device": "iPad-2064x2752",
+    "file": "ko/iPad-2064x2752/06-dark.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "4853303023bbe30dbb22149b6782b20dc59dbdfbab891f10dd132459c7a6f2c8"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/01-reading.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "200e9d652dd007ee39fe302b502e9ebf6292e1b9040c69363693209237562ddb"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/02-library.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "a36a2189991ba81203a30195b79df77a92b6ce1618dc1c7924d9979b9d237834"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/03-books.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "06c17acbc1eed1ddbaebf4e5b5d5b7b5259e322c44bf63382076ade8c83edf6c"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/04-home.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "508e38835624fa9bef1e9e6e63f8b115b0d61a5e664b8895152370134222ef1d"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/05-settings.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "2220a610ffe86a758d352fe0b6de910a2df5d4d4a1c25ef3ddb7243aa6b570af"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1206x2622",
+    "file": "ko/iPhone-1206x2622/06-dark.png",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "b9f4e12da71c56ec7cc0441329c3e42584ade07f9413e2db4090d559dc7309a6"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/01-reading.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "ab4e2c0f5b75931bb93adf9dc7c7ec7d88b3a3094d1473c5359f29383a5910aa"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/02-library.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "363dadb14b9e3e116b17b7e53e11758246c3cf71bd996e1b0b01d7c447352b29"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/03-books.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "affa29357652ca7910b1ffeddc802046fdc5a7f5c6719b1cfdfa7b26ecc137a3"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/04-home.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "93285518e5a64d15425241e7da7e566cc07a7d47c2f24e46d79a3dc561fd191a"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/05-settings.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "d1bc78104bab92bc38ebd15ac370d53ed841ada1f11f1291e50c0d157485874f"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-1320x2868",
+    "file": "ko/iPhone-1320x2868/06-dark.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "e78efbadfa2e7b7efc4206d9a98420a711fbc424aad3b94c332a31e7ae3a096a"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ko/iPhone-Duo-2853x2007/01-library.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "5f78fde5e973e7d040de99d175a8c4609c1cc228c38a84cd756afd123777f684"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ko/iPhone-Duo-2853x2007/02-books.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "05285308447f922bd3d6d05cd1e1cf5bbea6d4444293fc221f9869aaf250f12d"
+  },
+  {
+    "language": "ko",
+    "device": "iPhone-Duo-2853x2007",
+    "file": "ko/iPhone-Duo-2853x2007/03-home.png",
+    "width": 2853,
+    "height": 2007,
+    "sha256": "1beb9e46def48e0ca1194650ac963cff41b2fb8ec9bae71341c3295c3e300961"
+  }
+]

@@ -16,7 +16,7 @@ The previous SDK-linked app rendered in a compatibility viewport on the Duo simu
 
 ## Screenshot artifacts
 
-`work/store-duo/Koofy-Reader-iPhone-Duo-2007x2853.zip` contains six RGB PNGs, each 2007×2853. Raw open-display captures are 2853×2007. `preview.png` is the contact sheet; `render.mjs` and the SVGs retain the editable compositions.
+`출시·홍보자료/보관자료/이전스토어이미지/초기듀오/Koofy-Reader-iPhone-Duo-2007x2853.zip` contains six RGB PNGs, each 2007×2853. Raw open-display captures are 2853×2007. `preview.png` is the contact sheet; `render.mjs` and the SVGs retain the editable compositions.
 
 Capture uses an isolated source copy in `work/duo-capture`. The pinned ML Kit binary has no arm64 simulator slice, so translation is stubbed only in that copy; production dependencies and translation source remain intact. Translation was not exercised or depicted. Simulator checks do not replace device validation of ads, consent, TTS or translation.
 

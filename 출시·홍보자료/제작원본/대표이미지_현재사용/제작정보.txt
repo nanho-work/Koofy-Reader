@@ -1,0 +1,26 @@
+쿠피리더 대표 이미지 — 2026-11-02
+
+사용자 요청: 검색·스토어 대표 이미지만 교체하고 기존 상세 스크린샷은 유지한다.
+
+ko/en/ja-google-feature.png: Google Play 1024×500
+ko/en/ja-apple-header.png: Apple 제품 페이지 헤더 3840×1646
+ko/en/ja-apple-search.png: Apple 검색 결과 1920×1280
+모두 RGB PNG, 알파 채널 없음. manifest.json에 규격 목록을 기록했다.
+
+기존 v1의 편집 가능한 SVG 조판을 기반으로 단순한 펼침 기기 틀을 추가하고,
+저장소의 실제 언어별 표지와 보관된 네이티브 독서 본문 캡처를 발췌해 합성했다.
+일반적인 펼침 기기 형태이며 특정 제조사의 실기기 사진이 아니다.
+배경만 기존 image_gen 생성 자산을 재사용했다. 이 작업에서 새 API/CLI 이미지 생성은 하지 않았다.
+render.mjs와 sources/가 재현 가능한 원본이다.
+
+표지: assets/books/sample_mermaid_001{,_en,_ja}.jpg
+본문: 출시·홍보자료/제작원본/스토어스크린샷_기본6장/raw/{ko,en,ja}/ipad-reading.png
+워드마크: assets/images/promotions/koofy_reader_wordmark.png
+배경: 출시·홍보자료/제작원본/대표이미지_초기시안과배경/inputs/paper-background.png
+
+Apple 공식 규격 확인:
+https://developer.apple.com/help/app-store-connect/reference/app-information/creative-assets-specifications
+Apple 검색 미리보기에서 한국어 핵심 문구와 기기 이미지가 잘리지 않는 것을 확인했다.
+모든 기기의 모든 노출 위치에 대해 잘림이 없음을 보장한다는 뜻은 아니다.
+
+등록·심사 상태와 증빙은 출시·홍보자료/보관자료/출시기록/1.9.1_출시기록.md를 따른다.

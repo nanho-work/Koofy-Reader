@@ -1,0 +1,51 @@
+쿠피리더 1.10.0(21) — Google Play 등록 문구
+
+[앱 이름]
+Koofy Reader: EPUB, TXT & TTS
+
+[간단한 설명]
+Read EPUB & TXT with TTS. Two-page reading, reading calendar and time tracking.
+
+[자세한 설명]
+Your reading time, at a glance
+See your reading days and time in a calendar. Tap a date to revisit the books you read, and explore daily and monthly graphs. Your reading journal stays on your device.
+
+Open wide. Read two pages. Make every book your own.
+Koofy Reader is an EPUB ebook reader and TXT text viewer for your own files. Read on your commute, settle into a longer story on a tablet, or listen with your device’s text-to-speech voices.
+
+Monthly Koofy: a moment for a short read
+• Discover illustrated stories collected by month.
+• Discover newly published stories in Home and browse Books and download the stories you want to read.
+• Open Send a story for our reader submission guide.
+
+Build your personal bookshelf
+• Import EPUB and TXT files and organize them with covers and book groups.
+• Continue from your last reading position and save bookmarks for passages you want to revisit.
+• Read imported and downloaded books offline.
+
+Make every page comfortable
+• Adjust text size, line spacing, margins and fonts.
+• Add your own fonts or download fonts from the in-app collection.
+• Choose light, paper or dark themes and use automatic page turning.
+• Read on phones, tablets and foldables, with two-page viewing for larger screens.
+
+Read or listen
+• Use text-to-speech, adjust the reading speed and set a sleep timer.
+• Speech pauses when you leave the reading screen or the app.
+• Select text to translate it and hear its pronunciation.
+• Available voices and spoken languages depend on your device’s speech engine. Translation runs on your device after the required language data is downloaded.
+
+Stories in English, Japanese and Korean
+• App menus and the getting-started guide are available in all three languages.
+• Explore The Mermaid Princess Cuts the Waves with localized text and covers.
+• Find downloadable books in your selected app language and choose individual chapters from serialized stories.
+• The app initially follows your device language and uses English for unsupported languages. You can change the app language in Settings. Imported books are not automatically translated.
+
+Start without an account
+Your books and reading positions stay on your device. Optional usage analytics can be declined without losing reading features. The app includes banner ads and optional rewarded ads. Completing a rewarded ad hides banners for four hours.
+
+Supported formats: TXT and text-based, reflowable EPUB. PDF, fixed-layout EPUB and DRM-protected ebooks are not supported. Downloads, ads and other online features require an internet connection.
+
+Support: koofylab@gmail.com
+https://www.koofy.co.kr/koofy-reader/support
+Privacy policy: https://www.koofy.co.kr/koofy-reader/privacy

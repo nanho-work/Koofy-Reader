@@ -64,3 +64,11 @@ android/upload-keystore.jks
 /tmp/pdfs/*.png
 /tmp/pdfs/*.jpg
 /tmp/pdfs/*.jpeg
+
+# Local raw captures and historical store packages (final assets are tracked)
+/출시·홍보자료/보관자료/이전스토어이미지/
+/출시·홍보자료/제작원본/스토어스크린샷_기본6장/raw/
+/출시·홍보자료/제작원본/스토어스크린샷_기본6장/sources/
+/출시·홍보자료/제작원본/스토어스크린샷_기본6장/previews/
+/출시·홍보자료/제작원본/스토어스크린샷_기본6장/capture/
+/출시·홍보자료/제작원본/독서기록_화면캡처/

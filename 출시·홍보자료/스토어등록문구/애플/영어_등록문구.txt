@@ -1,0 +1,15 @@
+쿠피리더 1.10.0(21) — App Store 등록 문구
+
+[프로모션 텍스트]
+Meet your reading journal. Look back on your reading time with a calendar and graphs. Read EPUB and TXT, listen with TTS, and enjoy two-page reading on wider screens.
+
+[키워드]
+ebook,text,viewer,offline,books,reading,journal,calendar,foldable,tablet,bookmark
+
+[설명 앞에 추가한 문구]
+Your reading time, at a glance
+See your reading days and time in a calendar. Tap a date to revisit the books you read, and explore daily and monthly graphs. Your reading journal stays on your device.
+
+
+[기존 전체 소개 원고]
+공통 소개는 ../공통소개/영어_앱소개원고.txt 참고. 공통 원고에는 Android의 폴더블 표현이 포함돼 있으므로 Apple 등록 시 iPhone·iPad 표현으로 조정한다. Apple 전체 설명을 다시 조회한 파일은 아니다.
