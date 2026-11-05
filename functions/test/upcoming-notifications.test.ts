@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {upcomingItem,Content} from '../src/content';
+import {upcomingItem,publishedBookInfo,Content} from '../src/content';
 import {notificationPayload,releaseTimestamp} from '../src/reader-notifications';
 const cover={path:'secret/cover',size:10,sha256:'a'.repeat(64),extension:'webp',contentType:'image/webp'};
 const base={id:'a'.repeat(32),kind:'book',seriesId:'b'.repeat(32),published:true,deleting:false,revision:1,assets:{},updatedAt:'',title:'draft secret',author:'',description:'',license:'',publishedContent:{title:'Scheduled title',description:'private synopsis',author:'author',license:'license',language:'ko',seriesId:'b'.repeat(32),seriesTitle:'A story',episodeNumber:3,version:2,releaseAt:'2099-01-02T09:00:00+09:00',assets:{cover,txt:{...cover,path:'secret/manuscript',extension:'txt'}},sourceTxt:cover}} as Content;
@@ -29,4 +29,15 @@ test('linked translations expose stable public work identity and retain old topi
  assert.match(condition,new RegExp(`reader_work_${group}_ko`));
  assert.match(condition,new RegExp(`reader_work_${parent.id}_ko`));
  assert.match(condition,/reader_books_ko/); // legacy explicit all-story opt-ins only
+});
+
+test('legacy metadata recovery only returns released published books without storage paths',()=>{
+ assert.throws(()=>publishedBookInfo(base));
+ const released={...base,publishedContent:{...base.publishedContent!,releaseAt:'2020-01-01T09:00:00+09:00'}};
+ const info=publishedBookInfo(released);
+ assert.equal(info.id,base.id);assert.equal(info.seriesId,base.seriesId);
+ assert.ok(!JSON.stringify(info).includes('secret/'));
+ assert.throws(()=>publishedBookInfo({...released,published:false}));
+ assert.throws(()=>publishedBookInfo({...released,deleting:true}));
+ assert.throws(()=>publishedBookInfo({...released,kind:'series'}));
 });

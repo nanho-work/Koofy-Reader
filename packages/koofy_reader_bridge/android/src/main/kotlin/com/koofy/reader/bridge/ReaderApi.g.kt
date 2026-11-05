@@ -158,6 +158,9 @@ data class ReaderLaunchRequest (
   /** LevelPlay viewer ad unit and the shared reward expiry. */
   val bannerAdUnitId: String? = null,
   val adHiddenUntilEpochMs: Long? = null,
+  /** Localized continuation UI supplied by Flutter. No advertisement unlock. */
+  val nextBookLabel: String? = null,
+  val endOfBookMessage: String? = null,
   /** Optional next member in the user's saved group order. */
   val nextBookTitle: String? = null,
   val bookmarksJson: String? = null,
@@ -178,10 +181,12 @@ data class ReaderLaunchRequest (
       val preferences = pigeonVar_list[8] as ReaderPreferences
       val bannerAdUnitId = pigeonVar_list[9] as String?
       val adHiddenUntilEpochMs = pigeonVar_list[10] as Long?
-      val nextBookTitle = pigeonVar_list[11] as String?
-      val bookmarksJson = pigeonVar_list[12] as String?
-      val uiLanguage = pigeonVar_list[13] as String?
-      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookTitle, bookmarksJson, uiLanguage)
+      val nextBookLabel = pigeonVar_list[11] as String?
+      val endOfBookMessage = pigeonVar_list[12] as String?
+      val nextBookTitle = pigeonVar_list[13] as String?
+      val bookmarksJson = pigeonVar_list[14] as String?
+      val uiLanguage = pigeonVar_list[15] as String?
+      return ReaderLaunchRequest(protocolVersion, sessionId, sessionGeneration, publicationId, contentRevision, filePath, title, initialLocatorJson, preferences, bannerAdUnitId, adHiddenUntilEpochMs, nextBookLabel, endOfBookMessage, nextBookTitle, bookmarksJson, uiLanguage)
     }
   }
   fun toList(): List<Any?> {
@@ -197,6 +202,8 @@ data class ReaderLaunchRequest (
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookLabel,
+      endOfBookMessage,
       nextBookTitle,
       bookmarksJson,
       uiLanguage,

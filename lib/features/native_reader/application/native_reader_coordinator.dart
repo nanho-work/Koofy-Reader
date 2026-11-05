@@ -150,6 +150,8 @@ class NativeReaderCoordinator {
     String? bannerAdUnitId,
     int? adHiddenUntilEpochMs,
     String? nextBookTitle,
+    String? nextBookLabel,
+    String? endOfBookMessage,
     Future<String?> Function(StoredReaderPosition)? resolveInitialLocator,
   }) async {
     if (_opening || _activeSessionId != null) {
@@ -192,6 +194,8 @@ class NativeReaderCoordinator {
             bannerAdUnitId: bannerAdUnitId,
             adHiddenUntilEpochMs: adHiddenUntilEpochMs,
             nextBookTitle: nextBookTitle,
+            nextBookLabel: nextBookLabel,
+            endOfBookMessage: endOfBookMessage,
             bookmarksJson: position.bookmarksJson,
           ),
         );

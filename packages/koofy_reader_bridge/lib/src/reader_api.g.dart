@@ -148,6 +148,8 @@ class ReaderLaunchRequest {
     required this.preferences,
     this.bannerAdUnitId,
     this.adHiddenUntilEpochMs,
+    this.nextBookLabel,
+    this.endOfBookMessage,
     this.nextBookTitle,
     this.bookmarksJson,
     this.uiLanguage,
@@ -176,6 +178,11 @@ class ReaderLaunchRequest {
 
   int? adHiddenUntilEpochMs;
 
+  /// Localized continuation UI supplied by Flutter. No advertisement unlock.
+  String? nextBookLabel;
+
+  String? endOfBookMessage;
+
   /// Optional next member in the user's saved group order.
   String? nextBookTitle;
 
@@ -197,6 +204,8 @@ class ReaderLaunchRequest {
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookLabel,
+      endOfBookMessage,
       nextBookTitle,
       bookmarksJson,
       uiLanguage,
@@ -220,9 +229,11 @@ class ReaderLaunchRequest {
       preferences: result[8]! as ReaderPreferences,
       bannerAdUnitId: result[9] as String?,
       adHiddenUntilEpochMs: result[10] as int?,
-      nextBookTitle: result[11] as String?,
-      bookmarksJson: result[12] as String?,
-      uiLanguage: result[13] as String?,
+      nextBookLabel: result[11] as String?,
+      endOfBookMessage: result[12] as String?,
+      nextBookTitle: result[13] as String?,
+      bookmarksJson: result[14] as String?,
+      uiLanguage: result[15] as String?,
     );
   }
 

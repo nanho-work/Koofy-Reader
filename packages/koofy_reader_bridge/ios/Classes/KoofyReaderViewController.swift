@@ -626,7 +626,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
                 self.publication?.readingOrder.firstIndexWithHREF(fallback.href) == (self.publication?.readingOrder.count ?? 0) - 1
             self.hasCompletedBook = self.hasCompletedBook || self.atBookEnd
             let offerNext = self.atBookEnd && self.request.nextBookTitle != nil
-            self.nextPageItem?.title = offerNext ? L("이어서 읽기") : L("다음") + " ›"
+            self.nextPageItem?.title = offerNext ? (self.request.nextBookLabel ?? L("다음 회차 읽기")) : L("다음") + " ›"
             self.nextPageItem?.accessibilityLabel = offerNext ? L("다음 권 {0} 이어서 읽기", self.request.nextBookTitle ?? "") : L("다음 페이지")
             self.updateLocationStatus()
             if self.atBookEnd { self.stopAutoTurn() }
@@ -804,7 +804,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         report(error, code: "resource_failed", fatal: !hasSentReady)
     }
     func navigator(_ navigator: Navigator, presentExternalURL url: URL) {
-        if isReady, request.publicationId == "sample_mermaid_001",
+        if isReady, ["sample_mermaid_001", "sample_mermaid_001_en", "sample_mermaid_001_ja"].contains(request.publicationId),
            url.absoluteString == "koofy-reader://catalog/mermaid" {
             close(downloadSeries: true) { _ in }
             return
@@ -1240,7 +1240,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         navigationItem.rightBarButtonItems = [settings, contents, tools, bookmarks]
         updateBookmarkItem()
         if request.nextBookTitle != nil {
-            let next = UIBarButtonItem(title: L("다음 권"), style: .plain,
+            let next = UIBarButtonItem(title: request.nextBookLabel ?? L("다음 회차 읽기"), style: .plain,
                 target: self, action: #selector(nextBookTapped))
             navigationItem.rightBarButtonItems?.append(next)
         }
@@ -1252,13 +1252,11 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     @objc private func nextBookTapped() {
         stopAutoTurn()
         speech?.pause()
-        guard isReady, !isClosing, !turnBusy, presentedViewController == nil, let title = request.nextBookTitle else { return }
-        let alert = ReaderAlertController(title: L("다음 권 읽기"), message: title, preferredStyle: .alert, palette: ReaderPalette.forTheme(preferences.theme))
-        alert.addAction(ReaderAlertAction(title: L("취소"), style: .cancel))
-        alert.addAction(ReaderAlertAction(title: L("열기"), style: .default) { [weak self] _ in
-            self?.close(nextBook: true) { _ in }
-        })
-        alert.present(from: self)
+        guard isReady, !isClosing, !turnBusy, presentedViewController == nil, request.nextBookTitle != nil else { return }
+        // Persist and ACK the current locator before Flutter resolves the next
+        // local/server episode and shows the shared download confirmation.
+        close(nextBook: true) { _ in }
+
     }
 
     @objc private func preferencesTapped(_ sender: UIBarButtonItem) {
@@ -1384,7 +1382,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         guard let locator = lastLocator else { return }
         if preferences.footerInfo == "none" { progress.text = "" }
         else if isReaderDisplayCover(locator) { progress.text = L("표지") }
-        else if atBookEnd { progress.text = "100%" }
+        else if atBookEnd { progress.text = request.endOfBookMessage ?? "100%" }
         else { progress.text = locationInfo.footer(locator, mode: preferences.footerInfo) }
         progress.sizeToFit()
     }

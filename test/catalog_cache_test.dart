@@ -156,4 +156,34 @@ void main() {
       expect(await CatalogCache(() async => dir).read('bad'), isNull);
     },
   );
+
+  test(
+    'legacy download identity is recovered by content ID across revisions and endpoint scope',
+    () async {
+      final cache = CatalogCache.memory();
+      final item = catalogFixture(71, seriesId: 'a' * 32, episodeNumber: 1);
+      final newer = {...item.json, 'version': 2};
+      await cache.save('https://example.test/catalog|ja|series:${'a' * 32}', [
+        newer,
+      ]);
+      expect(
+        (await cache.findBook(
+          item.bookId,
+          'https://example.test/catalog',
+        ))?['version'],
+        2,
+      );
+      expect(
+        await cache.findBook(item.bookId, 'https://other.test/catalog'),
+        isNull,
+      );
+      expect(
+        await cache.findBook(
+          'local_${item.id}_1',
+          'https://example.test/catalog',
+        ),
+        isNull,
+      );
+    },
+  );
 }

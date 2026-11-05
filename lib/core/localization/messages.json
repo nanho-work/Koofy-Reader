@@ -4142,5 +4142,65 @@
   "즐겨찾기한 책이 없습니다. 책의 별표를 눌러 추가해 보세요.": {
     "en": "No favorites yet. Tap the star on a book to add it.",
     "ja": "お気に入りはまだありません。本の星をタップして追加してください。"
+  },
+  "다음 회차 확인": {
+    "en": "Check next episode",
+    "ja": "次の話を確認"
+  },
+  "다음 회차를 확인하고 있습니다…": {
+    "en": "Checking the next episode…",
+    "ja": "次の話を確認しています…"
+  },
+  "다음 회차 무료로 읽기": {
+    "en": "Read next episode for free",
+    "ja": "次の話を無料で読む"
+  },
+  "{0}을 무료로 다운로드한 뒤 바로 엽니다.": {
+    "en": "Download {0} for free and open it immediately.",
+    "ja": "{0}を無料でダウンロードして、そのまま開きます。"
+  },
+  "다운로드 후 읽기": {
+    "en": "Download and read",
+    "ja": "ダウンロードして読む"
+  },
+  "다음 회차를 다운로드하고 있습니다…": {
+    "en": "Downloading the next episode…",
+    "ja": "次の話をダウンロードしています…"
+  },
+  "{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.": {
+    "en": "Scheduled for {0} (Korean time). Read for free when released.",
+    "ja": "{0}（韓国時間）に公開予定です。公開後に無料で読めます。"
+  },
+  "다음 회차 안내": {
+    "en": "Next episode",
+    "ja": "次の話について"
+  },
+  "다음 회차를 기다려 주세요": {
+    "en": "Please wait for the next episode",
+    "ja": "次の話をお待ちください"
+  },
+  "묶음의 마지막 회차입니다": {
+    "en": "This is the last episode in this collection",
+    "ja": "このコレクションの最後の話です"
+  },
+  "마지막 회차입니다": {
+    "en": "This is the last episode",
+    "ja": "最後の話です"
+  },
+  "다음 회차를 열지 못했습니다": {
+    "en": "Could not open the next episode",
+    "ja": "次の話を開けませんでした"
+  },
+  "현재 회차로 돌아가기": {
+    "en": "Return to current episode",
+    "ja": "今の話に戻る"
+  },
+  "인터넷 연결을 확인하고 다시 시도해 주세요.": {
+    "en": "Check your internet connection and try again.",
+    "ja": "インターネット接続を確認して、もう一度お試しください。"
+  },
+  "작품 정보를 확인하지 못했습니다. 도서에서 작품 정보를 다시 확인해 주세요.": {
+    "en": "Could not find the work information. Please check this work in Books.",
+    "ja": "作品情報を確認できませんでした。「本」で作品情報を確認してください。"
   }
 }

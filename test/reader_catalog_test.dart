@@ -95,6 +95,9 @@ void main() {
       if (request.uri.path == '/file') {
         final bytes = files[request.uri.queryParameters['slot']]!;
         request.response.add(corrupt ? List.filled(bytes.length, 0) : bytes);
+      } else if (request.uri.queryParameters['action'] == 'info') {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'item': itemJson('book')}));
       } else if (request.uri.queryParameters['action'] == 'download') {
         final slot = request.uri.queryParameters['slot']!;
         requestedSlots.add(slot);
@@ -158,6 +161,23 @@ void main() {
       );
     },
   );
+  test('legacy download recovers source by ID without reinstalling', () async {
+    final old = Book.localFile(
+      id: 'catalog_${'a' * 32}_1',
+      title: 'old title',
+      author: '',
+      description: '',
+      localPath: '/existing.txt',
+    );
+    final item = await catalog.sourceForBook(old);
+    expect(item?.id, 'a' * 32);
+    expect(item?.title, '테스트');
+    expect((await catalog.sourceForBook(old))?.id, item?.id);
+    expect(
+      (await books.getBooks()).where((book) => book.id == old.id),
+      isEmpty,
+    );
+  });
   tearDown(() async {
     catalog.close();
     await server.close(force: true);

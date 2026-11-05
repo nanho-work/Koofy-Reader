@@ -216,6 +216,9 @@ struct ReaderLaunchRequest: Hashable {
   /// LevelPlay viewer ad unit and the shared reward expiry.
   var bannerAdUnitId: String? = nil
   var adHiddenUntilEpochMs: Int64? = nil
+  /// Localized continuation UI supplied by Flutter. No advertisement unlock.
+  var nextBookLabel: String? = nil
+  var endOfBookMessage: String? = nil
   /// Optional next member in the user's saved group order.
   var nextBookTitle: String? = nil
   var bookmarksJson: String? = nil
@@ -236,9 +239,11 @@ struct ReaderLaunchRequest: Hashable {
     let preferences = pigeonVar_list[8] as! ReaderPreferences
     let bannerAdUnitId: String? = nilOrValue(pigeonVar_list[9])
     let adHiddenUntilEpochMs: Int64? = nilOrValue(pigeonVar_list[10])
-    let nextBookTitle: String? = nilOrValue(pigeonVar_list[11])
-    let bookmarksJson: String? = nilOrValue(pigeonVar_list[12])
-    let uiLanguage: String? = nilOrValue(pigeonVar_list[13])
+    let nextBookLabel: String? = nilOrValue(pigeonVar_list[11])
+    let endOfBookMessage: String? = nilOrValue(pigeonVar_list[12])
+    let nextBookTitle: String? = nilOrValue(pigeonVar_list[13])
+    let bookmarksJson: String? = nilOrValue(pigeonVar_list[14])
+    let uiLanguage: String? = nilOrValue(pigeonVar_list[15])
 
     return ReaderLaunchRequest(
       protocolVersion: protocolVersion,
@@ -252,6 +257,8 @@ struct ReaderLaunchRequest: Hashable {
       preferences: preferences,
       bannerAdUnitId: bannerAdUnitId,
       adHiddenUntilEpochMs: adHiddenUntilEpochMs,
+      nextBookLabel: nextBookLabel,
+      endOfBookMessage: endOfBookMessage,
       nextBookTitle: nextBookTitle,
       bookmarksJson: bookmarksJson,
       uiLanguage: uiLanguage
@@ -270,6 +277,8 @@ struct ReaderLaunchRequest: Hashable {
       preferences,
       bannerAdUnitId,
       adHiddenUntilEpochMs,
+      nextBookLabel,
+      endOfBookMessage,
       nextBookTitle,
       bookmarksJson,
       uiLanguage,

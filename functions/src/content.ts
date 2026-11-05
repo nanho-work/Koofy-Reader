@@ -49,7 +49,7 @@ export function visibleInLanguage(item: Content, language: 'ko' | 'en' | 'ja') {
 export function publicationDay(now = new Date()): string {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
-function monthlyMetadata(data: Record<string, unknown>) {
+function publicationMetadata(data: Record<string, unknown>) {
   const issueMonth = data.issueMonth ?? '';
   const autoCompile = data.autoCompile ?? false;
   const byline = data.byline ?? '';
@@ -66,7 +66,7 @@ function monthlyMetadata(data: Record<string, unknown>) {
   const compilationId = data.compilationId ?? '';
   requireValue(typeof issueMonth === 'string' && (!issueMonth || /^20\d{2}-(0[1-9]|1[0-2])$/.test(issueMonth)), '월간호 발행 월을 확인해 주세요.');
   requireValue(typeof releaseDate === 'string' && (!releaseDate || (/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate) && Number.isFinite(Date.parse(releaseDate + 'T00:00:00Z')) && new Date(releaseDate + 'T00:00:00Z').toISOString().slice(0, 10) === releaseDate)), '발행일을 확인해 주세요.');
-  requireValue(!releaseDate || (!issueMonth && data.collectionType === 'general') || (issueMonth && releaseDate.startsWith(issueMonth + '-')), '발행일은 월간호의 해당 월이어야 합니다.');
+  requireValue(!releaseDate || !issueMonth || releaseDate.startsWith(issueMonth + '-'), '발행일은 월간호의 해당 월이어야 합니다.');
   requireValue(typeof compilationId === 'string' && (!compilationId || /^[a-f0-9]{32}$/.test(compilationId)), '합본 콘텐츠 ID를 확인해 주세요.');
   requireValue(!compilationId || !!issueMonth, '합본은 월간호에만 연결할 수 있습니다.');
   return { issueMonth, releaseDate, releaseAt, compilationId, autoCompile, byline: byline.trim() };
@@ -109,10 +109,10 @@ export function metadata(input: unknown): Metadata {
     return value.trim();
   }
   requireValue(data.collectionType === undefined || data.collectionType === 'general', '작품 관리 분류를 확인해 주세요.');
-  const monthly = monthlyMetadata(data);
-  const category = monthly.issueMonth ? '월간 쿠피' : data.category === undefined ? '기타' : categoryName(data.category);
+  const publication = publicationMetadata(data);
+  const category = publication.issueMonth ? '월간 쿠피' : data.category === undefined ? '기타' : categoryName(data.category);
   const source = data.source === undefined ? '' : field('source', 500);
-  return { ...(data.collectionType === 'general' ? { collectionType: 'general' as const } : {}), ...monthly, language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) };
+  return { ...(data.collectionType === 'general' ? { collectionType: 'general' as const } : {}), ...publication, language: contentLanguage(data.language), category, source, title: field('title', 160, true), author: data.issueMonth ? MONTHLY_DEFAULTS[contentLanguage(data.language)].author : field('author', 120, true), description: field('description', 2000), license: monthlyLicense(data.license === undefined ? undefined : field('license', 2000), contentLanguage(data.language)) };
 }
 export function seriesMetadata(input: unknown): Metadata {
   const fields = metadata(input);
@@ -415,6 +415,12 @@ export async function validateUpload(contentKind: Kind, slot: string, bytes: Buf
 /** Draft deletion must also reject previously published, now hidden content. */
 export function assertDraftDeletion(item: Pick<Content, 'published' | 'publishedContent'>) {
   requireValue(!item.published && !item.publishedContent, '공개 이력이 있는 콘텐츠는 초안 삭제할 수 없습니다.');
+}
+
+/** Metadata recovery for legacy downloads. Never exposes drafts or scheduled bodies. */
+export function publishedBookInfo(item: Content) {
+  requireValue(item.kind === 'book' && isReleased(item), '아직 발행되지 않은 도서입니다.');
+  return publicItem(item);
 }
 
 /** Deliberate teaser: never expose body asset metadata or draft fields. */

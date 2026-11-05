@@ -3,8 +3,8 @@ import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
-import 'package:koofy_reader/features/library/domain/bundled_books.dart';
-import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
+import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
+import 'package:koofy_reader/features/native_reader/application/next_reading.dart';
 import 'dart:io';
 import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
 import 'package:koofy_reader/features/fonts/presentation/personal_fonts_page.dart';
@@ -57,6 +57,12 @@ class _NativeReaderLaunchPageState
   bool _popScheduled = false;
   late Book _book = widget.book;
   Book? _nextBook;
+  bool _continuing = false;
+  bool _catalogStandalone = false;
+  bool _personalGroup = false;
+  NextReading? _knownNext;
+  String? _knownNextFor;
+  String? _continuationDownloadKey;
 
   @override
   void initState() {
@@ -99,6 +105,22 @@ class _NativeReaderLaunchPageState
       );
       if (!mounted || _leaveRequested) return;
       _nextBook = null;
+      _catalogStandalone = false;
+      _personalGroup = false;
+      if (_book.catalogMetadata != null) {
+        try {
+          final source = CatalogItem.fromJson(_book.catalogMetadata!);
+          if (source.bookId == _book.id) {
+            _catalogStandalone = source.seriesId == null;
+            _nextBook = (await NextReadingResolver.installedSuccessor(
+              source,
+              await ref.read(booksProvider.future),
+            ))?.book;
+          }
+        } catch (_) {
+          /* Legacy metadata must not prevent opening a local book. */
+        }
+      }
       Book? diaryGroup;
       try {
         final groups = await ref.read(bookGroupsProvider.future);
@@ -107,9 +129,19 @@ class _NativeReaderLaunchPageState
         for (final group in groups) {
           final index = group.bookIds.indexOf(_book.id);
           if (index >= 0) diaryGroup ??= group.displayBook;
-          if (index >= 0 && index + 1 < group.bookIds.length) {
-            final nextId = group.bookIds[index + 1];
-            _nextBook = books.where((b) => b.id == nextId).firstOrNull;
+          if (index >= 0 && !group.id.startsWith('group_monthly_')) {
+            _personalGroup = true;
+            _nextBook = null;
+            if (index + 1 < group.bookIds.length) {
+              final nextId = group.bookIds[index + 1];
+              final next = books.where((book) => book.id == nextId).firstOrNull;
+              if (next != null &&
+                  (!next.isLocalFile ||
+                      (next.localPath != null &&
+                          await File(next.localPath!).exists()))) {
+                _nextBook = next;
+              }
+            }
             break;
           }
         }
@@ -136,13 +168,40 @@ class _NativeReaderLaunchPageState
         /* Optional notifications never prevent reading. */
       }
       if (!mounted || _leaveRequested) return;
+      final known = _knownNextFor == _book.id ? _knownNext : null;
+      final noFollowing =
+          known?.kind == NextReadingKind.waiting ||
+          known?.kind == NextReadingKind.completed;
       await services.coordinator.open(
         diaryBook: diaryBook,
         publicationId: publication.publicationId,
         contentRevision: publication.contentRevision,
         filePath: publication.filePath,
         title: publication.title,
-        nextBookTitle: _nextBook?.title,
+        nextBookTitle:
+            _nextBook?.title ??
+            (NextReadingResolver.hasRemoteSource(_book) &&
+                    !_personalGroup &&
+                    !_catalogStandalone &&
+                    !noFollowing
+                ? tr('다음 회차 확인')
+                : null),
+        nextBookLabel: _nextBook != null
+            ? tr('다음 회차 읽기')
+            : known?.kind == NextReadingKind.download
+            ? tr('다음 회차 무료로 읽기')
+            : known?.kind == NextReadingKind.upcoming
+            ? tr('공개 예정')
+            : tr('다음 회차 확인'),
+        endOfBookMessage: known?.kind == NextReadingKind.waiting
+            ? tr('다음 회차를 기다려 주세요')
+            : _nextBook != null ||
+                  (NextReadingResolver.hasRemoteSource(_book) &&
+                      !_personalGroup &&
+                      !_catalogStandalone &&
+                      !noFollowing)
+            ? null
+            : tr(_personalGroup ? '묶음의 마지막 회차입니다' : '마지막 회차입니다'),
         bannerAdUnitId: adsReady ? LevelPlayIds.readerBanner : null,
         adHiddenUntilEpochMs: ads.hiddenUntil?.millisecondsSinceEpoch,
         resolveInitialLocator: (position) =>
@@ -285,40 +344,154 @@ class _NativeReaderLaunchPageState
             !_leaveRequested) {
           unawaited(_manageFonts());
         } else if (_error == null &&
-            event.message == 'downloadSeries' &&
-            BundledBooks.hasContinuation(_book) &&
+            (event.message == 'downloadSeries' ||
+                event.message == 'nextBook') &&
+            (_nextBook != null || NextReadingResolver.hasRemoteSource(_book)) &&
             !_leaveRequested) {
-          _showSeriesCatalog();
-        } else if (_error == null &&
-            event.message == 'nextBook' &&
-            _nextBook != null &&
-            !_leaveRequested) {
-          setState(() {
-            _book = _nextBook!;
-            _status = tr("다음 권을 준비하고 있습니다…");
-          });
-          unawaited(_open());
+          unawaited(_continueReading());
         } else if (_error == null) {
           _returnToLibrary();
         }
     }
   }
 
-  void _showSeriesCatalog() {
-    // Replace the closed reader route; Back returns to the library containing
-    // any newly downloaded books, rather than reopening the finished sample.
-    if (_popScheduled) return;
-    _popScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-      Navigator.of(context).pushReplacement<void, void>(
-        MaterialPageRoute(
-          builder: (_) =>
-              ReaderCatalogPage(initialBookQuery: BundledBooks.mermaidSeries),
+  Future<void> _continueReading() async {
+    if (_continuing || _leaveRequested) return;
+    setState(() {
+      _continuing = true;
+      _status = tr('다음 회차를 확인하고 있습니다…');
+    });
+    Book? next;
+    var retry = false;
+    try {
+      await _coordinator?.flush();
+      if (!mounted || _leaveRequested) return;
+      final books = await ref.read(booksProvider.future);
+      final groups = await ref.read(bookGroupsProvider.future);
+      final result = await NextReadingResolver(
+        ref.read(readerCatalogProvider),
+      ).resolve(_book, books, groups);
+      if (!mounted || _leaveRequested) return;
+      _knownNext = result;
+      _knownNextFor = _book.id;
+      switch (result.kind) {
+        case NextReadingKind.local:
+          next = result.book;
+        case NextReadingKind.download:
+          final item = result.item!;
+          final accepted = await showReaderDialog<bool>(
+            context: context,
+            builder: (dialogContext) => ReaderAlertDialog(
+              title: Text(tr('다음 회차 무료로 읽기')),
+              content: Text(
+                tr('{0}을 무료로 다운로드한 뒤 바로 엽니다.', [
+                  item.episodeNumber != null && item.episodeTitle != null
+                      ? tr('{0}화 · {1}', [
+                          item.episodeNumber,
+                          item.episodeTitle,
+                        ])
+                      : item.title,
+                ]),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(tr('취소')),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(tr('다운로드 후 읽기')),
+                ),
+              ],
+            ),
+          );
+          if (accepted != true || !mounted || _leaveRequested) break;
+          setState(() {
+            _status = tr('다음 회차를 다운로드하고 있습니다…');
+            _continuationDownloadKey = catalogItemKey(item);
+          });
+          await ref.read(catalogDownloadProvider.notifier).download(item);
+          if (!mounted || _leaveRequested) return;
+          final installed = await ref.refresh(booksProvider.future);
+          next = await NextReadingResolver.existingBook(item, installed);
+          if (next == null) {
+            throw const CatalogException('다운로드하지 못했습니다. 다시 시도해 주세요.');
+          }
+        case NextReadingKind.upcoming:
+          final date = result.item!.releaseAt.isNotEmpty
+              ? result.item!.releaseAt
+              : result.item!.releaseDate;
+          await _nextNotice(
+            tr('공개 예정'),
+            tr('{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.', [
+              date.replaceAll('T', ' ').replaceAll(':00+09:00', ''),
+            ]),
+          );
+        case NextReadingKind.waiting:
+          await _nextNotice(tr('다음 회차 안내'), tr('다음 회차를 기다려 주세요'));
+        case NextReadingKind.completed:
+          await _nextNotice(
+            tr('다음 회차 안내'),
+            tr(result.groupEnd ? '묶음의 마지막 회차입니다' : '마지막 회차입니다'),
+          );
+      }
+    } catch (error) {
+      if (mounted && !_leaveRequested) {
+        retry =
+            await showReaderDialog<bool>(
+              context: context,
+              builder: (dialogContext) => ReaderAlertDialog(
+                title: Text(tr('다음 회차를 열지 못했습니다')),
+                content: Text(
+                  error is CatalogException
+                      ? tr(error.message)
+                      : tr('인터넷 연결을 확인하고 다시 시도해 주세요.'),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(tr('현재 회차로 돌아가기')),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: Text(tr('다시 시도')),
+                  ),
+                ],
+              ),
+            ) ==
+            true;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _continuing = false;
+          _continuationDownloadKey = null;
+        });
+      }
+    }
+    if (!mounted || _leaveRequested) return;
+    if (retry) {
+      unawaited(_continueReading());
+      return;
+    }
+    if (next != null) setState(() => _book = next!);
+    await _open(); // Cancel/failure restores the exact saved last-page locator.
+  }
+
+  Future<void> _nextNotice(String title, String message) =>
+      showReaderDialog<void>(
+        context: context,
+        builder: (dialogContext) => ReaderAlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(tr('확인')),
+            ),
+          ],
         ),
       );
-    });
-  }
 
   Future<void> _manageFonts() async {
     try {
@@ -389,37 +562,49 @@ class _NativeReaderLaunchPageState
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_launching && (_coordinator?.activeSessionId == null || _closed),
-    onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) unawaited(_leave());
-    },
-    child: Scaffold(
-      appBar: AppBar(title: Text(_book.title)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_error == null) const CircularProgressIndicator(),
-              const SizedBox(height: 20),
-              Text(_error ?? _status, textAlign: TextAlign.center),
-              if (_error != null) ...[
-                const SizedBox(height: 16),
-                if (_coordinator?.activeSessionId == null)
-                  FilledButton(
-                    onPressed: _launching ? null : _open,
-                    child: Text(tr("다시 시도")),
-                  ),
-                TextButton(onPressed: _leave, child: Text(tr("서재로 돌아가기"))),
+  Widget build(BuildContext context) {
+    final download = ref.watch(catalogDownloadProvider);
+    final downloadingNext =
+        _continuing &&
+        download.busy &&
+        download.itemKey == _continuationDownloadKey;
+    return PopScope(
+      canPop: !_launching && (_coordinator?.activeSessionId == null || _closed),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_leave());
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(_book.title)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_error == null && downloadingNext)
+                  LinearProgressIndicator(value: download.progress)
+                else if (_error == null)
+                  const CircularProgressIndicator(),
+                if (downloadingNext)
+                  Text('${(download.progress * 100).floor()}%'),
+                const SizedBox(height: 20),
+                Text(_error ?? _status, textAlign: TextAlign.center),
+                if (_error != null) ...[
+                  const SizedBox(height: 16),
+                  if (_coordinator?.activeSessionId == null)
+                    FilledButton(
+                      onPressed: _launching ? null : _open,
+                      child: Text(tr("다시 시도")),
+                    ),
+                  TextButton(onPressed: _leave, child: Text(tr("서재로 돌아가기"))),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _LaunchCancelled implements Exception {

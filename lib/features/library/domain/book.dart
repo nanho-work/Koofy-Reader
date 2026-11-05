@@ -16,6 +16,7 @@ class Book {
     this.importSourcePath,
     this.sourceHash,
     this.originalFileName,
+    this.catalogMetadata,
   }) : _title = title,
        _description = description,
        _coverAssetPath = coverAssetPath;
@@ -49,6 +50,7 @@ class Book {
     String? importSourcePath,
     String? sourceHash,
     String? originalFileName,
+    Map<String, dynamic>? catalogMetadata,
   }) {
     return Book(
       id: id,
@@ -61,6 +63,7 @@ class Book {
       importSourcePath: importSourcePath,
       sourceHash: sourceHash,
       originalFileName: originalFileName,
+      catalogMetadata: catalogMetadata,
     );
   }
 
@@ -90,6 +93,9 @@ class Book {
   final String? sourceHash;
   final String? originalFileName;
 
+  /// Public source identity for downloaded chapters; never infer a series from a title.
+  final Map<String, dynamic>? catalogMetadata;
+
   /// Keep a filename, never a title or an app-owned `source.txt` fallback.
   String? get matchingFileName =>
       originalFileName ?? importSourcePath?.split(RegExp(r'[\\/]')).last;
@@ -109,6 +115,7 @@ class Book {
     importSourcePath: importSourcePath,
     sourceHash: sourceHash,
     originalFileName: originalFileName,
+    catalogMetadata: catalogMetadata,
   );
 
   Map<String, dynamic> toJson() {
@@ -125,6 +132,7 @@ class Book {
       'importSourcePath': importSourcePath,
       'sourceHash': sourceHash,
       'originalFileName': matchingFileName,
+      if (catalogMetadata != null) 'catalogMetadata': catalogMetadata,
     };
   }
 
@@ -153,6 +161,9 @@ class Book {
       author: author,
       description: description,
       sourceType: sourceType,
+      catalogMetadata: json['catalogMetadata'] is Map
+          ? Map<String, dynamic>.from(json['catalogMetadata'] as Map)
+          : null,
       originalFileName: json['originalFileName'] is String
           ? json['originalFileName'] as String
           : null,

@@ -63,6 +63,8 @@ class ReaderLaunchRequest {
     this.nextBookTitle,
     this.bookmarksJson,
     this.uiLanguage,
+    this.nextBookLabel,
+    this.endOfBookMessage,
   });
   int protocolVersion;
   String sessionId;
@@ -77,6 +79,10 @@ class ReaderLaunchRequest {
   /// LevelPlay viewer ad unit and the shared reward expiry.
   String? bannerAdUnitId;
   int? adHiddenUntilEpochMs;
+
+  /// Localized continuation UI supplied by Flutter. No advertisement unlock.
+  String? nextBookLabel;
+  String? endOfBookMessage;
 
   /// Optional next member in the user's saved group order.
   String? nextBookTitle;
@@ -113,7 +119,6 @@ class ReaderEvent {
   String? errorCode;
   String? message;
   String? bookmarksJson;
-
 }
 
 @HostApi()

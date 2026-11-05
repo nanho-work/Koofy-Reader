@@ -543,6 +543,31 @@ class ReaderCatalog {
     }
   }
 
+  Future<CatalogItem?> sourceForBook(Book book) async {
+    final identity = RegExp(
+      r'^catalog_([a-f0-9]{32})_[1-9][0-9]*$',
+    ).firstMatch(book.id)?.group(1);
+    if (identity == null) return null;
+    var json =
+        book.catalogMetadata ??
+        await _cache.findBook(book.id, endpoint.toString());
+    if (json == null) {
+      final response = await _json({'action': 'info', 'id': identity});
+      json = Map<String, dynamic>.from(response['item'] as Map);
+      final source = CatalogItem.fromJson(json);
+      if (source.id != identity || source.kind != 'book') {
+        throw const CatalogException('올바르지 않은 콘텐츠 정보입니다.');
+      }
+      try {
+        await _cache.save('$endpoint|source:$identity', [json]);
+      } catch (_) {
+        /* Metadata caching is optional. */
+      }
+    }
+    final source = CatalogItem.fromJson(json);
+    return source.id == identity && source.kind == 'book' ? source : null;
+  }
+
   Future<List<CatalogItem>> completeItems(String kind, {String? language}) =>
       watchItems(
         kind,
@@ -899,6 +924,7 @@ class ReaderCatalog {
         await books.saveDownloadedBook(
           Book.localFile(
             id: item.bookId,
+            catalogMetadata: item.json,
             title: item.title,
             author: item.author,
             description: item.description,

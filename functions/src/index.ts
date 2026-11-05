@@ -17,7 +17,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import { assertDraftDeletion, ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
+import { assertDraftDeletion, ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publishedBookInfo, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
 const app = initializeApp({ storageBucket: 'koofy-reader.firebasestorage.app' });
 // Only this issuer is trusted. The browser cannot choose an issuer/project.
@@ -526,6 +526,12 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
   response.set('Cache-Control', 'no-store');
   if (request.method !== 'GET') { response.status(405).json({ error: 'GET 요청만 지원합니다.' }); return; }
   try {
+    if (request.query.action === 'info') {
+      const item = await getItem(id(request.query.id));
+      const info = publishedBookInfo(item);
+      await requirePublishedSeries(item);
+      response.json({ item: info }); return;
+    }
     if (request.query.action === 'download') {
       const item = await getItem(id(request.query.id));
       publicItem(item); // Never sign draft/unpublished paths supplied by a caller.

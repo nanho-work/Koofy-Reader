@@ -534,9 +534,9 @@ String _continuationPage(String language) {
   final en = language == 'en';
   final title = en ? 'The story continues' : '物語は続きます';
   final message = en
-      ? 'Download the next available chapters from the Koofy Reader book catalog.'
-      : 'Koofy Readerのダウンロード一覧で公開中の続きの話をお楽しみください。';
-  final action = en ? 'Find the next chapter →' : '続きの話を探す →';
+      ? 'Continue with the next chapter. If needed, confirm its free download to start reading.'
+      : '次の話へ進めます。未ダウンロードの場合は、無料ダウンロードを確認して読み始められます。';
+  final action = en ? 'Read the next chapter →' : '次の話を読む →';
   final note = en
       ? 'An internet connection is required to browse and download. Downloaded books can be read offline.'
       : '一覧の表示とダウンロードにはインターネット接続が必要です。ダウンロードした本はオフラインでも読めます。';
@@ -556,9 +556,9 @@ a { display: inline-block; padding: .7em 1em; border: 1px solid currentColor; bo
 </style></head><body>
 <p class="kicker">인어공주는 파도를 벤다 · 1화 끝</p>
 <h1>이야기는 계속됩니다</h1>
-<p>다음 이야기가 궁금하신가요?<br/>쿠피리더 도서 다운로드에서 공개된 다음 화를 확인해 보세요.</p>
-<p><a href="${BundledBooks.continuationUrl}">공개된 다음 화 확인하기 →</a></p>
-<p class="note">서재의 ‘도서·글꼴 다운로드’에서도 작품명으로 찾을 수 있습니다. 아직 다음 화가 없다면 공개 후 다시 확인해 주세요.</p>
+<p>다음 이야기가 궁금하신가요?<br/>다음 회차로 이어서 읽어 보세요. 아직 받지 않았다면 무료 다운로드를 확인한 뒤 바로 열립니다.</p>
+<p><a href="${BundledBooks.continuationUrl}">다음 회차 읽기 →</a></p>
+<p class="note">공개 예정 회차는 공개 일시를 안내합니다. 아직 다음 회차가 없다면 조금만 기다려 주세요.</p>
 <p class="note">목록 확인과 다운로드에는 인터넷 연결이 필요합니다. 내려받은 책은 오프라인에서도 읽을 수 있습니다.</p>
 </body></html>''';
 

@@ -1,6 +1,5 @@
 import 'helpers/catalog_fixture.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
-import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 import 'dart:async';
 import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
@@ -105,6 +104,33 @@ class _LaunchGateway implements ReaderGateway {
   ) async {}
 }
 
+class _InstallingCatalog extends FakeReaderCatalog {
+  _InstallingCatalog(super.items, this.library);
+  final List<Book> library;
+  int installs = 0;
+  bool downloadFails = false;
+  @override
+  Future<void> install(
+    CatalogItem item, {
+    void Function(double)? progress,
+  }) async {
+    installs++;
+    progress?.call(.5);
+    if (downloadFails) throw const CatalogException('다운로드 실패');
+    library.add(
+      Book(
+        id: item.bookId,
+        title: item.title,
+        author: '',
+        description: '',
+        sourceType: BookSourceType.asset,
+        assetPath: 'next.txt',
+        catalogMetadata: item.json,
+      ),
+    );
+  }
+}
+
 void main() {
   final book = Book.asset(
     id: 'book',
@@ -138,8 +164,9 @@ void main() {
     String? initialLocator,
     List<Book>? library,
     List<BookGroup>? groups,
+    FakeReaderCatalog? customCatalog,
   }) async {
-    final catalog = FakeReaderCatalog([]);
+    final catalog = customCatalog ?? FakeReaderCatalog([]);
     addTearDown(catalog.close);
     final services = NativeReaderServices(
       preparer: preparer,
@@ -196,7 +223,7 @@ void main() {
   }
 
   testWidgets(
-    'sample continuation checkpoints then opens the filtered catalog',
+    'sample continuation shows shared wait notice and returns to the saved reader',
     (tester) async {
       preparer.publications[BundledBooks.mermaidId] =
           const PreparedReadingPublication(
@@ -228,22 +255,117 @@ void main() {
       );
       await pumpUntil(
         tester,
-        () => find.byType(ReaderCatalogPage).evaluate().isNotEmpty,
+        () => find.text('다음 회차를 기다려 주세요').evaluate().isNotEmpty,
       );
-      await tester.pumpAndSettle();
       expect(coordinator.activeSessionId, isNull);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        BundledBooks.mermaidSeries,
-      );
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(find.text('서재'), findsOneWidget);
-      expect(gateway.openCalls, 1);
+      await tester.tap(find.text('확인'));
+      await pumpUntil(tester, () => gateway.openCalls == 2);
+      expect(gateway.request!.publicationId, BundledBooks.mermaidId);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  for (final mode in ['cancel', 'success', 'retry']) {
+    final accept = mode != 'cancel';
+    testWidgets('next episode download $mode without catalog navigation', (
+      tester,
+    ) async {
+      final parent = catalogFixture(90, kind: 'series');
+      final first = catalogFixture(91, seriesId: parent.id, episodeNumber: 1);
+      final second = catalogFixture(92, seriesId: parent.id, episodeNumber: 2);
+      final current = Book(
+        id: first.bookId,
+        title: first.title,
+        author: '',
+        description: '',
+        sourceType: BookSourceType.asset,
+        assetPath: 'first.txt',
+        catalogMetadata: first.json,
+      );
+      final library = [current];
+      final catalog = _InstallingCatalog([parent, first, second], library)
+        ..downloadFails = mode == 'retry';
+      for (final item in [first, second]) {
+        preparer.publications[item.bookId] = PreparedReadingPublication(
+          publicationId: item.bookId,
+          contentRevision: 'revision',
+          filePath: '/prepared.epub',
+          title: item.title,
+        );
+      }
+      gateway.recovery.complete([]);
+      await mount(
+        tester,
+        initialBook: current,
+        library: library,
+        groups: [],
+        customCatalog: catalog,
+      );
+      await pumpUntil(tester, () => gateway.openCalls == 1);
+      final request = gateway.request!;
+      gateway.controller.add(
+        ReaderEvent(
+          protocolVersion: 1,
+          sessionId: request.sessionId,
+          sessionGeneration: request.sessionGeneration,
+          publicationId: current.id,
+          contentRevision: 'revision',
+          sequence: 1,
+          kind: 'closed',
+          message: 'nextBook',
+          locatorJson:
+              '{"href":"chapter.xhtml","locations":{"progression":0.95,"koofyBookCompleted":true}}',
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('다운로드 후 읽기').evaluate().isNotEmpty,
+      );
+      expect(find.text('다음 회차 무료로 읽기'), findsOneWidget);
+      expect(catalog.installs, 0);
+      await tester.tap(find.text(accept ? '다운로드 후 읽기' : '취소'));
+      if (mode == 'retry') {
+        await pumpUntil(
+          tester,
+          () => find.text('다음 회차를 열지 못했습니다').evaluate().isNotEmpty,
+        );
+        expect(gateway.openCalls, 1);
+        expect(
+          (await coordinator.store.loadPosition(
+            current.id,
+            'revision',
+          )).locatorJson,
+          contains('0.95'),
+        );
+        catalog.downloadFails = false;
+        await tester.tap(find.text('다시 시도'));
+        await pumpUntil(
+          tester,
+          () => find.text('다운로드 후 읽기').evaluate().isNotEmpty,
+        );
+        await tester.tap(find.text('다운로드 후 읽기'));
+      }
+      await pumpUntil(tester, () => gateway.openCalls == 2);
+      expect(
+        catalog.installs,
+        mode == 'retry'
+            ? 2
+            : accept
+            ? 1
+            : 0,
+      );
+      expect(
+        gateway.request!.publicationId,
+        accept ? second.bookId : first.bookId,
+      );
+      final old = await coordinator.store.loadPosition(current.id, 'revision');
+      expect(old.locatorJson, contains('0.95'));
+      if (!accept) expect(gateway.request!.initialLocatorJson, old.locatorJson);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets(
     'personal font management returns to the latest location, not the initial bookmark',

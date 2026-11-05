@@ -59,6 +59,48 @@ class CatalogCache {
     await temp.rename(file.path);
   }
 
+  /// Legacy downloads did not save their source metadata. Recover by exact ID
+  /// from public caches only; never search titles or contact every series.
+  Future<Map<String, dynamic>?> findBook(String bookId, String endpoint) async {
+    final identity = RegExp(
+      r'^catalog_([a-f0-9]{32})_[1-9][0-9]*$',
+    ).firstMatch(bookId)?.group(1);
+    if (identity == null) return null;
+    Map<String, dynamic>? find(Map<String, dynamic> snapshot) {
+      if (!(snapshot['key'] as String? ?? '').startsWith('$endpoint|')) {
+        return null;
+      }
+      for (final raw in (snapshot['items'] as List? ?? const [])) {
+        if (raw is Map && raw['id'] == identity) {
+          return Map<String, dynamic>.from(raw);
+        }
+      }
+      return null;
+    }
+
+    for (final snapshot in _memory.values) {
+      final item = find(snapshot);
+      if (item != null) return item;
+    }
+    if (directory == null) return null;
+    final folder = Directory('${(await directory!()).path}/catalog_lists');
+    if (!await folder.exists()) return null;
+    await for (final entry in folder.list()) {
+      if (entry is! File || !entry.path.endsWith('.json')) continue;
+      try {
+        if (await entry.length() > 8 * 1024 * 1024) continue;
+        final snapshot = jsonDecode(await entry.readAsString());
+        if (snapshot is Map<String, dynamic> && snapshot['version'] == 1) {
+          final item = find(snapshot);
+          if (item != null) return item;
+        }
+      } catch (_) {
+        /* A corrupt optional cache never prevents local reading. */
+      }
+    }
+    return null;
+  }
+
   bool fresh(Map<String, dynamic> value) {
     final now = DateTime.now().millisecondsSinceEpoch;
     final next = value['nextChange'] as int?;

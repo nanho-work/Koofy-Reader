@@ -130,7 +130,7 @@ void main() {
         end.findAllElements('a').single.getAttribute('href'),
         BundledBooks.continuationUrl,
       );
-      expect(end.innerText, contains('아직 다음 화가 없다면'));
+      expect(end.innerText, contains('아직 다음 회차가 없다면'));
       final uncovered = await preparer.prepare(
         book: BundledBooks.mermaid,
         showRegisteredCover: false,

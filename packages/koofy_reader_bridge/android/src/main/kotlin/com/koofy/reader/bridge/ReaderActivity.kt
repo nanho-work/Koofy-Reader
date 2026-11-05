@@ -219,15 +219,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         navigation.addView(button(L("다음") + " ›") { pageTurns?.request(true) })
-        session.request.nextBookTitle?.let { title ->
-            nextBookButton = button(L("다음 권")) {
+        session.request.nextBookTitle?.let {
+            nextBookButton = button(session.request.nextBookLabel ?: L("다음 회차 읽기")) {
                 stopAutoTurn()
-                if (toolsReady()) {
-                    ReaderAlert.Builder(this, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("다음 권 읽기"))
-                        .setMessage(title)
-                        .setPositiveButton(L("열기")) { _, _ -> closeReader(nextBook = true) }
-                        .setNegativeButton(L("취소"), null).show()
-                }
+                if (toolsReady()) closeReader(nextBook = true)
             }
             navigation.addView(nextBookButton)
         }
@@ -489,7 +484,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 checkpoint.put("locations", locations)
                 session.locatorJson = checkpoint.toString()
                 updateLocationStatus(saved)
-                nextBookButton?.text = if (atBookEnd) L("이어서 읽기") else L("다음 권")
+                nextBookButton?.text = session.request.nextBookLabel ?: L("다음 회차 읽기")
                 if (atBookEnd) {
                     stopAutoTurn()
                     nextBookButton?.contentDescription = L("다음 권 {0} 이어서 읽기", session.request.nextBookTitle)
@@ -512,7 +507,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
-        if (session.ready && session.request.publicationId == "sample_mermaid_001" &&
+        if (session.ready && session.request.publicationId in setOf("sample_mermaid_001", "sample_mermaid_001_en", "sample_mermaid_001_ja") &&
             url.toString() == "koofy-reader://catalog/mermaid") {
             closeReader(downloadSeries = true)
             return
@@ -770,7 +765,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         updateBookmarkButton()
         updateAutoControl()
         status.text = if (isReaderDisplayCover(locator) && session.preferences.footerInfo != "none") L("표지")
-            else if (atBookEnd && session.preferences.footerInfo != "none") "100%"
+            else if (atBookEnd && session.preferences.footerInfo != "none") session.request.endOfBookMessage ?: "100%"
             else locationInfo.footer(locator, session.preferences.footerInfo)
     }
     private fun startAutoTurn() {
