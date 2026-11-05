@@ -1013,7 +1013,7 @@ internal object ReaderStrings {
         "{0} 공개 예정" to "Available {0}",
         "아직 공개되지 않은 회차입니다." to "This chapter is not available yet.",
         "다운로드하고 읽기" to "Download and read",
-        "새 글 알림 받기" to "Notify me of new stories",
+        "새 글 알림 받기" to "Enable new episode notifications",
         "새 글 알림" to "New story notifications",
         "새로 출간된 책" to "New books",
         "알림 연결 다시 확인" to "Retry notification setup",
@@ -1055,6 +1055,10 @@ internal object ReaderStrings {
         "현재 회차로 돌아가기" to "Return to current episode",
         "인터넷 연결을 확인하고 다시 시도해 주세요." to "Check your internet connection and try again.",
         "작품 정보를 확인하지 못했습니다. 도서에서 작품 정보를 다시 확인해 주세요." to "Could not find the work information. Please check this work in Books.",
+        "즐겨찾기한 작품입니다" to "This work is in your favorites",
+        "작품 즐겨찾기" to "Favorite this work",
+        "작품 정보 다시 확인" to "Retry work information",
+        "작품을 즐겨찾기하면 새 회차 알림을 받을 수 있어요. 알림은 설정에서 켤 수 있어요." to "Favorite this work to receive new episode notifications. You can enable notifications in Settings.",
     )
     val ja = mapOf(
         "앱을 준비하지 못했습니다. 기존 책과 기록은 삭제하지 않았습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요." to "アプリを起動できませんでした。本と記録は保持されています。空き容量を確認して、もう一度お試しください。",
@@ -2066,7 +2070,7 @@ internal object ReaderStrings {
         "{0} 공개 예정" to "{0} 公開予定",
         "아직 공개되지 않은 회차입니다." to "この話はまだ公開されていません。",
         "다운로드하고 읽기" to "ダウンロードして読む",
-        "새 글 알림 받기" to "新しいお話の通知を受け取る",
+        "새 글 알림 받기" to "新しい話の通知を受け取る",
         "새 글 알림" to "新着通知",
         "새로 출간된 책" to "新しく公開された本",
         "알림 연결 다시 확인" to "通知の接続を再確認",
@@ -2108,6 +2112,10 @@ internal object ReaderStrings {
         "현재 회차로 돌아가기" to "今の話に戻る",
         "인터넷 연결을 확인하고 다시 시도해 주세요." to "インターネット接続を確認して、もう一度お試しください。",
         "작품 정보를 확인하지 못했습니다. 도서에서 작품 정보를 다시 확인해 주세요." to "作品情報を確認できませんでした。「本」で作品情報を確認してください。",
+        "즐겨찾기한 작품입니다" to "お気に入りに登録済みです",
+        "작품 즐겨찾기" to "作品をお気に入りに追加",
+        "작품 정보 다시 확인" to "作品情報を再確認",
+        "작품을 즐겨찾기하면 새 회차 알림을 받을 수 있어요. 알림은 설정에서 켤 수 있어요." to "作品をお気に入りに登録すると、新しい話の通知を受け取れます。通知は設定で有効にできます。",
     )
 }
 internal fun L(key: String, vararg arguments: Any?): String {

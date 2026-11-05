@@ -4036,8 +4036,8 @@
     "ja": "ダウンロードして読む"
   },
   "새 글 알림 받기": {
-    "en": "Notify me of new stories",
-    "ja": "新しいお話の通知を受け取る"
+    "en": "Enable new episode notifications",
+    "ja": "新しい話の通知を受け取る"
   },
   "새 글 알림": {
     "en": "New story notifications",
@@ -4202,5 +4202,21 @@
   "작품 정보를 확인하지 못했습니다. 도서에서 작품 정보를 다시 확인해 주세요.": {
     "en": "Could not find the work information. Please check this work in Books.",
     "ja": "作品情報を確認できませんでした。「本」で作品情報を確認してください。"
+  },
+  "즐겨찾기한 작품입니다": {
+    "en": "This work is in your favorites",
+    "ja": "お気に入りに登録済みです"
+  },
+  "작품 즐겨찾기": {
+    "en": "Favorite this work",
+    "ja": "作品をお気に入りに追加"
+  },
+  "작품 정보 다시 확인": {
+    "en": "Retry work information",
+    "ja": "作品情報を再確認"
+  },
+  "작품을 즐겨찾기하면 새 회차 알림을 받을 수 있어요. 알림은 설정에서 켤 수 있어요.": {
+    "en": "Favorite this work to receive new episode notifications. You can enable notifications in Settings.",
+    "ja": "作品をお気に入りに登録すると、新しい話の通知を受け取れます。通知は設定で有効にできます。"
   }
 }

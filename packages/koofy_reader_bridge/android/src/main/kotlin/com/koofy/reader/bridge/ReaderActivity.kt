@@ -222,8 +222,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         session.request.nextBookTitle?.let {
             nextBookButton = button(session.request.nextBookLabel ?: L("다음 회차 읽기")) {
                 stopAutoTurn()
-                if (toolsReady()) closeReader(nextBook = true)
+                if (atBookEnd && toolsReady()) closeReader(nextBook = true)
             }
+            nextBookButton?.visibility = View.GONE
             navigation.addView(nextBookButton)
         }
         translation = ReaderTranslation(this,
@@ -484,6 +485,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 checkpoint.put("locations", locations)
                 session.locatorJson = checkpoint.toString()
                 updateLocationStatus(saved)
+                nextBookButton?.visibility = if (atBookEnd) View.VISIBLE else View.GONE
                 nextBookButton?.text = session.request.nextBookLabel ?: L("다음 회차 읽기")
                 if (atBookEnd) {
                     stopAutoTurn()

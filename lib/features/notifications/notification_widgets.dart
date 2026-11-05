@@ -8,11 +8,26 @@ import 'package:koofy_reader/features/catalog/presentation/open_catalog_book.dar
 import 'package:koofy_reader/features/catalog/presentation/series_catalog.dart';
 import 'reader_notifications.dart';
 
+/// Explicit user action only; preserve an existing OS refusal.
+Future<void> enableReaderStoryNotifications(ReaderNotifications service) async {
+  if (service.asked && !service.allowed) {
+    await service.openSettings();
+  } else {
+    await service.enableNotifications();
+  }
+}
+
 /// The same star is used by catalog covers and work details.
 class FavoriteButton extends ConsumerStatefulWidget {
-  const FavoriteButton({super.key, required this.item, this.showLabel = false});
+  const FavoriteButton({
+    super.key,
+    required this.item,
+    this.showLabel = false,
+    this.addOnly = false,
+  });
   final CatalogItem item;
   final bool showLabel;
+  final bool addOnly;
   @override
   ConsumerState<FavoriteButton> createState() => _FavoriteButtonState();
 }
@@ -25,7 +40,7 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
     try {
       await service.initialize();
       await service.reconcile([widget.item]);
-      final next = !service.isFavorite(widget.item);
+      final next = widget.addOnly || !service.isFavorite(widget.item);
       await service.setFavorite(
         notificationBase(widget.item),
         widget.item.title,
@@ -50,11 +65,7 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
           ),
         );
         if (enable == true) {
-          if (service.asked && !service.allowed) {
-            await service.openSettings();
-          } else {
-            await service.enableNotifications();
-          }
+          await enableReaderStoryNotifications(service);
         }
       }
     } catch (e) {
@@ -74,14 +85,18 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
     ref.watch(readerNotificationsChangesProvider);
     final service = ref.watch(readerNotificationsProvider);
     final selected = service.isFavorite(widget.item);
-    final label = tr(selected ? '즐겨찾기 해제' : '즐겨찾기 추가');
+    final label = tr(
+      widget.addOnly
+          ? (selected ? '즐겨찾기한 작품입니다' : '작품 즐겨찾기')
+          : (selected ? '즐겨찾기 해제' : '즐겨찾기 추가'),
+    );
     final icon = Icon(
       selected ? Icons.star_rounded : Icons.star_outline_rounded,
     );
     if (widget.showLabel) {
       return TextButton.icon(
         key: ValueKey('favorite-detail-${widget.item.id}'),
-        onPressed: _busy ? null : _toggle,
+        onPressed: _busy || (widget.addOnly && selected) ? null : _toggle,
         icon: icon,
         label: Text(label),
       );
@@ -90,7 +105,7 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
       key: ValueKey('favorite-${widget.item.id}'),
       tooltip: label,
       isSelected: selected,
-      onPressed: _busy ? null : _toggle,
+      onPressed: _busy || (widget.addOnly && selected) ? null : _toggle,
       icon: icon,
       style: IconButton.styleFrom(
         backgroundColor: Theme.of(
@@ -113,10 +128,8 @@ class NotificationSettingsPage extends ConsumerWidget {
       try {
         if (!value) {
           await service.disableNotifications();
-        } else if (service.asked && !service.allowed) {
-          await service.openSettings();
         } else {
-          await service.enableNotifications();
+          await enableReaderStoryNotifications(service);
         }
       } catch (e) {
         if (context.mounted) {

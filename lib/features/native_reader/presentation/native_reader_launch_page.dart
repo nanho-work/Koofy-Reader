@@ -1,4 +1,5 @@
 import 'package:koofy_reader/features/notifications/reader_notifications.dart';
+import 'package:koofy_reader/features/notifications/upcoming_episode_notice.dart';
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/features/reading_diary/data/reading_diary.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
@@ -421,9 +422,10 @@ class _NativeReaderLaunchPageState
           final date = result.item!.releaseAt.isNotEmpty
               ? result.item!.releaseAt
               : result.item!.releaseDate;
-          await _nextNotice(
-            tr('공개 예정'),
-            tr('{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.', [
+          await showUpcomingEpisodeNotice(
+            context,
+            result.item!,
+            message: tr('{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.', [
               date.replaceAll('T', ' ').replaceAll(':00+09:00', ''),
             ]),
           );

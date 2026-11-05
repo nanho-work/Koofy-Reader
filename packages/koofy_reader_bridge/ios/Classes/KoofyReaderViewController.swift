@@ -1239,11 +1239,6 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         bookmarkItem = bookmarks
         navigationItem.rightBarButtonItems = [settings, contents, tools, bookmarks]
         updateBookmarkItem()
-        if request.nextBookTitle != nil {
-            let next = UIBarButtonItem(title: request.nextBookLabel ?? L("다음 회차 읽기"), style: .plain,
-                target: self, action: #selector(nextBookTapped))
-            navigationItem.rightBarButtonItems?.append(next)
-        }
         // Keep the navigation bar height stable across preference changes.
         navigationItem.prompt = nil
         applyChromeTheme()
@@ -1252,7 +1247,7 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
     @objc private func nextBookTapped() {
         stopAutoTurn()
         speech?.pause()
-        guard isReady, !isClosing, !turnBusy, presentedViewController == nil, request.nextBookTitle != nil else { return }
+        guard isReady, atBookEnd, !isClosing, !turnBusy, presentedViewController == nil, request.nextBookTitle != nil else { return }
         // Persist and ACK the current locator before Flutter resolves the next
         // local/server episode and shows the shared download confirmation.
         close(nextBook: true) { _ in }
