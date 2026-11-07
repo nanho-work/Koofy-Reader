@@ -7,11 +7,18 @@ import 'package:koofy_reader/features/library/domain/bundled_books.dart';
 enum NextReadingKind { local, download, upcoming, waiting, completed }
 
 class NextReading {
-  const NextReading(this.kind, {this.book, this.item, this.groupEnd = false});
+  const NextReading(
+    this.kind, {
+    this.book,
+    this.item,
+    this.groupEnd = false,
+    this.afterEpisode,
+  });
   final NextReadingKind kind;
   final Book? book;
   final CatalogItem? item;
   final bool groupEnd;
+  final int? afterEpisode;
 }
 
 /// One continuation policy for both native viewers. Local collections use only
@@ -89,7 +96,7 @@ class NextReadingResolver {
     List<BookGroup> groups,
   ) async {
     final personalGroups = groups
-        .where((group) => !group.id.startsWith('group_monthly_'))
+        .where((group) => group.catalogSeriesId == null)
         .toList();
     if (!hasRemoteSource(current) ||
         personalGroups.any((group) => group.bookIds.contains(current.id))) {
@@ -149,6 +156,7 @@ class NextReadingResolver {
       return NextReading(
         item.upcoming ? NextReadingKind.upcoming : NextReadingKind.download,
         item: item,
+        afterEpisode: number,
       );
     }
     final works = await catalog.completeItems('book', language: language);

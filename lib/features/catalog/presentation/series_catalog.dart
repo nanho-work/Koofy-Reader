@@ -286,8 +286,9 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                       item: episode,
                       installed: received,
                       onOpen:
-                          !episode.upcoming &&
-                              (received || series.issueMonth.isNotEmpty) &&
+                          (received ||
+                                  (!episode.upcoming &&
+                                      series.issueMonth.isNotEmpty)) &&
                               !_opening
                           ? () => _read(episode)
                           : null,

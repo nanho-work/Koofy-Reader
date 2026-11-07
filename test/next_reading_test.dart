@@ -49,7 +49,7 @@ void main() {
     },
   );
   test(
-    'catalog sequence is not replaced by a partial automatic monthly group',
+    'catalog sequence survives partial automatic groups for serials and monthly issues',
     () async {
       final series = catalogFixture(10, kind: 'series');
       final first = catalogFixture(11, seriesId: series.id, episodeNumber: 1);
@@ -62,19 +62,21 @@ void main() {
       final catalog = FakeReaderCatalog([series, first, next, unrelated]);
       addTearDown(catalog.close);
       final current = downloaded(first, '/unused');
-      final result = await NextReadingResolver(catalog).resolve(
-        current,
-        [current, local('other')],
-        [
-          BookGroup(
-            id: 'group_monthly_${series.id}',
-            title: 'custom',
-            bookIds: [current.id, 'other'],
-          ),
-        ],
-      );
-      expect(result.kind, NextReadingKind.download);
-      expect(result.item?.id, next.id);
+      for (final monthly in [false, true]) {
+        final result = await NextReadingResolver(catalog).resolve(
+          current,
+          [current, local('other')],
+          [
+            BookGroup(
+              id: BookGroup.catalogId(series.id, monthly: monthly),
+              title: 'custom',
+              bookIds: [current.id, 'other'],
+            ),
+          ],
+        );
+        expect(result.kind, NextReadingKind.download);
+        expect(result.item?.id, next.id);
+      }
     },
   );
   test(

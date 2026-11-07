@@ -30,6 +30,12 @@ final rewardedAdServiceProvider = Provider<RewardedAdService>((ref) {
   return service;
 });
 
+final previewRewardedAdServiceProvider = Provider<RewardedAdService>((ref) {
+  final service = RewardedAdService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
 class RewardedAdService {
   RewardedAdService({
     Future<void> Function()? onReward,
@@ -45,10 +51,14 @@ class RewardedAdService {
   final LevelPlayRewardedAd Function() _createAd;
   final RewardCallbacks _callbacks;
   LevelPlayRewardedAd? _ad;
-  bool _showing = false;
+  static bool _showing = false;
   bool _disposed = false;
 
-  Future<bool?> show() async {
+  Future<bool?> show() => _show();
+
+  Future<bool?> showPreview(String attemptId) => _show(attemptId: attemptId);
+
+  Future<bool?> _show({String? attemptId}) async {
     if (_showing || _disposed) return null;
     _showing = true;
     try {
@@ -69,8 +79,18 @@ class RewardedAdService {
         _callbacks.finish(attempt);
         return null;
       }
-      await ad.showAd();
-      return await attempt.closed.future;
+      if (attemptId != null) await LevelPlay.setDynamicUserId(attemptId);
+      await ad.showAd(
+        placementName: attemptId == null ? null : 'next_episode_preview',
+      );
+      final rewarded = await attempt.closed.future.timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          _callbacks.finish(attempt);
+          return false;
+        },
+      );
+      return attemptId != null && attempt.auctionId == null ? null : rewarded;
     } catch (error) {
       _callbacks.cancelCurrent();
       debugPrint('LevelPlay reward unavailable: $error');

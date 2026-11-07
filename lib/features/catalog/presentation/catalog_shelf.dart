@@ -27,20 +27,21 @@ class CatalogShelfCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final locked = item.upcoming && !installed;
     final title = item.episodeNumber != null && item.episodeTitle != null
         ? tr('{0}화 · {1}', [item.episodeNumber, item.episodeTitle])
         : item.title;
     return Semantics(
-      button: !item.upcoming,
+      button: !locked,
       label: [
         title,
         if (item.kind == 'series') tr(item.seriesStatusLabel),
         if (installed) tr('다운로드 완료'),
-        if (item.upcoming) _releaseLabel(item),
+        if (locked) _releaseLabel(item),
       ].join(', '),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
-        onTap: item.upcoming ? null : onTap,
+        onTap: locked ? null : onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -59,7 +60,7 @@ class CatalogShelfCard extends StatelessWidget {
                       ],
                     ),
                     child: Opacity(
-                      opacity: item.upcoming ? .38 : 1,
+                      opacity: locked ? .38 : 1,
                       child: CatalogCover(
                         item: item,
                         width: constraints.maxWidth,
@@ -176,7 +177,7 @@ class CatalogShelfCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (item.upcoming)
+            if (locked)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(

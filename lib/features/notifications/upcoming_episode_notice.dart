@@ -8,11 +8,12 @@ import 'reader_notifications.dart';
 
 /// Resolve the work before saving a star: an episode ID must never become a
 /// work subscription. Monthly favorites retain the existing whole-corner key.
-Future<void> showUpcomingEpisodeNotice(
+Future<bool?> showUpcomingEpisodeNotice(
   BuildContext context,
   CatalogItem episode, {
   required String message,
-}) => showReaderDialog<void>(
+  String? previewAction,
+}) => showReaderDialog<bool>(
   context: context,
   builder: (dialogContext) => ReaderAlertDialog(
     title: Text(tr('공개 예정')),
@@ -22,6 +23,11 @@ Future<void> showUpcomingEpisodeNotice(
         onPressed: () => Navigator.pop(dialogContext),
         child: Text(tr('닫기')),
       ),
+      if (previewAction != null)
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(previewAction),
+        ),
     ],
   ),
 );

@@ -18,22 +18,30 @@ final groupCoverStoreProvider = Provider(
 );
 final bookGroupsProvider = FutureProvider<List<BookGroup>>((ref) async {
   final booksFuture = ref.watch(booksProvider.future);
-  final groupsFuture = ref.watch(bookGroupRepositoryProvider).load();
+  final repository = ref.watch(bookGroupRepositoryProvider);
   final covers = ref.watch(groupCoverStoreProvider);
-  final results = await Future.wait<Object>([booksFuture, groupsFuture]);
-  final books = results[0] as List<Book>;
-  final ids = books.map((book) => book.id).toSet();
-  final hiddenGroups = await LibraryTrashStore(
-    ref.read(localStorageProvider),
-  ).hiddenGroupIds();
-  final groups = (results[1] as List<BookGroup>)
+  final storage = ref.watch(localStorageProvider);
+  final books = await booksFuture;
+  final localBooks = {for (final book in books) book.id: book};
+  await repository.syncCatalogSeries(books);
+  final hiddenGroups = await LibraryTrashStore(storage).hiddenGroupIds();
+  final groups = (await repository.load())
       .where((group) => !hiddenGroups.contains(group.id))
       .map(
-        (group) =>
-            group.copyWith(bookIds: group.bookIds.where(ids.contains).toList()),
+        (group) => group.copyWith(
+          bookIds: group.bookIds.where(localBooks.containsKey).toList(),
+        ),
       )
       .toList();
-  final covered = await covers.apply(groups.map((g) => g.displayBook).toList());
+  final covered = await covers.apply([
+    for (final group in groups)
+      if (group.catalogSeriesId != null && group.bookIds.isNotEmpty)
+        group.displayBook.withCoverPath(
+          localBooks[group.bookIds.first]?.coverPath,
+        )
+      else
+        group.displayBook,
+  ]);
   return [
     for (var i = 0; i < groups.length; i++)
       groups[i].copyWith(coverPath: covered[i].coverPath),
@@ -53,6 +61,7 @@ class BookGroupRepository {
   BookGroupRepository(this.storage);
   final LocalStorage storage;
   static const storageKey = 'library_book_groups_v1';
+  static const _seriesMigrationKey = 'library_catalog_series_groups_v1';
   Future<T> _serial<T>(Future<T> Function() operation) =>
       LibraryMutations.run(operation);
 
@@ -83,10 +92,15 @@ class BookGroupRepository {
   Future<GroupChange> _change(
     void Function(List<BookGroup>) edit, {
     List<String> removed = const [],
+    bool skipUnchanged = false,
   }) => _serial(() async {
     final before = await storage.getString(storageKey);
     final groups = _decode(before);
+    final previousGroups = skipUnchanged ? jsonEncode(groups) : null;
     edit(groups);
+    if (previousGroups != null && previousGroups == jsonEncode(groups)) {
+      return GroupChange(before, before ?? '');
+    }
     final after = jsonEncode({
       'revision': _newId(),
       'groups': groups.map((g) => g.toJson()).toList(),
@@ -121,41 +135,86 @@ class BookGroupRepository {
     }
   }
 
-  /// One monthly shelf entry, retaining each episode's independent locator.
-  /// Never move a book out of a group the reader made themselves.
-  Future<GroupChange> addMonthlyEpisode(
-    String seriesId,
-    String title,
-    String bookId,
-    List<String> order,
-  ) => _change((groups) {
-    final id = 'group_monthly_$seriesId';
-    if (groups.any(
-      (group) => group.id != id && group.bookIds.contains(bookId),
-    )) {
+  /// Migrate existing series once. Later downloads add only that episode so
+  /// taking a book out of a bundle remains a reader choice.
+  Future<void> syncCatalogSeries(
+    List<Book> books, {
+    String? downloadedBookId,
+  }) => _serial(() async {
+    final migrating = downloadedBookId == null;
+    if (migrating && await storage.getString(_seriesMigrationKey) == 'done') {
       return;
     }
-    final index = groups.indexWhere((group) => group.id == id);
-    final old = index < 0 ? null : groups[index];
-    final ids = {...?old?.bookIds, bookId}.toList();
-    ids.sort((a, b) {
-      final ai = order.indexOf(a), bi = order.indexOf(b);
-      if (ai < 0 || bi < 0) return ai < 0 ? (bi < 0 ? a.compareTo(b) : 1) : -1;
-      return ai.compareTo(bi);
-    });
-    final group =
-        old?.copyWith(bookIds: ids) ??
-        BookGroup(
-          id: id,
-          title: title.length > 100 ? title.substring(0, 100) : title,
-          bookIds: ids,
-          showMemberCovers: true,
-        );
-    if (index < 0) {
-      groups.add(group);
-    } else {
-      groups[index] = group;
+
+    final episodes = <String, List<({Book book, int number, String title})>>{};
+    for (final book in books) {
+      final metadata = book.catalogMetadata;
+      final seriesId = metadata?['seriesId'];
+      final number = metadata?['episodeNumber'];
+      final title = metadata?['seriesTitle'];
+      final month = metadata?['issueMonth'];
+      final monthly = month is String && month.isNotEmpty;
+      if (seriesId is! String ||
+          seriesId.isEmpty ||
+          number is! int ||
+          (migrating && monthly)) {
+        continue;
+      }
+      final groupId = BookGroup.catalogId(seriesId, monthly: monthly);
+      episodes.putIfAbsent(groupId, () => []).add((
+        book: book,
+        number: number,
+        title: title is String && title.trim().isNotEmpty
+            ? title.trim()
+            : monthly
+            ? month
+            : book.title,
+      ));
     }
+    if (episodes.isNotEmpty) {
+      await _change((groups) {
+        final occupied = groups.expand((group) => group.bookIds).toSet();
+        for (final entry in episodes.entries) {
+          final additions = entry.value
+              .where(
+                (episode) =>
+                    (migrating || episode.book.id == downloadedBookId) &&
+                    !occupied.contains(episode.book.id),
+              )
+              .toList();
+          if (additions.isEmpty) continue;
+          final index = groups.indexWhere((group) => group.id == entry.key);
+          final old = index < 0 ? null : groups[index];
+          final order = {
+            for (final episode in entry.value) episode.book.id: episode.number,
+          };
+          final ids =
+              [...?old?.bookIds, ...additions.map((episode) => episode.book.id)]
+                ..sort((a, b) {
+                  final ai = order[a], bi = order[b];
+                  if (ai == null || bi == null) {
+                    return ai == null ? (bi == null ? a.compareTo(b) : 1) : -1;
+                  }
+                  final byNumber = ai.compareTo(bi);
+                  return byNumber == 0 ? a.compareTo(b) : byNumber;
+                });
+          if (old == null) {
+            final title = additions.first.title;
+            groups.add(
+              BookGroup(
+                id: entry.key,
+                title: title.length > 100 ? title.substring(0, 100) : title,
+                bookIds: ids,
+                showMemberCovers: true,
+              ),
+            );
+          } else {
+            groups[index] = old.copyWith(bookIds: ids);
+          }
+        }
+      }, skipUnchanged: true);
+    }
+    if (migrating) await storage.setString(_seriesMigrationKey, 'done');
   });
 
   Future<GroupChange> create(String title, List<String> ids, {String? id}) =>

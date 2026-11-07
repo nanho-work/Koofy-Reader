@@ -1,5 +1,6 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
+import 'package:koofy_reader/core/widgets/koofy_reader_wordmark.dart';
 import 'package:koofy_reader/core/widgets/selection_menu.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/reviews/data/reader_review_service.dart';
@@ -109,7 +110,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(bookImportControllerProvider);
-    ref.watch(monthlyGroupCoverSyncProvider);
+    ref.watch(catalogGroupCoverSyncProvider);
     Localizations.localeOf(
       context,
     ); // Rebuild app-owned labels when language changes.
@@ -138,7 +139,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           anchorPoint: Offset.zero,
           child: Builder(
             builder: (context) => Scaffold(
-              appBar: AppBar(toolbarHeight: 48, title: Text(tr("서재"))),
+              appBar: AppBar(
+                toolbarHeight: 48,
+                centerTitle: false,
+                title: KoofyReaderWordmark(semanticLabel: tr('서재')),
+              ),
               body: SafeArea(
                 top: false,
                 child: _body(

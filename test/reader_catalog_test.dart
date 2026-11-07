@@ -348,6 +348,40 @@ void main() {
     },
   );
   test(
+    'scheduled episode is installed only while its local file exists',
+    () async {
+      final item = CatalogItem.fromJson(
+        itemJson('book')
+          ..['upcoming'] = true
+          ..['seriesId'] = 'b' * 32
+          ..['episodeNumber'] = 2
+          ..['episodeTitle'] = '다음 화'
+          ..['assets'] = {'cover': asset('cover')},
+      );
+      expect(await catalog.isInstalled(item), isFalse);
+      expect(await catalog.installedKeys([item]), isEmpty);
+
+      final file = await File(
+        '${directory.path}/preview.epub',
+      ).writeAsBytes(files['epub']!);
+      await books.saveDownloadedBook(
+        Book.localFile(
+          id: item.bookId,
+          title: item.title,
+          author: item.author,
+          description: item.description,
+          localPath: file.path,
+        ),
+      );
+      expect(await catalog.isInstalled(item), isTrue);
+      expect(await catalog.installedKeys([item]), {catalogItemKey(item)});
+
+      await file.delete();
+      expect(await catalog.isInstalled(item), isFalse);
+      expect(await catalog.installedKeys([item]), isEmpty);
+    },
+  );
+  test(
     'checksum failure never registers incomplete book or leaves partial files',
     () async {
       corrupt = true;

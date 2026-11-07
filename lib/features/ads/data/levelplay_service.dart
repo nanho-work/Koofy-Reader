@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unity_levelplay_mediation/unity_levelplay_mediation.dart';
 import '../config/levelplay_ids.dart';
 import 'package:koofy_reader/features/privacy/data/privacy_service.dart';
+import 'preview_installation.dart';
 
 final levelPlayReadyProvider = FutureProvider<bool>(
   (ref) => LevelPlayService.instance.initialize(),
@@ -35,7 +36,9 @@ class LevelPlayService implements LevelPlayInitListener {
         });
       }
       await LevelPlay.init(
-        initRequest: LevelPlayInitRequest.builder(LevelPlayIds.appKey).build(),
+        initRequest: LevelPlayInitRequest.builder(
+          LevelPlayIds.appKey,
+        ).withUserId(await PreviewInstallation.levelPlayId()).build(),
         initListener: this,
       );
     } catch (error) {

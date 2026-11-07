@@ -21,6 +21,7 @@ import 'package:koofy_reader/features/library/data/library_reading_repository.da
 import 'package:koofy_reader/features/ads/config/levelplay_ids.dart';
 import 'package:koofy_reader/features/ads/data/levelplay_service.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
+import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_coordinator.dart';
 import 'package:koofy_reader/features/native_reader/application/native_reader_services.dart';
 import 'package:koofy_reader_bridge/koofy_reader_bridge.dart';
@@ -130,7 +131,7 @@ class _NativeReaderLaunchPageState
         for (final group in groups) {
           final index = group.bookIds.indexOf(_book.id);
           if (index >= 0) diaryGroup ??= group.displayBook;
-          if (index >= 0 && !group.id.startsWith('group_monthly_')) {
+          if (index >= 0 && group.catalogSeriesId == null) {
             _personalGroup = true;
             _nextBook = null;
             if (index + 1 < group.bookIds.length) {
@@ -379,56 +380,9 @@ class _NativeReaderLaunchPageState
         case NextReadingKind.local:
           next = result.book;
         case NextReadingKind.download:
-          final item = result.item!;
-          final accepted = await showReaderDialog<bool>(
-            context: context,
-            builder: (dialogContext) => ReaderAlertDialog(
-              title: Text(tr('다음 회차 무료로 읽기')),
-              content: Text(
-                tr('{0}을 무료로 다운로드한 뒤 바로 엽니다.', [
-                  item.episodeNumber != null && item.episodeTitle != null
-                      ? tr('{0}화 · {1}', [
-                          item.episodeNumber,
-                          item.episodeTitle,
-                        ])
-                      : item.title,
-                ]),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: Text(tr('취소')),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: Text(tr('다운로드 후 읽기')),
-                ),
-              ],
-            ),
-          );
-          if (accepted != true || !mounted || _leaveRequested) break;
-          setState(() {
-            _status = tr('다음 회차를 다운로드하고 있습니다…');
-            _continuationDownloadKey = catalogItemKey(item);
-          });
-          await ref.read(catalogDownloadProvider.notifier).download(item);
-          if (!mounted || _leaveRequested) return;
-          final installed = await ref.refresh(booksProvider.future);
-          next = await NextReadingResolver.existingBook(item, installed);
-          if (next == null) {
-            throw const CatalogException('다운로드하지 못했습니다. 다시 시도해 주세요.');
-          }
+          next = await _downloadNext(result.item!);
         case NextReadingKind.upcoming:
-          final date = result.item!.releaseAt.isNotEmpty
-              ? result.item!.releaseAt
-              : result.item!.releaseDate;
-          await showUpcomingEpisodeNotice(
-            context,
-            result.item!,
-            message: tr('{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.', [
-              date.replaceAll('T', ' ').replaceAll(':00+09:00', ''),
-            ]),
-          );
+          next = await _previewUpcoming(result.item!, result.afterEpisode);
         case NextReadingKind.waiting:
           await _nextNotice(tr('다음 회차 안내'), tr('다음 회차를 기다려 주세요'));
         case NextReadingKind.completed:
@@ -478,6 +432,154 @@ class _NativeReaderLaunchPageState
     }
     if (next != null) setState(() => _book = next!);
     await _open(); // Cancel/failure restores the exact saved last-page locator.
+  }
+
+  Future<Book?> _downloadNext(
+    CatalogItem item, {
+    GrantedEpisodePreview? preview,
+  }) async {
+    if (preview == null) {
+      final accepted = await showReaderDialog<bool>(
+        context: context,
+        builder: (dialogContext) => ReaderAlertDialog(
+          title: Text(tr('다음 회차 무료로 읽기')),
+          content: Text(
+            tr('{0}을 무료로 다운로드한 뒤 바로 엽니다.', [
+              item.episodeNumber != null && item.episodeTitle != null
+                  ? tr('{0}화 · {1}', [item.episodeNumber, item.episodeTitle])
+                  : item.title,
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(tr('취소')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(tr('다운로드 후 읽기')),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true) return null;
+    }
+    if (!mounted || _leaveRequested) return null;
+    setState(() {
+      _status = tr('다음 회차를 다운로드하고 있습니다…');
+      _continuationDownloadKey = catalogItemKey(item);
+    });
+    final downloads = ref.read(catalogDownloadProvider.notifier);
+    if (preview == null) {
+      await downloads.download(item);
+    } else {
+      await downloads.downloadPreview(preview);
+    }
+    if (!mounted || _leaveRequested) return null;
+    final installed = await ref.refresh(booksProvider.future);
+    final next = await NextReadingResolver.existingBook(item, installed);
+    if (next == null) {
+      throw const CatalogException('다운로드하지 못했습니다. 다시 시도해 주세요.');
+    }
+    return next;
+  }
+
+  Future<Book?> _previewUpcoming(CatalogItem item, int? afterEpisode) async {
+    final catalog = ref.read(readerCatalogProvider);
+    Future<EpisodePreviewResult> request(String action) => catalog
+        .episodePreview(item, action: action, afterEpisode: afterEpisode!);
+    EpisodePreviewResult? status;
+    if (afterEpisode != null && LevelPlayIds.supported) {
+      try {
+        status = await request('status').timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // The scheduled release notice is still available without this service.
+      }
+    }
+    if (!mounted || _leaveRequested) return null;
+    final released = status?.releasedItem;
+    if (released != null) return _downloadNext(released);
+    final date = item.releaseAt.isNotEmpty ? item.releaseAt : item.releaseDate;
+    final releaseNotice = tr('{0} 공개 예정입니다. 공개 후 무료로 읽을 수 있습니다.', [
+      date.replaceAll('T', ' ').replaceAll(':00+09:00', ''),
+    ]);
+    final previewAction = switch (status?.state) {
+      'available' => tr('광고 보고 미리 보기'),
+      'granted' => tr('미리 보기 계속'),
+      _ => null,
+    };
+    final accepted = await showUpcomingEpisodeNotice(
+      context,
+      item,
+      message: [
+        releaseNotice,
+        if (status?.state == 'available')
+          tr('광고를 끝까지 보면 바로 읽을 수 있어요. 미리 보기는 12시간에 한 번 이용할 수 있습니다.'),
+        if (status?.nextAt != null) _previewCooldown(status!.nextAt!),
+      ].join('\n\n'),
+      previewAction: previewAction,
+    );
+    if (accepted != true || !mounted || _leaveRequested) return null;
+    if (status?.state == 'available') {
+      final attempt = await request('begin');
+      if (!mounted || _leaveRequested) return null;
+      if (attempt.releasedItem case final released?) {
+        return _downloadNext(released);
+      }
+      if (attempt.nextAt case final nextAt?) {
+        await _nextNotice(tr('공개 예정'), _previewCooldown(nextAt));
+        return null;
+      }
+      if (attempt.attemptId case final attemptId?) {
+        final closed = await ref
+            .read(previewRewardedAdServiceProvider)
+            .showPreview(attemptId);
+        if (!mounted || _leaveRequested) return null;
+        if (closed == null) {
+          await _nextNotice(
+            tr('공개 예정'),
+            tr('지금은 광고를 재생할 수 없습니다. 잠시 후 다시 시도해 주세요. 독서는 계속할 수 있습니다.'),
+          );
+          return null;
+        }
+      } else if (attempt.state != 'granted') {
+        return null;
+      }
+    }
+    setState(() => _status = tr('광고 시청을 확인하고 있습니다…'));
+    final wait = Stopwatch()..start();
+    do {
+      final response = await request('claim').timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => throw const CatalogException(
+          '광고 시청 확인이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.',
+        ),
+      );
+      if (!mounted || _leaveRequested) return null;
+      if (response.releasedItem case final released?) {
+        return _downloadNext(released);
+      }
+      if (response.grant case final preview?) {
+        return _downloadNext(preview.item, preview: preview);
+      }
+      if (response.state != 'pending') break;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    } while (mounted &&
+        !_leaveRequested &&
+        wait.elapsed < const Duration(seconds: 12));
+    if (mounted && !_leaveRequested) {
+      await _nextNotice(
+        tr('공개 예정'),
+        tr('광고 시청이 확인되면 미리 보기를 계속할 수 있어요. 다음 회차에서 다시 확인해 주세요.'),
+      );
+    }
+    return null;
+  }
+
+  String _previewCooldown(DateTime nextAt) {
+    final local = nextAt.toLocal();
+    final date = local.toString().substring(0, 16);
+    return tr('{0}부터 광고 미리 보기를 다시 이용할 수 있어요.', [date]);
   }
 
   Future<void> _nextNotice(String title, String message) =>

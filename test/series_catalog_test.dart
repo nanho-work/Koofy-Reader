@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'package:koofy_reader/features/catalog/presentation/series_catalog.dart';
@@ -132,6 +133,48 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('series-back-to-books')));
       await tester.pumpAndSettle();
       expect(find.byType(SeriesCatalogRow), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'downloaded preview offers reading while other scheduled episodes stay locked',
+    (tester) async {
+      await initializeDateFormatting('ko');
+      final series = catalogFixture(200, kind: 'series', title: '작품');
+      CatalogItem scheduled(int number) {
+        final item = catalogFixture(
+          number,
+          title: '이야기 $number',
+          seriesId: series.id,
+          episodeNumber: number,
+        );
+        return CatalogItem.fromJson({
+          ...item.json,
+          'upcoming': true,
+          'releaseAt': '2099-11-04T09:00:00+09:00',
+          'assets': {'cover': (item.json['assets'] as Map)['cover']},
+        });
+      }
+
+      final downloaded = scheduled(1);
+      final locked = scheduled(2);
+      final catalog = FakeReaderCatalog([series, downloaded, locked]);
+      catalog.installed.add(catalogItemKey(downloaded));
+      await pumpSeries(tester, catalog, initialQuery: series.title);
+      expect(find.text('서재에 있음'), findsOneWidget);
+      expect(find.textContaining('공개 예정'), findsOneWidget);
+      await tester.tap(find.text('2화 · 이야기 2'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('book-download-${locked.id}')), findsNothing);
+
+      await tester.tap(find.text('1화 · 이야기 1'));
+      await tester.pumpAndSettle();
+      final read = find.byKey(ValueKey('book-download-${downloaded.id}'));
+      expect(
+        find.descendant(of: read, matching: find.text('읽기')),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(read).onPressed, isNotNull);
     },
   );
 

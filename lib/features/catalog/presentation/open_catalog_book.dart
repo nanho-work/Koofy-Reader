@@ -13,12 +13,14 @@ Future<void> openCatalogBook(
   CatalogItem item,
 ) async {
   try {
-    if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
     if (!ref.read(nativeReaderAvailableProvider)) {
       throw const CatalogException('독서 화면은 Android와 iOS 앱에서 사용할 수 있습니다.');
     }
     final repository = ref.read(readerCatalogProvider);
     if (!await repository.isInstalled(item)) {
+      if (item.upcoming) {
+        throw const CatalogException('아직 공개되지 않은 회차입니다.');
+      }
       if (!context.mounted) return;
       await ref.read(catalogDownloadProvider.notifier).download(item);
     }

@@ -102,6 +102,6 @@ class BookCatalogRow extends StatelessWidget {
     item: item,
     installed: installed,
     progress: progress,
-    onTap: item.upcoming ? null : () => _details(context),
+    onTap: () => _details(context),
   );
 }

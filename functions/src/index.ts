@@ -1,4 +1,5 @@
 import {readerStatistics} from './reader-statistics';
+import { episodePreview } from './episode-preview';
 import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
 import {compatibleEpisode, releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
@@ -16,7 +17,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, Transaction, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { onRequest, Request } from 'firebase-functions/v2/https';
-import { defineString } from 'firebase-functions/params';
+import { defineBoolean, defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { assertDraftDeletion, ApiError, Content, compilationReady, isReleased, catalogLanguage, contentLanguage, visibleInLanguage, assertRevision, bearer, categoryName, defaultCategories, episodeMetadata, id, kind, metadata, seriesMetadata, publicItem, publishedBookInfo, publish, replaceAsset, requireSuperAdmin, requireValue, revision, validateUpload } from './content';
 
@@ -34,6 +35,9 @@ function categoryList(data: FirebaseFirestore.DocumentData | undefined): string[
 }
 const origins = defineString('READER_ADMIN_ORIGINS', { default: 'https://admin.koofy.co.kr,http://localhost:3000' });
 const options = { region: 'asia-northeast3', maxInstances: 3, minInstances: 0, concurrency: 1, serviceAccount: 'koofy-reader-api@koofy-reader.iam.gserviceaccount.com', memory: '512MiB' as const, timeoutSeconds: 120, invoker: 'public' as const };
+const previewKeys = defineSecret('READER_EPISODE_PREVIEW_KEYS');
+const previewEnabled = defineBoolean('READER_EPISODE_PREVIEW_ENABLED', { default: false });
+const preview = episodePreview(db, bucket);
 
 function sendError(error: unknown, response: { status: (code: number) => { json: (value: unknown) => unknown } }) {
   if (error instanceof ApiError) response.status(error.status).json({ error: error.message });
@@ -553,6 +557,35 @@ export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '2
   } catch (error) { sendError(error, response); }
 });
 
+
+export const readerEpisodePreview = onRequest(
+  { ...options, concurrency: 20, memory: '256MiB', secrets: [previewKeys] },
+  async (request, response) => {
+    response.set('Cache-Control', 'no-store');
+    try {
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        response.status(405).end();
+        return;
+      }
+      const data = request.method === 'GET' ? request.query : body(request);
+      const platform = data.platform;
+      requireValue(platform === 'ios' || platform === 'android', '지원하지 않는 플랫폼입니다.');
+      const keys = JSON.parse(previewKeys.value()) as Record<string, unknown>;
+      const key = keys[String(platform)];
+      if (request.method === 'GET') {
+        requireValue(typeof key === 'string' && key.length > 0, 'Reward verification is unavailable.');
+        const eventId = await preview.reward(data, String(platform), key as string);
+        response.type('text/plain').send(`${eventId}:OK`);
+        return;
+      }
+      if (!previewEnabled.value() || typeof key !== 'string' || !key.length) {
+        response.json({ state: 'unavailable' });
+        return;
+      }
+      response.json(await preview.request(data));
+    } catch (error) { sendError(error, response); }
+  },
+);
 
 // No mobile update is needed when a new issue is finalized. Publish both documents atomically.
 export const readerMonthlyCompilation = onSchedule({

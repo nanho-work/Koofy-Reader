@@ -15,6 +15,20 @@ class BookGroup {
   final String? coverPath;
   final bool showMemberCovers;
 
+  static const _monthlyPrefix = 'group_monthly_';
+  static const _seriesPrefix = 'group_series_';
+
+  static String catalogId(String seriesId, {required bool monthly}) =>
+      '${monthly ? _monthlyPrefix : _seriesPrefix}$seriesId';
+
+  String? get catalogSeriesId {
+    if (id.startsWith(_monthlyPrefix)) {
+      return id.substring(_monthlyPrefix.length);
+    }
+    if (id.startsWith(_seriesPrefix)) return id.substring(_seriesPrefix.length);
+    return null;
+  }
+
   BookGroup copyWith({
     String? title,
     List<String>? bookIds,

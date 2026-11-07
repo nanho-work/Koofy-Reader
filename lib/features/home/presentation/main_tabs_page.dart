@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:koofy_reader/features/reading_diary/presentation/reading_diary_page.dart';
 import 'package:koofy_reader/features/settings/presentation/settings_page.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
+import 'package:koofy_reader/core/widgets/koofy_reader_wordmark.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'discovery_feed.dart';
@@ -180,26 +181,7 @@ class _DiscoveryPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Semantics(
-              label: 'Koofy Reader',
-              header: true,
-              image: true,
-              child: SizedBox(
-                width: 132,
-                height: 24,
-                child: ClipRect(
-                  child: OverflowBox(
-                    maxHeight: 48,
-                    child: Image.asset(
-                      'assets/images/promotions/koofy_reader_wordmark.png',
-                      width: 132,
-                      fit: BoxFit.fitWidth,
-                      excludeFromSemantics: true,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const KoofyReaderWordmark(),
             const SizedBox(height: 12),
             const DiscoveryFeed(),
           ],
@@ -239,10 +221,15 @@ class _BookstorePageState extends State<_BookstorePage> {
               if (sidebar)
                 SizedBox(
                   width: catalogSidebarWidth,
-                  child: Center(child: Text(tr('도서'))),
+                  child: Center(
+                    child: KoofyReaderWordmark(semanticLabel: tr('도서')),
+                  ),
                 )
               else ...[
-                Text(tr('도서')),
+                KoofyReaderWordmark(
+                  width: (availableWidth - 188).clamp(72.0, 132.0),
+                  semanticLabel: tr('도서'),
+                ),
                 const SizedBox(width: 12),
               ],
               Expanded(

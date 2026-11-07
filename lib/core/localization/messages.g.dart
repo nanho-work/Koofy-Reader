@@ -4219,5 +4219,37 @@ const messages = {
   "작품을 즐겨찾기하면 새 회차 알림을 받을 수 있어요. 알림은 설정에서 켤 수 있어요.": {
     "en": "Favorite this work to receive new episode notifications. You can enable notifications in Settings.",
     "ja": "作品をお気に入りに登録すると、新しい話の通知を受け取れます。通知は設定で有効にできます。"
+  },
+  "광고 보고 미리 보기": {
+    "en": "Watch an ad to preview",
+    "ja": "広告を見て先読み"
+  },
+  "미리 보기 계속": {
+    "en": "Continue preview",
+    "ja": "先読みを続ける"
+  },
+  "광고를 끝까지 보면 바로 읽을 수 있어요. 미리 보기는 12시간에 한 번 이용할 수 있습니다.": {
+    "en": "Watch the ad to the end to read this episode now. One preview is available every 12 hours.",
+    "ja": "広告を最後まで見ると、今すぐ読めます。先読みは12時間に1回利用できます。"
+  },
+  "광고 시청을 확인하고 있습니다…": {
+    "en": "Verifying ad completion…",
+    "ja": "広告の視聴を確認しています…"
+  },
+  "광고 시청 확인이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.": {
+    "en": "Ad verification is taking longer than expected. Please check again shortly.",
+    "ja": "広告の視聴確認に時間がかかっています。しばらくしてから再度ご確認ください。"
+  },
+  "광고 시청이 확인되면 미리 보기를 계속할 수 있어요. 다음 회차에서 다시 확인해 주세요.": {
+    "en": "You can continue once the ad is verified. Check the next episode again shortly.",
+    "ja": "広告の視聴が確認されると、先読みを続けられます。次のエピソードでもう一度ご確認ください。"
+  },
+  "{0}부터 광고 미리 보기를 다시 이용할 수 있어요.": {
+    "en": "Ad previews are available again from {0}.",
+    "ja": "{0}から広告での先読みを再び利用できます。"
+  },
+  "미리 보기 파일을 준비하지 못했습니다.": {
+    "en": "Could not prepare the preview files.",
+    "ja": "先読み用のファイルを準備できませんでした。"
   }
 };

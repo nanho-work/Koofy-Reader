@@ -27,6 +27,37 @@
 
 ## 개발 기기 검증
 
+### 다음 회차 광고 미리 보기
+
+1. LevelPlay의 쿠피리더 iOS·Android 앱 각각에 기존 Rewarded 광고 단위를 사용하는
+   `next_episode_preview` 배치를 만든다. 보상 이름은 `episode_preview`, 수량은 1로 설정한다.
+   12시간 제한은 서버에서 적용한다.
+2. 두 앱의 S2S 콜백 Private Key 값을 프로젝트 밖의 JSON 파일에
+   `{"ios":"iOS 키","android":"Android 키"}` 형태로 준비한다. 쿠피리더 프로젝트 루트에서
+   아래 명령으로 Firebase Secret Manager에 등록하고 함수를 배포한다.
+
+   ```sh
+   firebase functions:secrets:set READER_EPISODE_PREVIEW_KEYS --data-file /절대경로/preview-keys.json --project koofy-reader
+   firebase deploy --only functions:reader:readerEpisodePreview --project koofy-reader
+   ```
+
+3. LevelPlay에서 두 앱의 S2S 콜백에 같은 플랫폼별 Private Key를 입력하고 아래 URL을
+   사용한다. Android는 `platform=android`로 입력한다. Placement Name 항목이 자동으로
+   추가되는 경우 `placement=[PLACEMENT_NAME]`이 한 번만 들어가도록 확인한다.
+
+   ```text
+   https://asia-northeast3-koofy-reader.cloudfunctions.net/readerEpisodePreview?platform=ios&userId=[USER_ID]&eventId=[EVENT_ID]&rewards=[REWARDS]&placement=[PLACEMENT_NAME]
+   ```
+
+4. LevelPlay 콜백 테스트가 통과하면 `functions/.env.koofy-reader`에
+   `READER_EPISODE_PREVIEW_ENABLED=true`를 추가하고 위 배포 명령을 다시 실행한다.
+   테스트 기기에 새 앱을 설치하고 공개된 회차 마지막에서 다음 회차를 선택한다.
+   iPhone과 Android에서 각각 중도 종료, 완료 후 자동 열기, 다른 예정 회차의 12시간 제한을 확인한다.
+
+서버는 설치 단위로 광고 보상을 기록한다. 앱을 다시 열어도 서버의 제한이 유지된다.
+같은 회차의 보상이 이미 확인된 경우 미리 보기를 다시 이어갈 수 있다. 광고 보상 확인에는
+LevelPlay SDK의 `dynamicUserId`와 S2S 서명을 사용한다. [LevelPlay 콜백 설정](https://docs.unity.com/en-us/grow/levelplay/platform/settings/server-to-server-callback)
+
 ### 광고 미노출 안내 개선 (2026-09-27)
 
 - 서재와 Android/iOS 뷰어에서 로드·표시 실패는 `지금은 광고를 표시할 수 없습니다.`로 안내한다. 이 문구는 물량 부족을 확정하는 의미가 아니다. 공급 부족, 네트워크, 설정 오류는 SDK 오류 코드로 구분한다.

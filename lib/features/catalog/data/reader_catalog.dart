@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/ads/data/preview_installation.dart';
 import 'package:koofy_reader/features/library/data/book_group_repository.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
@@ -83,15 +84,15 @@ final catalogItemsProvider = FutureProvider.family<List<CatalogItem>, String>((
   return last;
 });
 
-// Repair old downloaded monthly groups without replacing personal cover choices.
-final monthlyGroupCoverSyncProvider = FutureProvider<void>((ref) async {
+// Fill in the work's cover after the local shelf is available.
+final catalogGroupCoverSyncProvider = FutureProvider<void>((ref) async {
   final groups = await ref.watch(bookGroupsProvider.future);
   final covers = ref.read(groupCoverStoreProvider);
   final pending = <String, String>{};
   for (final group in groups) {
-    if (group.id.startsWith('group_monthly_') &&
-        !await covers.hasSelection(group.id)) {
-      pending[group.id.substring('group_monthly_'.length)] = group.id;
+    final seriesId = group.catalogSeriesId;
+    if (seriesId != null && !await covers.hasSelection(group.id)) {
+      pending[seriesId] = group.id;
     }
   }
   if (pending.isEmpty) return;
@@ -109,7 +110,7 @@ final monthlyGroupCoverSyncProvider = FutureProvider<void>((ref) async {
         );
         for (final issue in page.items) {
           final groupId = pending[issue.id];
-          if (groupId == null || issue.issueMonth.isEmpty) continue;
+          if (groupId == null) continue;
           try {
             final file = await catalog.coverFile(issue);
             if (file == null) continue;
@@ -172,12 +173,17 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
   Future<void> _tail = Future.value();
   final _jobs = <String, Future<void>>{};
   void cancel() => ref.read(readerCatalogProvider).cancelInstall();
-  Future<void> download(CatalogItem item) {
+  Future<void> download(CatalogItem item) => _enqueue(item);
+
+  Future<void> downloadPreview(GrantedEpisodePreview preview) =>
+      _enqueue(preview.item, preview: preview);
+
+  Future<void> _enqueue(CatalogItem item, {GrantedEpisodePreview? preview}) {
     final key = catalogItemKey(item);
     if (_jobs.containsKey(key)) return _jobs[key]!;
     final job = _tail
         .catchError((Object _) {})
-        .then((_) => _performDownload(item));
+        .then((_) => _performDownload(item, preview: preview));
     _jobs[key] = job;
     if (state.busy) {
       state = CatalogDownloadState(
@@ -198,7 +204,10 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
     return job;
   }
 
-  Future<void> _performDownload(CatalogItem item) async {
+  Future<void> _performDownload(
+    CatalogItem item, {
+    GrantedEpisodePreview? preview,
+  }) async {
     if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
 
     final key = catalogItemKey(item);
@@ -213,38 +222,31 @@ class CatalogDownloadController extends Notifier<CatalogDownloadState> {
       result: 'start',
     );
     try {
-      await ref
-          .read(readerCatalogProvider)
-          .install(
-            item,
-            progress: (value) {
-              state = CatalogDownloadState(
-                itemKey: key,
-                title: item.title,
-                queued: (_jobs.length - 1).clamp(0, 999),
-                progress: value.clamp(0, 1),
-              );
-            },
-          );
-      if (item.seriesId != null && item.issueMonth.isNotEmpty) {
+      void progress(double value) {
+        state = CatalogDownloadState(
+          itemKey: key,
+          title: item.title,
+          queued: (_jobs.length - 1).clamp(0, 999),
+          progress: value.clamp(0, 1),
+        );
+      }
+
+      final catalog = ref.read(readerCatalogProvider);
+      if (preview == null) {
+        await catalog.install(item, progress: progress);
+      } else {
+        await catalog.installPreview(preview, progress: progress);
+      }
+      if (item.seriesId != null) {
         // Grouping failure must not roll back a successfully verified download.
         try {
-          final episodes = [
-            ...await ref
-                .read(readerCatalogProvider)
-                .completeItems('series:${item.seriesId}'),
-          ]..sort((a, b) => a.episodeNumber!.compareTo(b.episodeNumber!));
+          final books = await ref.read(bookRepositoryProvider).getBooks();
           await ref
               .read(bookGroupRepositoryProvider)
-              .addMonthlyEpisode(
-                item.seriesId!,
-                item.seriesTitle.isEmpty ? item.issueMonth : item.seriesTitle,
-                item.bookId,
-                episodes.map((episode) => episode.bookId).toList(),
-              );
+              .syncCatalogSeries(books, downloadedBookId: item.bookId);
           ref.invalidate(bookGroupsProvider);
         } catch (error) {
-          debugPrint('Monthly grouping deferred: $error');
+          debugPrint('Catalog grouping deferred: $error');
         }
       }
       ReaderAnalytics.instance.download(
@@ -421,6 +423,38 @@ class CatalogPage {
 
 /// Published catalog only. Download files are verified and renamed atomically
 /// before the library or native font manifest references them.
+class GrantedEpisodePreview {
+  GrantedEpisodePreview._(this.item, this._links);
+
+  final CatalogItem item;
+  final Map<String, dynamic> _links;
+}
+
+class EpisodePreviewResult {
+  EpisodePreviewResult._(Map<String, dynamic> json)
+    : state = json['state'] as String? ?? 'unavailable',
+      attemptId = json['attemptId'] as String?,
+      nextAt = json['nextAt'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['nextAt'] as int)
+          : null,
+      releasedItem = json['state'] == 'released'
+          ? CatalogItem.fromJson(json['item'] as Map<String, dynamic>)
+          : null,
+      grant =
+          json['state'] == 'granted' && json['links'] is Map<String, dynamic>
+          ? GrantedEpisodePreview._(
+              CatalogItem.fromJson(json['item'] as Map<String, dynamic>),
+              json['links'] as Map<String, dynamic>,
+            )
+          : null;
+
+  final String state;
+  final String? attemptId;
+  final DateTime? nextAt;
+  final CatalogItem? releasedItem;
+  final GrantedEpisodePreview? grant;
+}
+
 class ReaderCatalog {
   ReaderCatalog(
     this.books, {
@@ -596,13 +630,12 @@ class ReaderCatalog {
     Map<String, dynamic>? fonts;
     Directory? fontRoot;
     for (final item in items) {
-      if (item.upcoming) continue;
       if (item.kind == 'book') {
         final path = local[item.bookId]?.localPath;
         if (path != null && await File(path).exists()) {
           installed.add(catalogItemKey(item));
         }
-      } else if (item.kind == 'font') {
+      } else if (item.kind == 'font' && !item.upcoming) {
         fontRoot ??= await _root();
         fonts ??= await _fontManifest(fontRoot);
         if ((fonts['families'] as List).any(
@@ -634,20 +667,56 @@ class ReaderCatalog {
     );
   }
 
-  Future<Map<String, dynamic>> _fetchJson(Map<String, String> query) async {
+  Future<EpisodePreviewResult> episodePreview(
+    CatalogItem item, {
+    required String action,
+    required int afterEpisode,
+  }) async {
+    final path = endpoint.pathSegments;
+    if (path.isEmpty || path.last != 'readerCatalog') {
+      return EpisodePreviewResult._({});
+    }
+    final uri = endpoint.replace(
+      pathSegments: [...path.take(path.length - 1), 'readerEpisodePreview'],
+    );
+    final data = await _fetchJson(
+      const {},
+      uri: uri,
+      payload: {
+        'action': action,
+        'episodeId': item.id,
+        'afterEpisode': afterEpisode,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'credential': await PreviewInstallation.credential(),
+      },
+    );
+    return EpisodePreviewResult._(data);
+  }
+
+  Future<Map<String, dynamic>> _fetchJson(
+    Map<String, String> query, {
+    Uri? uri,
+    Map<String, dynamic>? payload,
+  }) async {
     try {
-      if (endpoint.scheme != 'https' &&
+      final url = (uri ?? endpoint).replace(queryParameters: query);
+      if (url.scheme != 'https' &&
           !(kDebugMode &&
               const [
                 'localhost',
                 '127.0.0.1',
                 '10.0.2.2',
-              ].contains(endpoint.host))) {
+              ].contains(url.host))) {
         throw const CatalogException('안전한 다운로드 서버 주소가 필요합니다.');
       }
       final request = await _client
-          .getUrl(endpoint.replace(queryParameters: query))
+          .openUrl(payload == null ? 'GET' : 'POST', url)
           .timeout(const Duration(seconds: 20));
+      if (payload != null) {
+        request.followRedirects = false;
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(payload));
+      }
       final response = await request.close().timeout(
         const Duration(seconds: 30),
       );
@@ -722,15 +791,15 @@ class ReaderCatalog {
   }
 
   Future<bool> isInstalled(CatalogItem item) async {
-    if (item.upcoming) return false;
     if (item.kind == 'series') return false;
     if (item.kind == 'book') {
-      final matches = (await books.getBooks()).where(
-        (book) => book.id == item.bookId,
-      );
-      return matches.isNotEmpty &&
-          await File(matches.first.localPath!).exists();
+      final path = (await books.getBooks())
+          .where((book) => book.id == item.bookId)
+          .firstOrNull
+          ?.localPath;
+      return path != null && await File(path).exists();
     }
+    if (item.upcoming) return false;
     final root = await _root();
     final manifest = await _fontManifest(root);
     return (manifest['families'] as List).any(
@@ -750,6 +819,7 @@ class ReaderCatalog {
     Directory directory,
     void Function(int) received, {
     CatalogAsset? previewAsset,
+    Map<String, dynamic>? signedInfo,
   }) {
     final key =
         '${directory.path}/${(previewAsset ?? item.assets[slot]!).filename}';
@@ -762,6 +832,7 @@ class ReaderCatalog {
             directory,
             received,
             previewAsset: previewAsset,
+            signedInfo: signedInfo,
           ).whenComplete(() {
             _downloads.remove(key);
           }),
@@ -774,6 +845,7 @@ class ReaderCatalog {
     Directory directory,
     void Function(int) received, {
     CatalogAsset? previewAsset,
+    Map<String, dynamic>? signedInfo,
   }) async {
     final asset = previewAsset ?? item.assets[slot]!;
     await directory.create(recursive: true);
@@ -784,12 +856,14 @@ class ReaderCatalog {
       received(asset.size);
       return target;
     }
-    final info = await _json({
-      'action': 'download',
-      'id': item.id,
-      'version': '${item.version}',
-      'slot': slot,
-    });
+    final info =
+        signedInfo ??
+        await _json({
+          'action': 'download',
+          'id': item.id,
+          'version': '${item.version}',
+          'slot': slot,
+        });
     if (info['sha256'] != asset.sha || info['size'] != asset.size) {
       throw const CatalogException('파일이 변경되었습니다. 목록을 새로고침해 주세요.');
     }
@@ -893,8 +967,17 @@ class ReaderCatalog {
     });
   }
 
-  Future<void> install(
+  Future<void> install(CatalogItem item, {void Function(double)? progress}) =>
+      _install(item, progress: progress);
+
+  Future<void> installPreview(
+    GrantedEpisodePreview preview, {
+    void Function(double)? progress,
+  }) => _install(preview.item, preview: preview, progress: progress);
+
+  Future<void> _install(
     CatalogItem item, {
+    GrantedEpisodePreview? preview,
     void Function(double)? progress,
   }) async {
     if (item.upcoming) throw const CatalogException('아직 공개되지 않은 회차입니다.');
@@ -914,10 +997,14 @@ class ReaderCatalog {
       final files = <String, File>{};
       for (final slot in item.assets.keys) {
         _checkCancelled(item);
+        final signedInfo = preview?._links[slot] as Map<String, dynamic>?;
+        if (preview != null && signedInfo == null) {
+          throw const CatalogException('미리 보기 파일을 준비하지 못했습니다.');
+        }
         files[slot] = await _download(item, slot, folder, (bytes) {
           count += bytes;
           progress?.call(count / item.totalSize);
-        });
+        }, signedInfo: signedInfo);
       }
       _checkCancelled(item);
       if (item.kind == 'book') {

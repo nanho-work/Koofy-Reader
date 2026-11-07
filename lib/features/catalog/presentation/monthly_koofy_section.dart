@@ -64,7 +64,7 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
         ref.read(readerCatalogProvider).forceRefresh(kind);
       }
     }
-    ref.invalidate(monthlyGroupCoverSyncProvider);
+    ref.invalidate(catalogGroupCoverSyncProvider);
     ref.invalidate(catalogItemsProvider('monthly'));
     ref.invalidate(catalogItemsProvider('book'));
     ref.invalidate(catalogItemsProvider('series'));
