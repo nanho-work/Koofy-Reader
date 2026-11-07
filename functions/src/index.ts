@@ -1,3 +1,4 @@
+import {readerStatistics} from './reader-statistics';
 import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
 import {compatibleEpisode, releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
@@ -275,6 +276,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     catch { throw new ApiError(401, '관리자 인증이 만료되었거나 올바르지 않습니다. 다시 로그인해 주세요.'); }
     requireSuperAdmin({ superAdmin: claims.superAdmin });
     if (request.method === 'GET') {
+      if (request.query.action === 'statistics') { response.json(await readerStatistics(request.query.source, request.query.days, request.query.platform)); return; }
       if (request.query.action === 'works') { response.json(await adminWorks(request.query.kind, request.query.after, request.query.scope)); return; }
       if (request.query.action === 'work') {
         const item = await getItem(id(request.query.id));
