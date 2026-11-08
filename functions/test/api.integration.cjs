@@ -503,7 +503,7 @@ test('scheduled chapter previews opt in and cannot expose future body downloads'
   assert.equal((await fetch(base + download + '&slot=cover')).status, 200);
 });
 
-test('Koofy Story exposes only opted-in, released content and its current published revision', async () => {
+test('Koofy Story lists opted-in schedules without exposing their assets or reading links', async () => {
   const cover = await require('sharp')({ create: { width: 12, height: 16, channels: 3, background: '#f8f6ef' } }).png().toBuffer();
   const metadata = { title: 'Web Story test', author: 'Test', description: '', license: 'Test fixture only', language: 'ja' };
   const change = async (action, input, status = 200, jwt) => {
@@ -537,6 +537,7 @@ test('Koofy Story exposes only opted-in, released content and its current publis
   let chapterOne = await chapter(1);
   const chapterTwo = await chapter(2);
   const scheduled = await chapter(3, '2099-01-01');
+  const privateScheduled = await chapter(4, '2099-01-02');
   await change('setWebPublication', setting(chapterOne, true), 403, token('slimestrikeforce', false));
   assert.equal((await view('work', parent.id)).status, 404);
 
@@ -550,7 +551,9 @@ test('Koofy Story exposes only opted-in, released content and its current publis
   assert.ok(!(await (await view('list', undefined, undefined, 'ko')).json()).works.some(work => work.id === parent.id));
   const detail = await (await view('work', parent.id)).json();
   assert.deepEqual(detail.episodes.map(episode => episode.id), [chapterOne.id]);
-  for (const privateChapter of [chapterTwo, scheduled]) {
+  assert.deepEqual(detail.upcomingEpisodes, [{ id: scheduled.id, title: 'Chapter 3', number: 3, scheduledAt: '2099-01-01' }]);
+  assert.equal((await (await view('episode', parent.id, chapterOne.id)).json()).next, null);
+  for (const privateChapter of [chapterTwo, scheduled, privateScheduled]) {
     assert.equal((await view('episode', parent.id, privateChapter.id)).status, 404);
     assert.equal((await view('cover', parent.id, privateChapter.id)).status, 404);
   }

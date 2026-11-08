@@ -9,13 +9,17 @@ type Bucket = ReturnType<ReturnType<typeof getStorage>['bucket']>;
 type LiveContent = Content & { publishedContent: Snapshot };
 type Language = ReturnType<typeof contentLanguage>;
 
-function released(item: Content | undefined, language: Language, now: Date): item is LiveContent {
-  return !!(item?.published && !item.deleting && item.publishedContent && isReleased(item, now) &&
+function publishedInLanguage(item: Content | undefined, language: Language): item is LiveContent {
+  return !!(item?.published && !item.deleting && item.publishedContent &&
     contentLanguage(item.publishedContent.language) === language);
 }
 
-function webEpisode(item: Content | undefined, language: Language, now: Date): item is LiveContent {
-  return item?.kind === 'book' && item.webPublic === true && released(item, language, now);
+function released(item: Content | undefined, language: Language, now: Date): item is LiveContent {
+  return publishedInLanguage(item, language) && isReleased(item, now);
+}
+
+function webEpisode(item: Content | undefined, language: Language): item is LiveContent {
+  return item?.kind === 'book' && item.webPublic === true && publishedInLanguage(item, language);
 }
 
 function publicStoryItem(item: LiveContent) {
@@ -57,7 +61,7 @@ export function storyCatalog(db: Firestore, bucket: Bucket) {
     const now = new Date();
     const language = contentLanguage(request.query.language);
     const action = request.query.action || 'list';
-    const visible = (item: Content | undefined): item is LiveContent => webEpisode(item, language, now);
+    const visible = (item: Content | undefined): item is LiveContent => webEpisode(item, language) && isReleased(item, now);
 
     if (action === 'list') {
       const documents = await contents.where('webPublic', '==', true).select('id', 'kind', 'published', 'deleting', 'webPublic',
@@ -97,15 +101,25 @@ export function storyCatalog(db: Firestore, bucket: Bucket) {
     if (!released(work, language, now)) throw missing();
     const episodeId = request.query.episode === undefined ? undefined : id(request.query.episode);
     let episodes: LiveContent[];
+    let upcomingEpisodes: { id: string; title: string; number: number | null; scheduledAt: string }[] = [];
     if (work.kind === 'series') {
       if (action === 'cover' && episodeId) {
         const episode = await get(episodeId);
         episodes = visible(episode) && episode.publishedContent.seriesId === work.id ? [episode] : [];
       } else {
         const docs = await contents.where('seriesId', '==', work.id).where('webPublic', '==', true).get();
-        episodes = docs.docs.map(doc => doc.data() as Content).filter(visible)
+        const chapters = docs.docs.map(doc => doc.data() as Content).filter(item => webEpisode(item, language))
           .filter(item => item.publishedContent.seriesId === work.id)
           .sort((a, b) => (a.publishedContent.episodeNumber ?? 0) - (b.publishedContent.episodeNumber ?? 0) || a.id.localeCompare(b.id));
+        episodes = chapters.filter(visible);
+        if (action === 'work') {
+          upcomingEpisodes = chapters.flatMap(chapter => {
+            const { title, episodeNumber, releaseAt, releaseDate } = chapter.publishedContent;
+            const scheduledAt = releaseAt || releaseDate;
+            if (!scheduledAt || isReleased(chapter, now)) return [];
+            return [{ id: chapter.id, title, number: episodeNumber ?? null, scheduledAt }];
+          });
+        }
       }
     } else {
       if (!visible(work) || work.publishedContent.seriesId) throw missing();
@@ -114,7 +128,7 @@ export function storyCatalog(db: Firestore, bucket: Bucket) {
     if (!episodes.length) throw missing();
 
     if (action === 'work') {
-      response.json({ work: workDetails(work, episodes), episodes: episodes.map(episodeDetails) });
+      response.json({ work: workDetails(work, episodes), episodes: episodes.map(episodeDetails), upcomingEpisodes });
       return;
     }
 
