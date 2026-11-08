@@ -1,4 +1,6 @@
 import {readerStatistics} from './reader-statistics';
+import { prepareStoryBody } from './story-body';
+import { storyCatalog } from './story-catalog';
 import { episodePreview } from './episode-preview';
 import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
@@ -454,6 +456,29 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     if (action === 'delete') {
       response.json(await deleteContent(contentId, expected, claims.uid, data.draftOnly === true)); return;
     }
+    if (action === 'setWebPublication') {
+      requireValue(typeof data.enabled === 'boolean', '웹 공개 상태를 선택해 주세요.');
+      const enabled = data.enabled;
+      if (enabled) {
+        const item = await getItem(contentId);
+        assertRevision(item, expected);
+        requireValue(item.kind === 'book' && item.published && !item.deleting && item.publishedContent, '앱에서 공개 또는 예약한 도서만 웹 공개를 설정할 수 있습니다.');
+        await prepareStoryBody(bucket, contentId, item.publishedContent);
+      }
+      const result = await db.runTransaction(async transaction => {
+        const ref = contents.doc(contentId);
+        const item = (await transaction.get(ref)).data() as Content | undefined;
+        if (!item) throw new ApiError(404, '콘텐츠를 찾을 수 없습니다.');
+        assertRevision(item, expected);
+        requireValue(item.kind === 'book' && !item.deleting, '도서 또는 회차의 웹 공개만 변경할 수 있습니다.');
+        if ((item.webPublic === true) === enabled) return item;
+        transaction.update(ref, { webPublic: enabled });
+        transaction.create(db.collection('readerAudit').doc(), { contentId, uid: claims.uid, action, enabled, revision: item.revision, at: new Date().toISOString() });
+        return { ...item, webPublic: enabled };
+      });
+      response.json(result);
+      return;
+    }
     // Render before entering the Firestore transaction. Recheck revision when
     // committing so a concurrent rename/upload cannot publish a stale preview.
     if (action === 'publish') {
@@ -480,7 +505,9 @@ export const readerAdmin = onRequest(options, async (request, response) => {
       }
       let next: Content;
       try {
-        next = await change(contentId, expected, claims.uid, action, async (_, transaction) => {
+        if (item.webPublic === true) await prepareStoryBody(bucket, contentId, snapshot);
+        next = await change(contentId, expected, claims.uid, action, async (currentItem, transaction) => {
+          if ((currentItem.webPublic === true) !== (item.webPublic === true)) throw new ApiError(409, '웹 공개 설정이 바뀌었습니다. 다시 공개해 주세요.');
           if (parent) {
             const current = await seriesInTransaction(transaction, parent.id);
             assertRevision(current, parent.revision);
@@ -517,7 +544,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
           await reserveEpisode(transaction, item.id, parent.id, fields.episodeNumber!, item.episodeNumber);
           return fields;
         }
-        case 'unpublish': return { published: false };
+        case 'unpublish': return { published: false, webPublic: false };
         case 'removeAsset': {
           requireValue(typeof data.slot === 'string' && Object.hasOwn(item.assets, data.slot), '등록된 파일이 없습니다.');
           const assets = { ...item.assets }; delete assets[data.slot]; return { assets };
@@ -526,6 +553,12 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     });
     response.json(next);
   } catch (error) { sendError(error, response); }
+});
+
+const serveStory = storyCatalog(db, bucket);
+export const readerStory = onRequest({ ...options, concurrency: 8 }, async (request, response) => {
+  try { await serveStory(request, response); }
+  catch (error) { sendError(error, response); }
 });
 
 export const readerCatalog = onRequest({ ...options, concurrency: 20, memory: '256MiB', cors: true }, async (request, response) => {

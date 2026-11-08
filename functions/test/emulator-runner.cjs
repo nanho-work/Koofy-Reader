@@ -10,7 +10,7 @@ process.chdir(path.resolve(__dirname, '../..'));
 // Signing is an IAM integration tested only after cloud deployment.
 const { File } = require('@google-cloud/storage');
 mock.method(File.prototype, 'getSignedUrl', async function () { return ['https://storage.googleapis.com/emulator-only/' + encodeURIComponent(this.name)]; });
-const { readerAdmin, readerCatalog } = require('../lib/src/index.js');
+const { readerAdmin, readerCatalog, readerStory } = require('../lib/src/index.js');
 const app = express();
 app.use(express.raw({ type: () => true, limit: '25mb' }));
 app.use((req, res, next) => {
@@ -20,6 +20,7 @@ app.use((req, res, next) => {
 });
 app.all('/demo-koofy-reader/asia-northeast3/readerAdmin', readerAdmin);
 app.all('/demo-koofy-reader/asia-northeast3/readerCatalog', readerCatalog);
+app.all('/demo-koofy-reader/asia-northeast3/readerStory', readerStory);
 let server;
 before(async () => {
   const { getApp } = require('firebase-admin/app');

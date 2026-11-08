@@ -25,6 +25,7 @@ export interface Content extends Metadata {
   id: string; kind: Kind; revision: number; assets: Record<string, Asset>;
   published: boolean; publishedContent: Snapshot | null; updatedAt: string;
   compilationError?: string; deleting?: boolean;
+  webPublic?: boolean;
 }
 export function kind(value: unknown): Kind {
   requireValue(value === 'book' || value === 'font' || value === 'series', '콘텐츠 종류를 확인해 주세요.');
@@ -269,7 +270,7 @@ function inspectMarkup(value: unknown) {
 
 // Inspect every ZIP entry without extracting it to disk. Bounded decompression
 // prevents a small compressed upload from exhausting the function's memory.
-async function inspectEpub(bytes: Buffer): Promise<void> {
+export async function inspectEpub(bytes: Buffer) {
   const entryNames = new Set<string>();
   const files = await new Promise<Map<string, Buffer>>((resolve, reject) => {
     yauzl.fromBuffer(bytes, { lazyEntries: true, validateEntrySizes: true }, (error, zip) => {
@@ -366,7 +367,7 @@ async function inspectEpub(bytes: Buffer): Promise<void> {
     if (/\.(xhtml|html|htm|svg)$/i.test(name)) inspectMarkup(parse(data));
     else if (/\.css$/i.test(name)) inspectCss(text(data));
   }
-
+  return { files, spinePaths: spine.filter(item => item['@_linear'] !== 'no').map(item => localEpubPath(base, manifest.get(item['@_idref'])['@_href'])), text };
 }
 export function inspectFont(bytes: Buffer): 'otf' | 'ttf' {
   requireValue(bytes.length >= 12, '글꼴 파일이 너무 짧습니다.');

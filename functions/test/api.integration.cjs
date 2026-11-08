@@ -502,3 +502,68 @@ test('scheduled chapter previews opt in and cannot expose future body downloads'
   assert.equal((await fetch(base + download + '&slot=txt')).status, 400);
   assert.equal((await fetch(base + download + '&slot=cover')).status, 200);
 });
+
+test('Koofy Story exposes only opted-in, released content and its current published revision', async () => {
+  const cover = await require('sharp')({ create: { width: 12, height: 16, channels: 3, background: '#f8f6ef' } }).png().toBuffer();
+  const metadata = { title: 'Web Story test', author: 'Test', description: '', license: 'Test fixture only', language: 'ja' };
+  const change = async (action, input, status = 200, jwt) => {
+    const result = await api(action, input, jwt);
+    assert.equal(result.status, status, JSON.stringify(result.body));
+    return result.body;
+  };
+  const upload = async (item, slot, bytes) => {
+    const response = await fetch(base + `readerAdmin?action=upload&id=${item.id}&revision=${item.revision}&slot=${slot}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' }, body: bytes,
+    });
+    const data = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(data));
+    return data;
+  };
+  const publish = item => change('publish', { id: item.id, revision: item.revision });
+  const setting = (item, enabled) => ({ id: item.id, revision: item.revision, enabled });
+  const view = (action, work, episode, language = 'ja') => fetch(base + 'readerStory?' + new URLSearchParams({
+    action, language, ...(work ? { work } : {}), ...(episode ? { episode } : {}),
+  }));
+
+  const parentDraft = await change('create', { kind: 'series', metadata }, 201);
+  const parent = await publish(await upload(parentDraft, 'cover', cover));
+  async function chapter(episodeNumber, releaseDate) {
+    const draft = await change('create', { kind: 'book', seriesId: parent.id, metadata: {
+      ...metadata, title: `Chapter ${episodeNumber}`, episodeNumber, ...(releaseDate ? { releaseDate } : {}),
+    } }, 201);
+    await change('setWebPublication', setting(draft, true), 400);
+    return publish(await upload(draft, 'txt', Buffer.from(`Chapter ${episodeNumber}\n\nPublished body ${episodeNumber}`)));
+  }
+  let chapterOne = await chapter(1);
+  const chapterTwo = await chapter(2);
+  const scheduled = await chapter(3, '2099-01-01');
+  await change('setWebPublication', setting(chapterOne, true), 403, token('slimestrikeforce', false));
+  assert.equal((await view('work', parent.id)).status, 404);
+
+  const enabled = await change('setWebPublication', setting(chapterOne, true));
+  assert.equal(enabled.revision, chapterOne.revision);
+  assert.equal(enabled.publishedContent.version, chapterOne.publishedContent.version);
+  chapterOne = enabled;
+  await change('setWebPublication', setting(scheduled, true));
+  const catalog = await (await view('list')).json();
+  assert.equal(catalog.works.find(work => work.id === parent.id).episodeCount, 1);
+  assert.ok(!(await (await view('list', undefined, undefined, 'ko')).json()).works.some(work => work.id === parent.id));
+  const detail = await (await view('work', parent.id)).json();
+  assert.deepEqual(detail.episodes.map(episode => episode.id), [chapterOne.id]);
+  for (const privateChapter of [chapterTwo, scheduled]) {
+    assert.equal((await view('episode', parent.id, privateChapter.id)).status, 404);
+    assert.equal((await view('cover', parent.id, privateChapter.id)).status, 404);
+  }
+  assert.equal((await view('cover', parent.id)).status, 200);
+
+  chapterOne = await upload(chapterOne, 'txt', Buffer.from('Updated draft body'));
+  const oldReading = await view('episode', parent.id, chapterOne.id);
+  assert.equal(oldReading.headers.get('cache-control'), 'no-store');
+  assert.deepEqual((await oldReading.json()).blocks, [{ type: 'paragraph', text: 'Published body 1' }]);
+  chapterOne = await publish(chapterOne);
+  assert.deepEqual((await (await view('episode', parent.id, chapterOne.id)).json()).blocks, [{ type: 'paragraph', text: 'Updated draft body' }]);
+  chapterOne = await change('setWebPublication', setting(chapterOne, false));
+  assert.equal((await view('episode', parent.id, chapterOne.id)).status, 404);
+  assert.equal((await view('work', parent.id)).status, 404);
+  assert.ok(!(await (await view('list')).json()).works.some(work => work.id === parent.id));
+});
