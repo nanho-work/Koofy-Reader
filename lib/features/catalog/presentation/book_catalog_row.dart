@@ -17,6 +17,7 @@ class BookCatalogRow extends StatelessWidget {
     this.onOpen,
     this.readingLabel,
     this.isNew = false,
+    this.episodeLayout = false,
   });
   final CatalogItem item;
   final bool installed;
@@ -24,6 +25,7 @@ class BookCatalogRow extends StatelessWidget {
   final VoidCallback? onDownload, onOpen;
   final String? readingLabel;
   final bool isNew;
+  final bool episodeLayout;
 
   void _details(BuildContext context) {
     showReaderDialog<void>(
@@ -102,6 +104,7 @@ class BookCatalogRow extends StatelessWidget {
     item: item,
     installed: installed,
     progress: progress,
+    episodeLayout: episodeLayout,
     onTap: () => _details(context),
   );
 }

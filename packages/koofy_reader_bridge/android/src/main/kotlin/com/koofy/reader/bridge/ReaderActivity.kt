@@ -87,6 +87,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private var speechFollowJob: Job? = null
     private var bannerFooter: ReaderBannerFooter? = null
     private var chromeVisible = true
+    private var showEndFooter = false
+    private var initialChromeHide: Job? = null
+    private var atBookStart = false
+    private lateinit var previousPageButton: Button
     private lateinit var container: FragmentContainerView
     private lateinit var turnHost: ReaderTurnHost
     private lateinit var previewContainer: FragmentContainerView
@@ -108,6 +112,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     private lateinit var autoButton: Button
     private var atBookEnd = false
     private var hasCompletedBook = false
+    private lateinit var nextPageButton: Button
     private var nextBookButton: Button? = null
     private var initialTarget: Locator? = null
     private var restoreTarget: Locator? = null
@@ -174,7 +179,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         bookmarkButton = iconButton(R.drawable.reader_bookmark, L("책갈피")) { showReaderTools() }.apply { tag = "reader.bookmarks" }
         toolbar.addView(bookmarkButton)
         toolbar.addView(iconButton(android.R.drawable.ic_menu_manage, L("독서 설정")) { showSettings() })
-        page.addView(toolbar, LinearLayout.LayoutParams(-1, dp(52)))
+
         container = FragmentContainerView(this).apply { id = View.generateViewId() }
         previewContainer = FragmentContainerView(this).apply {
             id = View.generateViewId()
@@ -195,7 +200,10 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             bottomMargin = dp(24)
         })
         turnHost.addView(curlView, FrameLayout.LayoutParams(-1, -1))
-        page.addView(turnHost, LinearLayout.LayoutParams(-1, 0, 1f))
+        val readingArea = FrameLayout(this)
+        page.addView(readingArea, LinearLayout.LayoutParams(-1, 0, 1f))
+        readingArea.addView(turnHost, FrameLayout.LayoutParams(-1, -1))
+        readingArea.addView(toolbar, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         returnButton = button("↶") { returnToReading() }.apply {
             contentDescription = L("이동 전 위치로"); isEnabled = false; visibility = View.GONE
@@ -208,7 +216,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             contentDescription = L("자동 넘김 일시정지"); visibility = View.GONE
         }
         navigation.addView(autoButton)
-        navigation.addView(button("‹ " + L("이전")) { pageTurns?.request(false) })
+        previousPageButton = button("‹ " + L("이전")) { pageTurns?.request(false) }
+        navigation.addView(previousPageButton)
         status = TextView(this).apply {
             text = L("책을 여는 중…")
             gravity = Gravity.CENTER
@@ -218,14 +227,24 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             setTextColor(Color.rgb(60, 50, 40))
         }
         navigation.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-        navigation.addView(button(L("다음") + " ›") { pageTurns?.request(true) })
-        session.request.nextBookTitle?.let {
-            nextBookButton = button(session.request.nextBookLabel ?: L("다음 회차 읽기")) {
+        nextPageButton = button(L("다음") + " ›") {
+            if (!atBookEnd) pageTurns?.request(true)
+        }
+        navigation.addView(nextPageButton)
+        val nextLabel = session.request.nextBookLabel
+            ?: session.request.nextBookTitle?.let { L("다음 화 읽기") }
+        if (nextLabel != null) {
+            val nextTitle = session.request.nextBookTitle
+            nextBookButton = button(listOfNotNull(nextLabel, nextTitle).joinToString("\n")) {
                 stopAutoTurn()
                 if (atBookEnd && toolsReady()) closeReader(nextBook = true)
+            }.apply {
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                contentDescription = listOfNotNull(nextLabel, nextTitle).joinToString(", ")
+                visibility = View.GONE
             }
-            nextBookButton?.visibility = View.GONE
-            navigation.addView(nextBookButton)
+            navigation.addView(nextBookButton, LinearLayout.LayoutParams(0, -1, 1f))
         }
         translation = ReaderTranslation(this,
             sample = { script -> if (session.ready && !session.closing && !layoutPending) navigator?.evaluateJavascript(script) else null },
@@ -234,7 +253,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             onClose = { toggleTranslation() }).also {
                 page.addView(it.view, LinearLayout.LayoutParams(-1, dp(220)))
             }
-        page.addView(navigation, LinearLayout.LayoutParams(-1, dp(48)))
+        readingArea.addView(navigation, FrameLayout.LayoutParams(-1, dp(48), Gravity.BOTTOM))
         bannerFooter = ReaderBannerFooter(this, session.request.bannerAdUnitId, session.adHiddenUntilEpochMs, onAdInteraction = { stopAutoTurn(); speech?.pause(); translation?.stopVoice() }, beforeResize = {
             if (session.ready && !session.closing) scheduleRelayout()
         }).also {
@@ -474,6 +493,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 val kind = if (!session.ready) "ready" else "locationChanged"
                 session.ready = true
                 openingTimeout?.cancel()
+                atBookStart = snapshot.optBoolean("resourceStart", false) &&
+                    publication?.readingOrder?.firstOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
+                val wasAtBookEnd = atBookEnd
                 atBookEnd = snapshot.optBoolean("resourceEnd", false) &&
                     publication?.readingOrder?.lastOrNull()?.url()?.removeFragment() == locator.href.removeFragment()
                 hasCompletedBook = hasCompletedBook || atBookEnd
@@ -485,12 +507,13 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                 checkpoint.put("locations", locations)
                 session.locatorJson = checkpoint.toString()
                 updateLocationStatus(saved)
+                if (wasAtBookEnd != atBookEnd) showEndFooter = atBookEnd
+                previousPageButton.visibility = if (atBookStart) View.GONE else View.VISIBLE
+                nextPageButton.visibility = if (atBookStart || atBookEnd) View.GONE else View.VISIBLE
                 nextBookButton?.visibility = if (atBookEnd) View.VISIBLE else View.GONE
-                nextBookButton?.text = session.request.nextBookLabel ?: L("다음 회차 읽기")
-                if (atBookEnd) {
-                    stopAutoTurn()
-                    nextBookButton?.contentDescription = L("다음 권 {0} 이어서 읽기", session.request.nextBookTitle)
-                } else nextBookButton?.contentDescription = L("다음 권 {0}", session.request.nextBookTitle)
+                updateChrome()
+                if (kind == "ready") scheduleInitialChromeHide()
+                if (atBookEnd) stopAutoTurn()
                 if (autoRunning) scheduleAutoTurn()
                 emit(kind)
                 if (kind == "ready") usage(if (hasWindowFocus()) "reading_overlay_resume" else "reading_overlay_pause")
@@ -643,7 +666,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             { toggleTranslation() }, translation?.enabled == true, { canShowSpread() },
             { listeningMode = true; translation?.stopVoice(); speech?.toggle(); updateSpeechControls() },
             { speech?.pause(); listeningMode = false; updateSpeechControls() },
-            { closeReader(manageFonts = true) }, { updateSpeechControls() }, { autoRunning }, { if (autoRunning) stopAutoTurn() else startAutoTurn() }, { readerFonts.preview(it) }, readerBounds = { android.graphics.Rect().also { page.getGlobalVisibleRect(it) } }).also { it.show() }
+            { updateSpeechControls() }, { autoRunning }, { if (autoRunning) stopAutoTurn() else startAutoTurn() }, { readerFonts.preview(it) }, readerBounds = { android.graphics.Rect().also { page.getGlobalVisibleRect(it) } }).also { it.show() }
     }
 
     private fun toggleTranslation() {
@@ -655,17 +678,65 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         lifecycleScope.launch { navigator?.evaluateJavascript("window.getSelection().removeAllRanges();") }
         if (panel.enabled) panel.disable() else panel.enable()
         turnHost.translationMode = panel.enabled
-        toolbar.visibility = View.VISIBLE; navigation.visibility = View.VISIBLE; chromeVisible = true
+        initialChromeHide?.cancel()
+        chromeVisible = true
+        updateChrome()
         panel.palette(ReaderPalette.forTheme(session.preferences.theme))
         updateAutoControl()
     }
 
+    private fun scheduleInitialChromeHide() {
+        val accessibility = getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        if (!chromeVisible || accessibility?.isTouchExplorationEnabled == true) return
+        initialChromeHide = lifecycleScope.launch {
+            delay(2_000)
+            if (session.closing || loadingFailed || turnHost.selecting ||
+                accessibility?.isTouchExplorationEnabled == true) return@launch
+            chromeVisible = false
+            updateChrome(animate = true)
+        }
+    }
+
     private fun toggleChrome() {
+        initialChromeHide?.cancel()
+        if (chromeVisible && atBookEnd) showEndFooter = false
         chromeVisible = !chromeVisible
-        // INVISIBLE retains the navigator's exact viewport, so a menu tap cannot repaginate.
-        toolbar.visibility = if (chromeVisible) View.VISIBLE else View.INVISIBLE
-        navigation.visibility = if (chromeVisible) View.VISIBLE else View.INVISIBLE
+        updateChrome(animate = true)
+    }
+
+    private fun updateChrome(animate: Boolean = false) {
+        animateChrome(toolbar, chromeVisible, -1f, animate)
+        val showFooter = (chromeVisible && !atBookStart) || (atBookEnd && (chromeVisible || showEndFooter))
+        animateChrome(navigation, showFooter, 1f, animate)
         updateSpeechControls()
+    }
+
+    private fun animateChrome(bar: View, visible: Boolean, direction: Float, animate: Boolean) {
+        val accessibility = if (visible) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+            else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        if (bar.importantForAccessibility == accessibility &&
+            (bar.visibility == View.VISIBLE) == visible && bar.alpha == 1f && bar.translationY == 0f) return
+        bar.animate().cancel()
+        bar.importantForAccessibility = accessibility
+        if (!animate || bar.height == 0 || (android.os.Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled())) {
+            bar.alpha = 1f
+            bar.translationY = 0f
+            bar.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+            return
+        }
+        if (!visible) {
+            if (bar.visibility == View.VISIBLE) {
+                bar.animate().translationY(direction * bar.height).alpha(0f).setDuration(180)
+                    .withEndAction { bar.visibility = View.INVISIBLE }.start()
+            }
+            return
+        }
+        if (bar.visibility != View.VISIBLE) {
+            bar.translationY = direction * bar.height
+            bar.alpha = 0f
+        }
+        bar.visibility = View.VISIBLE
+        bar.animate().translationY(0f).alpha(1f).setDuration(180).start()
     }
 
     @Suppress("DEPRECATION")
@@ -691,6 +762,8 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             if (view is TextView) view.setTextColor(palette.foreground)
             if (view is ViewGroup) for (i in 0 until view.childCount) tint(view.getChildAt(i))
         }
+        toolbar.setBackgroundColor(palette.background)
+        navigation.setBackgroundColor(palette.background)
         tint(toolbar)
         tint(navigation)
         status.setTextColor(palette.secondary)
@@ -722,7 +795,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         updateAutoControl()
         val transport = (listeningMode && !autoWasUsed) || speech?.playing == true || speech?.busy == true
         speechControls.visibility = if (transport) View.VISIBLE else View.GONE
-        status.visibility = if (transport) View.GONE else View.VISIBLE
+        updateProgressVisibility()
         for (i in 0..1) speechControls.getChildAt(i).isEnabled = speech?.playing == true && speech?.busy != true
         val rate = speech?.speed?.toString()?.removeSuffix(".0") ?: "1"
         val timer = speech?.timerMinutes ?: 0
@@ -760,14 +833,31 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
-        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN && autoRunning) scheduleAutoTurn()
+        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            if (autoRunning) scheduleAutoTurn()
+            if (initialChromeHide?.isActive == true) {
+                val bounds = android.graphics.Rect()
+                val x = event.x.toInt()
+                val y = event.y.toInt()
+                if ((toolbar.getGlobalVisibleRect(bounds) && bounds.contains(x, y)) ||
+                    (navigation.getGlobalVisibleRect(bounds) && bounds.contains(x, y))) {
+                    initialChromeHide?.cancel()
+                }
+            }
+        }
         return super.dispatchTouchEvent(event)
+    }
+    private fun updateProgressVisibility() {
+        status.visibility = if (speechControls.visibility == View.VISIBLE ||
+            (atBookEnd && nextBookButton != null)) View.GONE else View.VISIBLE
     }
     private fun updateLocationStatus(locator: Locator) {
         updateBookmarkButton()
         updateAutoControl()
+        updateProgressVisibility()
         status.text = if (isReaderDisplayCover(locator) && session.preferences.footerInfo != "none") L("표지")
-            else if (atBookEnd && session.preferences.footerInfo != "none") session.request.endOfBookMessage ?: "100%"
+            else if (atBookEnd && session.request.endOfBookMessage != null) session.request.endOfBookMessage
+            else if (atBookEnd && session.preferences.footerInfo != "none") "100%"
             else locationInfo.footer(locator, session.preferences.footerInfo)
     }
     private fun startAutoTurn() {
@@ -938,6 +1028,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
     }
 
     override fun onPause() {
+        initialChromeHide?.cancel()
         usage("reading_pause")
         stopAutoTurn()
         translation?.suspend()
@@ -985,7 +1076,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (::turnHost.isInitialized) turnHost.selecting = false
     }
 
-    fun closeReader(nextBook: Boolean = false, manageFonts: Boolean = false, downloadSeries: Boolean = false) {
+    fun closeReader(nextBook: Boolean = false, downloadSeries: Boolean = false) {
         if (!::session.isInitialized || session.closing) return
         speech?.pause()
         translation?.suspend()
@@ -999,7 +1090,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
             // If closing follows a settled page callback, finish its DOM read.
             // During a relayout retain the canonical pre-layout anchor.
             captureJob?.join()
-            ReaderRuntime.emit(session.event("closed", message = if (manageFonts) "manageFonts" else if (nextBook) "nextBook" else if (downloadSeries) "downloadSeries" else null)) { result ->
+            ReaderRuntime.emit(session.event("closed", message = if (nextBook) "nextBook" else if (downloadSeries) "downloadSeries" else null)) { result ->
                 if (result.isSuccess) {
                     if (ReaderRuntime.session === session) ReaderRuntime.session = null
                     finish()
@@ -1007,7 +1098,7 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
                     session.closing = false
                     ReaderAlert.Builder(this@ReaderActivity, ReaderPalette.forTheme(session.preferences.theme)).setTitle(L("읽기 기록 저장 실패"))
                         .setMessage(L("기기 저장 공간을 확인한 뒤 다시 시도해 주세요."))
-                        .setPositiveButton(L("다시 저장")) { _, _ -> closeReader(nextBook, manageFonts, downloadSeries) }
+                        .setPositiveButton(L("다시 저장")) { _, _ -> closeReader(nextBook, downloadSeries) }
                         .setNegativeButton(L("계속 읽기"), null).show()
                 }
             }
@@ -1038,6 +1129,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         if (loadingFailed || isFinishing) return
         speech?.pause()
         loadingFailed = true
+        initialChromeHide?.cancel()
+        chromeVisible = true
+        updateChrome()
         stopAutoTurn()
         restoreTimeout?.cancel()
         openingTimeout?.cancel()

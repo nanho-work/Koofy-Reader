@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:koofy_reader/core/theme/app_appearance.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,7 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koofy_reader/features/ads/data/ad_repository.dart';
 import 'package:koofy_reader/features/ads/data/rewarded_ad_service.dart';
 import 'package:koofy_reader/features/ads/domain/ad_state.dart';
+import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
+import 'package:koofy_reader/features/settings/presentation/cover_preview_option.dart';
 import 'package:koofy_reader/features/settings/presentation/settings_page.dart';
+import 'package:koofy_reader/features/settings/presentation/settings_choice_option.dart';
 
 class _Ads extends AdRepository {
   DateTime? until;
@@ -33,7 +37,12 @@ class _Reward extends RewardedAdService {
 }
 
 void main() {
-  Future<void> mount(WidgetTester tester, _Ads ads, _Reward reward) async {
+  Future<void> mount(
+    WidgetTester tester,
+    _Ads ads,
+    _Reward reward, {
+    bool openReward = false,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -50,12 +59,25 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byType(FilledButton),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
+    if (openReward) {
+      final rewardTile = find.text('광고 없이 읽기');
+      await tester.scrollUntilVisible(
+        rewardTile,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(rewardTile);
+      await tester.pumpAndSettle();
+      await tester.tap(rewardTile);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byType(FilledButton),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+    }
   }
 
   testWidgets(
@@ -67,6 +89,14 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, 1000));
       await tester.pumpAndSettle();
       expect(find.text('독서 배경'), findsOneWidget);
+      final language = tester.getCenter(find.text('언어'));
+      final languageValue = tester.getCenter(find.textContaining('기기 설정 · '));
+      expect(languageValue.dx, greaterThan(language.dx));
+      expect(languageValue.dy, closeTo(language.dy, 1));
+      final background = tester.getCenter(find.text('독서 배경'));
+      final backgroundValue = tester.getCenter(find.text('기기 설정'));
+      expect(backgroundValue.dx, greaterThan(background.dx));
+      expect(backgroundValue.dy, closeTo(background.dy, 1));
       await tester.tap(find.text('독서 배경'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('어둡게'));
@@ -81,11 +111,58 @@ void main() {
       await tester.tap(find.text('종이색'));
       await tester.pumpAndSettle();
       expect(AppAppearance.instance.selection, 'sepia');
-      await tester.tap(find.text('기기 설정 따르기'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SettingsChoiceOption),
+          matching: find.text('기기 설정'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(AppAppearance.instance.mode, ThemeMode.system);
       await tester.pumpWidget(const SizedBox.shrink());
     },
+  );
+
+  testWidgets(
+    'cover previews show and save the current choice',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await mount(tester, _Ads(), _Reward());
+      await tester.drag(find.byType(ListView), const Offset(0, 1000));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpAndSettle();
+      final entry = find.text('독서 화면에 표지 표시');
+      expect(
+        tester.renderObject<RenderParagraph>(entry).didExceedMaxLines,
+        isFalse,
+      );
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      bool selected(String label) => tester
+          .widget<CoverPreviewOption>(
+            find.ancestor(
+              of: find.text(label),
+              matching: find.byType(CoverPreviewOption),
+            ),
+          )
+          .selected;
+      expect(selected('표지 표시'), isTrue);
+      await tester.tap(find.text('표지 건너뛰기'));
+      await tester.pumpAndSettle();
+      expect(selected('표지 건너뛰기'), isTrue);
+      expect(
+        (await SharedPreferences.getInstance()).getInt(readerCoverSettingKey),
+        0,
+      );
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
   );
 
   for (final size in [const Size(390, 844), const Size(840, 900)]) {
@@ -142,7 +219,7 @@ void main() {
   ) async {
     final ads = _Ads();
     final reward = _Reward();
-    await mount(tester, ads, reward);
+    await mount(tester, ads, reward, openReward: true);
     expect(find.byType(FilledButton), findsOneWidget);
     await tester.ensureVisible(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
@@ -164,7 +241,7 @@ void main() {
     final expiry = DateTime.now().add(const Duration(hours: 5));
     final ads = _Ads()..until = expiry;
     final reward = _Reward();
-    await mount(tester, ads, reward);
+    await mount(tester, ads, reward, openReward: true);
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNull,
@@ -178,7 +255,7 @@ void main() {
   testWidgets('incomplete reward does not grant hidden time', (tester) async {
     final ads = _Ads();
     final reward = _Reward()..result = false;
-    await mount(tester, ads, reward);
+    await mount(tester, ads, reward, openReward: true);
     await tester.ensureVisible(find.text('광고 보고 4시간 광고 없이 읽기'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('광고 보고 4시간 광고 없이 읽기'));

@@ -5,7 +5,6 @@ final class ReaderSettingsViewController: UITableViewController {
     var onStartAuto: (() -> Void)?
     var onStartSpeech: (() -> Void)?
     var onEndSpeech: (() -> Void)?
-    var onManageFonts: (() -> Void)?
     var onSpeechVisibility: (() -> Void)?
     var canShowSpread: () -> Bool = { true }
     var previewFont: (String) -> UIFont? = { _ in nil }
@@ -133,7 +132,7 @@ final class ReaderSettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         let id = settingSection(section)
         guard expanded == id else { return 1 }
-        return 1 + [fontIds.count + 2, 2, 1, 1, 3, 2, 1, 4, 1][id]
+        return 1 + [fontIds.count + 1, 2, 1, 1, 3, 2, 1, 4, 1][id]
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         let id = settingSection(section)
@@ -253,15 +252,11 @@ final class ReaderSettingsViewController: UITableViewController {
             return cell
         }
         if settingSection(path.section) == 0 && row > 0 {
-            if row == fontIds.count + 1 {
-                cell.textLabel?.text = L("＋ 내 글꼴 추가·관리"); cell.accessoryType = .disclosureIndicator; cell.selectionStyle = .default
-            } else {
-                let index = row - 1, id = fontIds[row - 1]
-                cell.textLabel?.text = fontLabels[index] + "\n" + L("오늘도 한 페이지를 읽습니다.") + (id.hasPrefix("personal_") ? L(" · 내 글꼴") : id.hasPrefix("remote_") ? L(" · 다운로드") : "")
-                cell.textLabel?.font = previewFont(id) ?? .preferredFont(forTextStyle: .body)
-                let selected = fontIds.contains(preferences.fontId ?? "default") ? preferences.fontId ?? "default" : "default"
-                cell.accessoryType = id == selected ? .checkmark : .none; cell.selectionStyle = .default
-            }
+            let index = row - 1, id = fontIds[row - 1]
+            cell.textLabel?.text = fontLabels[index] + "\n" + L("오늘도 한 페이지를 읽습니다.") + (id.hasPrefix("personal_") ? L(" · 내 글꼴") : id.hasPrefix("remote_") ? L(" · 다운로드") : "")
+            cell.textLabel?.font = previewFont(id) ?? .preferredFont(forTextStyle: .body)
+            let selected = fontIds.contains(preferences.fontId ?? "default") ? preferences.fontId ?? "default" : "default"
+            cell.accessoryType = id == selected ? .checkmark : .none; cell.selectionStyle = .default
             cell.isUserInteractionEnabled = !busy
             return cell
         }
@@ -327,8 +322,7 @@ final class ReaderSettingsViewController: UITableViewController {
             return
         }
         if settingSection(path.section) == 0 && row > 0 {
-            if row == fontIds.count + 1 { onManageFonts?() }
-            else { update { $0.fontId = fontIds[row - 1] } }
+            update { $0.fontId = fontIds[row - 1] }
         }
     }
     private func choose(_ setting: Int, _ index: Int) {

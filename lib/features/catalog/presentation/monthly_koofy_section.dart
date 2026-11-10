@@ -1,6 +1,5 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
 import 'promotion_carousel.dart';
-import 'editorial_story.dart';
 import 'catalog_cover.dart';
 import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 import 'package:flutter/material.dart';
@@ -155,38 +154,36 @@ class _MonthlyKoofySectionState extends ConsumerState<MonthlyKoofySection>
     final download = ref.watch(catalogDownloadProvider);
     final states = ref.watch(libraryReadingStateProvider).valueOrNull;
     if (widget.editorial) {
+      final compilation = items
+          .where((item) => item.kind == 'book' && item.seriesId == null)
+          .firstOrNull;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PromotionCarousel(
             cards: [
               if (episode != null && issue != null)
-                EditorialStory(
+                PromotionCover(
                   key: ValueKey(episode.id),
-                  overlayTitle: true,
-                  eyebrow: issue.title,
-                  item: episode,
+                  item: issue,
+                  label: episode.episodeTitle ?? episode.title,
                   onTap: _opening ? null : () => _read(episode),
-                  overlayActions: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 12,
-                    children: [
-                      TextButton(
-                        onPressed: _opening ? null : () => _read(episode),
-                        child: Text(tr('읽기')),
-                      ),
-                      TextButton(
-                        onPressed: _opening
-                            ? null
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      ReaderSeriesPage(series: issue),
-                                ),
-                              ),
-                        child: Text(tr('이번 호 전체 보기')),
-                      ),
-                    ],
+                )
+              else if (compilation != null)
+                PromotionCover(
+                  key: ValueKey(compilation.id),
+                  item: compilation,
+                  onTap: _opening ? null : () => _read(compilation),
+                )
+              else
+                Card(
+                  key: const ValueKey('monthly-promotion-placeholder'),
+                  margin: EdgeInsets.zero,
+                  child: Semantics(
+                    label: tr('월간 쿠피'),
+                    child: const Center(
+                      child: Icon(Icons.auto_stories_outlined, size: 48),
+                    ),
                   ),
                 ),
               ...widget.promotions,

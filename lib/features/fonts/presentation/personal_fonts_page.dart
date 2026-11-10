@@ -97,8 +97,7 @@ class _PersonalFontsPageState extends State<PersonalFontsPage> {
       await preview.load();
       _loaded.add(family);
     }
-    final id = await widget.store.install(bytes, picked.name);
-    await widget.reader.setGlobalFont(id);
+    await widget.store.install(bytes, picked.name);
     await _reload();
   }
 
@@ -134,23 +133,11 @@ class _PersonalFontsPageState extends State<PersonalFontsPage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: Scaffold(
-      appBar: AppBar(
-        title: Text(tr("내 글꼴")),
-        actions: [
-          TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context),
-            child: Text(tr("독서로 돌아가기")),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(tr("내 글꼴"))),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            tr(
-              "기기에 있는 TTF·OTF 파일을 가져와 사용할 수 있습니다. 추가한 글꼴은 앱 안에 보관되며 모든 책에 적용됩니다.",
-            ),
-          ),
+          Text(tr("기기에 있는 TTF·OTF 글꼴을 추가한 뒤 독서 화면에서 선택할 수 있습니다.")),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _busy ? null : () => _run(_import),
@@ -184,12 +171,6 @@ class _PersonalFontsPageState extends State<PersonalFontsPage> {
                       ? Icons.check_circle
                       : Icons.text_fields,
                 ),
-                onTap: _busy
-                    ? null
-                    : () => _run(() async {
-                        await widget.reader.setGlobalFont(font['id'] as String);
-                        await _reload();
-                      }),
                 trailing: IconButton(
                   tooltip: tr("글꼴 삭제"),
                   onPressed: _busy ? null : () => _remove(font),

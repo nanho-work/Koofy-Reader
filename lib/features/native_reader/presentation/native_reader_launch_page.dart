@@ -6,9 +6,6 @@ import 'package:koofy_reader/features/analytics/data/reader_analytics.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/native_reader/application/next_reading.dart';
-import 'dart:io';
-import 'package:koofy_reader/features/fonts/data/personal_fonts.dart';
-import 'package:koofy_reader/features/fonts/presentation/personal_fonts_page.dart';
 import 'dart:async';
 import 'package:koofy_reader/features/settings/data/reader_cover_settings.dart';
 
@@ -58,12 +55,8 @@ class _NativeReaderLaunchPageState
   bool _closed = false;
   bool _popScheduled = false;
   late Book _book = widget.book;
-  Book? _nextBook;
   bool _continuing = false;
-  bool _catalogStandalone = false;
-  bool _personalGroup = false;
-  NextReading? _knownNext;
-  String? _knownNextFor;
+  bool _canContinue = false;
   String? _continuationDownloadKey;
 
   @override
@@ -106,51 +99,61 @@ class _NativeReaderLaunchPageState
         showRegisteredCover: showCover,
       );
       if (!mounted || _leaveRequested) return;
-      _nextBook = null;
-      _catalogStandalone = false;
-      _personalGroup = false;
-      if (_book.catalogMetadata != null) {
-        try {
-          final source = CatalogItem.fromJson(_book.catalogMetadata!);
-          if (source.bookId == _book.id) {
-            _catalogStandalone = source.seriesId == null;
-            _nextBook = (await NextReadingResolver.installedSuccessor(
-              source,
-              await ref.read(booksProvider.future),
-            ))?.book;
-          }
-        } catch (_) {
-          /* Legacy metadata must not prevent opening a local book. */
-        }
-      }
       Book? diaryGroup;
+      NextReading? following;
       try {
         final groups = await ref.read(bookGroupsProvider.future);
         if (!mounted || _leaveRequested) return;
-        final books = await ref.read(booksProvider.future);
-        for (final group in groups) {
-          final index = group.bookIds.indexOf(_book.id);
-          if (index >= 0) diaryGroup ??= group.displayBook;
-          if (index >= 0 && group.catalogSeriesId == null) {
-            _personalGroup = true;
-            _nextBook = null;
-            if (index + 1 < group.bookIds.length) {
-              final nextId = group.bookIds[index + 1];
-              final next = books.where((book) => book.id == nextId).firstOrNull;
-              if (next != null &&
-                  (!next.isLocalFile ||
-                      (next.localPath != null &&
-                          await File(next.localPath!).exists()))) {
-                _nextBook = next;
-              }
-            }
-            break;
+        diaryGroup = groups
+            .where((group) => group.bookIds.contains(_book.id))
+            .firstOrNull
+            ?.displayBook;
+        following = await NextReadingResolver(ref.read(readerCatalogProvider))
+            .resolve(_book, await ref.read(booksProvider.future), groups)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // An unavailable catalog must not prevent opening a saved book.
+      }
+      EpisodePreviewResult? preview;
+      if (following?.kind == NextReadingKind.upcoming &&
+          LevelPlayIds.supported) {
+        final afterEpisode = following!.afterEpisode;
+        if (afterEpisode != null && mounted && !_leaveRequested) {
+          try {
+            preview = await ref
+                .read(readerCatalogProvider)
+                .episodePreview(
+                  following.item!,
+                  action: 'status',
+                  afterEpisode: afterEpisode,
+                )
+                .timeout(const Duration(seconds: 1));
+          } catch (_) {
+            // The release notice remains available if preview status is unknown.
           }
         }
-      } catch (_) {
-        // Broken optional group metadata must not prevent reading this book.
-        _nextBook = null;
       }
+      final nextTitle = following?.book?.title ?? following?.item?.title;
+      final nextLabel = switch (following?.kind) {
+        NextReadingKind.local || NextReadingKind.download => tr('다음 화 읽기'),
+        NextReadingKind.upcoming => switch (preview?.state) {
+          'available' => tr('광고 보고 미리 보기'),
+          'granted' => tr('미리 보기 계속'),
+          'released' => tr('다음 화 읽기'),
+          _ => tr('공개 예정'),
+        },
+        null when NextReadingResolver.hasRemoteSource(_book) => tr('다음 회차 확인'),
+        _ => null,
+      };
+      _canContinue = nextLabel != null;
+      final endMessage = switch (following?.kind) {
+        NextReadingKind.waiting => tr('최신 회차까지 읽었어요'),
+        NextReadingKind.completed
+            when following!.seriesEnd || following.groupEnd =>
+          tr('마지막 회차까지 읽었어요'),
+        _ when !_canContinue => tr('다 읽었어요'),
+        _ => null,
+      };
       if (!mounted || _leaveRequested) return;
       setState(() => _status = tr("읽던 위치를 불러오고 있습니다…"));
       // Read storage afresh on every launch, including after earning a reward.
@@ -170,40 +173,15 @@ class _NativeReaderLaunchPageState
         /* Optional notifications never prevent reading. */
       }
       if (!mounted || _leaveRequested) return;
-      final known = _knownNextFor == _book.id ? _knownNext : null;
-      final noFollowing =
-          known?.kind == NextReadingKind.waiting ||
-          known?.kind == NextReadingKind.completed;
       await services.coordinator.open(
         diaryBook: diaryBook,
         publicationId: publication.publicationId,
         contentRevision: publication.contentRevision,
         filePath: publication.filePath,
         title: publication.title,
-        nextBookTitle:
-            _nextBook?.title ??
-            (NextReadingResolver.hasRemoteSource(_book) &&
-                    !_personalGroup &&
-                    !_catalogStandalone &&
-                    !noFollowing
-                ? tr('다음 회차 확인')
-                : null),
-        nextBookLabel: _nextBook != null
-            ? tr('다음 회차 읽기')
-            : known?.kind == NextReadingKind.download
-            ? tr('다음 회차 무료로 읽기')
-            : known?.kind == NextReadingKind.upcoming
-            ? tr('공개 예정')
-            : tr('다음 회차 확인'),
-        endOfBookMessage: known?.kind == NextReadingKind.waiting
-            ? tr('다음 회차를 기다려 주세요')
-            : _nextBook != null ||
-                  (NextReadingResolver.hasRemoteSource(_book) &&
-                      !_personalGroup &&
-                      !_catalogStandalone &&
-                      !noFollowing)
-            ? null
-            : tr(_personalGroup ? '묶음의 마지막 회차입니다' : '마지막 회차입니다'),
+        nextBookTitle: nextTitle,
+        nextBookLabel: nextLabel,
+        endOfBookMessage: endMessage,
         bannerAdUnitId: adsReady ? LevelPlayIds.readerBanner : null,
         adHiddenUntilEpochMs: ads.hiddenUntil?.millisecondsSinceEpoch,
         resolveInitialLocator: (position) =>
@@ -342,13 +320,9 @@ class _NativeReaderLaunchPageState
         setState(() => _closed = true);
         ref.invalidate(nativeLibraryPositionsProvider);
         if (_error == null &&
-            event.message == 'manageFonts' &&
-            !_leaveRequested) {
-          unawaited(_manageFonts());
-        } else if (_error == null &&
-            (event.message == 'downloadSeries' ||
-                event.message == 'nextBook') &&
-            (_nextBook != null || NextReadingResolver.hasRemoteSource(_book)) &&
+            ((event.message == 'downloadSeries' &&
+                    NextReadingResolver.hasRemoteSource(_book)) ||
+                (event.message == 'nextBook' && _canContinue)) &&
             !_leaveRequested) {
           unawaited(_continueReading());
         } else if (_error == null) {
@@ -374,8 +348,6 @@ class _NativeReaderLaunchPageState
         ref.read(readerCatalogProvider),
       ).resolve(_book, books, groups);
       if (!mounted || _leaveRequested) return;
-      _knownNext = result;
-      _knownNextFor = _book.id;
       switch (result.kind) {
         case NextReadingKind.local:
           next = result.book;
@@ -596,33 +568,6 @@ class _NativeReaderLaunchPageState
           ],
         ),
       );
-
-  Future<void> _manageFonts() async {
-    try {
-      final services = await ref.read(nativeReaderServicesProvider.future);
-      if (!mounted) return;
-      final support = services.supportDirectory;
-      if (support == null) throw StateError(tr("글꼴 저장소를 찾지 못했습니다."));
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => PersonalFontsPage(
-            store: PersonalFontStore(
-              Directory('${support.path}/personal_fonts'),
-            ),
-            reader: services.coordinator.store,
-          ),
-        ),
-      );
-      if (mounted && !_leaveRequested) await _open();
-    } catch (error) {
-      if (mounted) {
-        setState(
-          () =>
-              _error = tr("글꼴 관리 화면을 열지 못했습니다.\n{0}", [localizedError(error)]),
-        );
-      }
-    }
-  }
 
   Future<void> _leave() async {
     if (_launching) {

@@ -1,4 +1,5 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'package:koofy_reader/core/widgets/setting_value_title.dart';
 import 'package:flutter/material.dart';
 import 'app_language.dart';
 
@@ -86,9 +87,9 @@ class LanguageButton extends StatelessWidget {
           ? ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.language),
-              title: Text(tr('언어')),
-              subtitle: Text(
-                [
+              title: SettingValueTitle(
+                title: tr('언어'),
+                value: [
                   if (AppLanguage.instance.selection == null) tr('기기 설정 따르기'),
                   const {
                     'ko': '한국어',

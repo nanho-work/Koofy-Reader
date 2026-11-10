@@ -4,7 +4,7 @@ import { storyCatalog } from './story-catalog';
 import { episodePreview } from './episode-preview';
 import { adminWorkPage, adminWorkKey, inAdminWorkScope, type AdminWorkScope } from './admin-work-page';
 import {upcomingItem} from './content';
-import {compatibleEpisode, releasedEpisodeCounts, nextCatalogChange} from './catalog-summary';
+import {compatibleEpisode, releasedEpisodeSummaries, nextCatalogChange} from './catalog-summary';
 import { changeSeriesStatus, pendingEpisodes } from './series-status';
 import {adminCoverAsset} from './admin-cover';
 import { validateTranslationGroup } from './translation-groups';
@@ -158,10 +158,10 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
   const countDocuments: Content[] = [];
   for (let offset = 0; offset < countIds.length; offset += 30) {
     const result = await contents.where('seriesId', 'in', countIds.slice(offset, offset + 30)).where('published', '==', true)
-      .select('id','kind','seriesId','published','deleting','language','publishedContent.language','publishedContent.issueMonth','publishedContent.releaseAt','publishedContent.releaseDate').get();
+      .select('id','kind','seriesId','published','deleting','language','publishedContent.language','publishedContent.issueMonth','publishedContent.releaseAt','publishedContent.releaseDate','publishedContent.publishedAt').get();
     countDocuments.push(...result.docs.map(doc => doc.data() as Content));
   }
-  const counts = releasedEpisodeCounts(countDocuments, language);
+  const summaries = releasedEpisodeSummaries(countDocuments, language);
   const compilationIds = publicOnly ? [...new Set(visible.map(item => item.publishedContent?.compilationId).filter((value): value is string => !!value))] : [];
   const compilations = compilationIds.length ? await db.getAll(...compilationIds.map(value => contents.doc(value))) : [];
   const compiled = new Map(compilations.map(doc => [doc.id, doc.data() as Content | undefined]));
@@ -171,9 +171,13 @@ async function list(contentKind: unknown, after: unknown, publicOnly: boolean, s
     if (item.kind !== 'series') return result;
     const compilationId = item.publishedContent?.compilationId;
     if (compilationId && compilationReady(item, compiled.get(compilationId))) return null;
-    const episodeCount = counts.get(item.id) ?? 0;
+    const summary = summaries.get(item.id);
+    const episodeCount = summary?.count ?? 0;
     if (item.publishedContent?.issueMonth && !episodeCount) return null;
-    return { ...result, episodeCount };
+    return {
+      ...result, episodeCount,
+      ...(summary?.latestAt ? { latestEpisodeReleasedAt: new Date(summary.latestAt).toISOString() } : {}),
+    };
   }));
   return { items: items.filter(Boolean), nextCursor: docs.length > 40 ? docs[39].id : null, nextChangeAt: publicOnly ? nextCatalogChange([...docs.map(doc => doc.data() as Content), ...countDocuments]) : null };
 }

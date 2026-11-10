@@ -6,12 +6,14 @@ import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
 import 'package:koofy_reader/features/catalog/presentation/open_catalog_book.dart';
+import 'package:koofy_reader/features/catalog/presentation/promotion_carousel.dart';
 import 'package:koofy_reader/features/catalog/presentation/series_catalog.dart';
 import 'package:koofy_reader/features/privacy/presentation/privacy_pages.dart';
 
 /// The home is an editorial feed; books and reading history live in their tabs.
 class DiscoveryFeed extends ConsumerStatefulWidget {
-  const DiscoveryFeed({super.key});
+  const DiscoveryFeed({super.key, required this.onBrowse});
+  final VoidCallback onBrowse;
   @override
   ConsumerState<DiscoveryFeed> createState() => _DiscoveryFeedState();
 }
@@ -38,6 +40,8 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final sectionTitle = textTheme.titleLarge?.copyWith(fontSize: 18);
     final books = ref.watch(catalogItemsProvider('book'));
     final series = ref.watch(catalogItemsProvider('series'));
     final items = {
@@ -47,38 +51,59 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
     final interviews = items
         .where((item) => item.category == '사람을 만나다')
         .toList();
+    int publicationTime(CatalogItem item) {
+      final dates = [
+        item.latestEpisodeReleasedAt,
+        item.releaseAt,
+        if (item.releaseDate.isNotEmpty) '${item.releaseDate}T00:00:00+09:00',
+        item.publishedAt,
+      ];
+      return dates
+              .map(DateTime.tryParse)
+              .whereType<DateTime>()
+              .firstOrNull
+              ?.millisecondsSinceEpoch ??
+          0;
+    }
+
+    final promotions = [...items]
+      ..sort((a, b) => publicationTime(b).compareTo(publicationTime(a)));
     final newBooks = items
         .where((item) => item.category != '사람을 만나다')
         .take(6)
         .toList();
+    final covers = [
+      for (final item in promotions.take(5))
+        PromotionCover(
+          key: ValueKey('promotion-${item.id}'),
+          item: item,
+          onTap: () => _open(item),
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MonthlyKoofySection(
-          editorial: true,
-          promotions: [
-            for (final item in [...interviews.take(2), ...newBooks.take(3)])
-              EditorialStory(
-                key: ValueKey('promotion-${item.id}'),
-                overlayTitle: true,
-                eyebrow: tr(
-                  item.category == '사람을 만나다' ? '사람을 만나다' : '새로 도착한 이야기',
+        MonthlyKoofySection(editorial: true, promotions: covers),
+        const SizedBox(height: 24),
+        const ReaderInvitationBanner(),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: Text(tr('새로 도착한 이야기'), style: sectionTitle)),
+            if (newBooks.isNotEmpty)
+              TextButton(
+                onPressed: widget.onBrowse,
+                style: TextButton.styleFrom(
+                  alignment: AlignmentDirectional.centerEnd,
+                  padding: const EdgeInsetsDirectional.only(start: 12),
+                  textStyle: textTheme.labelLarge?.copyWith(fontSize: 12),
                 ),
-                item: item,
-                onTap: () => _open(item),
-                overlayActions: TextButton(
-                  onPressed: () => _open(item),
-                  child: Text(tr(item.kind == 'series' ? '전체 보기' : '읽기')),
-                ),
+                child: Text(tr('전체 보기')),
               ),
           ],
         ),
-        const SizedBox(height: 24),
-        const ReaderInvitationBanner(),
-        const SizedBox(height: 36),
-        Text(tr('새로 도착한 이야기'), style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 18),
+        const SizedBox(height: 8),
         if (newBooks.isEmpty)
           Text(
             tr(
@@ -114,13 +139,14 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
                 (constraints.maxWidth - (count - 1) * bookShelfSpacing) / count;
             return Wrap(
               spacing: bookShelfSpacing,
-              runSpacing: 24,
+              runSpacing: 18,
               children: [
                 for (final item in newBooks)
                   SizedBox(
                     width: width,
                     child: CatalogShelfCard(
                       item: item,
+                      titleFontSize: 12,
                       onTap: () => _open(item),
                       installed:
                           ref
@@ -141,7 +167,7 @@ class _DiscoveryFeedState extends ConsumerState<DiscoveryFeed> {
         ),
         if (interviews.isNotEmpty) ...[
           const SizedBox(height: 36),
-          Text(tr('사람을 만나다'), style: Theme.of(context).textTheme.titleLarge),
+          Text(tr('사람을 만나다'), style: sectionTitle),
           const SizedBox(height: 18),
           for (final item in interviews.take(3))
             Padding(

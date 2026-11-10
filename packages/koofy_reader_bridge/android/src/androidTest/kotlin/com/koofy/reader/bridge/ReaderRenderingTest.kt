@@ -848,14 +848,15 @@ class ReaderRenderingTest {
             }
             return shown
         }
-        tapCenter()
-        awaitCondition("Center tap did not hide chrome") { !chromeShown() }
+        awaitCondition("Chrome did not hide after opening") { !chromeShown() }
         assertEquals(before.getInt("height"), snapshot().getInt("height"))
         assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
         tapCenter()
         awaitCondition("Center tap did not restore chrome") { chromeShown() }
         assertEquals(before.getInt("height"), snapshot().getInt("height"))
         assertEquals(anchor, ReaderRuntime.session!!.locatorJson)
+        tapCenter()
+        awaitCondition("Center tap did not hide chrome again") { !chromeShown() }
     }
 
     @Test fun englishReaderLabelsPreserveBookText() = localizedReader("en", "Back to library", "Reading settings")
@@ -908,18 +909,21 @@ class ReaderRenderingTest {
         }
         try {
             shell("cmd device_state state reset")
-            launch()
+            launch(preferences = ReaderPreferences(1.0, 0, false, "light"))
+            awaitCondition("Open display did not show two pages in automatic mode") {
+                snapshot().getString("columns") == "2"
+            }
             val wide = width()
             val anchor = requireNotNull(ReaderRuntime.session!!.locatorJson)
             capture("opened")
             android.util.Log.i("KoofyFoldTest", "REQUEST_FOLD")
             awaitCondition("Closed display did not resize and restore the text") {
-                width() < wide && anchorVisible(anchor)
+                width() < wide && snapshot().getString("columns") == "1" && anchorVisible(anchor)
             }
             capture("closed")
             android.util.Log.i("KoofyFoldTest", "REQUEST_UNFOLD")
             awaitCondition("Open display did not restore its width and text") {
-                width() == wide && anchorVisible(anchor)
+                width() == wide && snapshot().getString("columns") == "2" && anchorVisible(anchor)
             }
             scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
             scenario!!.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)

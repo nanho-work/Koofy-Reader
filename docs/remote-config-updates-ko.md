@@ -18,10 +18,10 @@
 
 ## 사용자에게 보이는 동작
 
-1. 앱 프로세스가 새로 실행될 때 개인정보 안내 이후, 서재에 들어가기 전에 한 번 확인한다. 설정 > 앱 버전에는 실제 설치된 버전과 빌드 번호가 표시된다.
-2. 설치 버전이 최신 버전 이상이면 안내 없이 서재로 이동한다.
-3. `최소 버전 ≤ 설치 버전 < 최신 버전`이면 제목·문구와 **업데이트 / 나중에**를 표시한다. 나중에를 누르면 그 실행 중에는 다시 표시하지 않는다.
-4. `설치 버전 < 최소 버전`이면 **업데이트가 필요합니다** 제목과 필수 문구를 표시한다. 이 경우 나중에는 없고 서재로 진행하지 않는다.
+1. 앱 프로세스가 새로 실행될 때 홈에 들어가기 전에 한 번 확인한다. 설정 > 앱 버전에는 실제 설치된 버전과 빌드 번호가 표시된다.
+2. 설치 버전이 최신 버전 이상이면 안내 없이 홈으로 이동한다.
+3. `최소 버전 ≤ 설치 버전 < 최신 버전`이면 홈 헤더의 종 아이콘에 읽지 않은 점을 표시한다. 종 아이콘 아래 목록에서 알림을 누르면 버전·변경 내용·업데이트 버튼이 담긴 팝업이 열린다. 상세를 열면 점이 사라지며 같은 버전을 다시 확인해도 읽은 상태를 유지한다. 목록과 팝업은 바깥을 눌러 닫을 수 있다.
+4. `설치 버전 < 최소 버전`이면 **업데이트가 필요합니다** 전용 화면에서 필수 문구를 표시하고 홈 진입을 막는다.
 5. 업데이트는 해당 스토어 링크를 외부 앱으로 연다. 스토어를 여는 것 자체가 업데이트 완료를 뜻하지는 않는다. 앱 삭제를 안내하지 않는다.
 6. 홈 화면으로 잠깐 나갔다 복귀, 스토어에서 복귀, 책 이동, 화면 재구성은 새 확인을 발생시키지 않는다. 앱을 완전히 종료했다 다시 실행하면 다시 확인한다. OS가 프로세스를 종료했다 재실행한 경우도 새 실행이다.
 7. 실시간 설정 구독이나 백그라운드 팝업은 사용하지 않는다. 앱 실행 도중 Firebase 값을 변경해도 다음 실행 때 적용한다.
@@ -39,7 +39,7 @@
 | `android_update_enabled` | `ios_update_enabled` | Boolean. `true`는 안내 사용, `false`는 모든 업데이트 안내와 최소 버전 차단 중지. |
 | `android_update_latest_version` | `ios_update_latest_version` | String. 실제 배포된 최신 버전. 예: `1.3.0`. |
 | `android_update_minimum_version` | `ios_update_minimum_version` | String. 계속 사용 가능한 가장 낮은 버전. 일반 업데이트에서는 그대로 둔다. |
-| `android_update_title` | `ios_update_title` | String. 선택형 안내 제목. 1~100자. 기본값: 새 버전이 있습니다. |
+| `android_update_title` | `ios_update_title` | String. 기존 앱의 선택형 안내 제목. 1~100자. 알림함에는 앱 언어로 버전 번호를 표시한다. |
 | `android_update_message` | `ios_update_message` | String. 선택형 안내 본문. 1~2000자. 개선 내용을 간단히 적는다. |
 | `android_update_required_message` | `ios_update_required_message` | String. 최소 버전 미만일 때 표시할 본문. 1~2000자. 필요한 이유와 기존 기록 보존 안내를 적는다. 필수 안내 제목은 앱에서 고정한다. |
 | `android_update_store_url` | `ios_update_store_url` | String. 아래 쿠피리더 스토어 주소. 다른 앱·사이트 주소, HTTP 주소는 무시한다. |
@@ -72,7 +72,7 @@ https://apps.apple.com/kr/app/id6814514729
 4. `android_update_minimum_version`은 `1.0.0`으로 유지한다.
 5. `android_update_title`, `android_update_message`에 변경 내용을 적는다.
 6. 설치 링크를 확인하고 `android_update_enabled`를 `true`로 바꾼 후 변경사항을 게시한다.
-7. 이 기능을 포함한 이전 버전 앱을 완전히 종료 후 실행해 안내·나중에·스토어 이동을 확인한다. 새 버전에서는 안내가 없는지도 확인한다.
+7. 알림함을 지원하는 이전 버전 앱을 완전히 종료 후 실행해 종 아이콘·알림함·스토어 이동을 확인한다. 알림을 읽고 다시 실행하면 점이 사라진 상태인지, 새 버전에서는 안내가 없는지도 확인한다.
 
 iOS는 `ios_` 키에 같은 순서를 적용한다. Android만 출시됐을 때 iOS 안내까지 켜지 않는다. 테스트를 위해 운영 최소 버전을 높이지 않는다.
 
@@ -94,8 +94,8 @@ iOS는 `ios_` 키에 같은 순서를 적용한다. Android만 출시됐을 때 
 - `firebase.json`의 `remoteconfig`: 위 파일을 연결한다.
 - `lib/features/updates/domain/update_policy.dart`: 버전 비교·최소 버전·스토어 주소 검증.
 - `lib/features/updates/data/update_service.dart`: 프로세스 실행당 한 번 조회, 시간 제한, 설치 버전 확인.
-- `lib/features/updates/presentation/startup_update_gate.dart`: 안내·나중에·스토어 이동.
-- `lib/app/app.dart`: 개인정보 화면 이후 서재 진입 전 연결.
+- `lib/features/updates/presentation/startup_update_gate.dart`: 홈 진입 전 필수 업데이트 안내.
+- `lib/features/updates/presentation/update_inbox.dart`: 일반 업데이트와 버전별 읽음 상태.
 
 이번에는 Firebase CLI의 `deploy --only remoteconfig --project koofy-reader`로 **Remote Config만** 게시했다. Functions·Firestore·Storage 배포는 하지 않았다. 게시 후 서버 템플릿을 다시 받아 로컬 정의와 14개 키가 일치하는지 확인했다. 로그와 전후 템플릿은 `work/remote-config/`에 있다.
 

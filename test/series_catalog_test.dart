@@ -162,7 +162,7 @@ void main() {
       catalog.installed.add(catalogItemKey(downloaded));
       await pumpSeries(tester, catalog, initialQuery: series.title);
       expect(find.text('서재에 있음'), findsOneWidget);
-      expect(find.textContaining('공개 예정'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'\d{2}:\d{2} 공개$')), findsNWidgets(2));
       await tester.tap(find.text('2화 · 이야기 2'));
       await tester.pumpAndSettle();
       expect(find.byKey(ValueKey('book-download-${locked.id}')), findsNothing);

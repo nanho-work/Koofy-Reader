@@ -35,6 +35,7 @@
       ? Math.abs(window.scrollX) + width >= root.scrollWidth - 2
       : window.scrollY + height >= root.scrollHeight - 2;
   };
+  const resourceStart = Math.abs(window.scrollX) <= 2 && window.scrollY <= 2;
   let anchorVisible = null;
   try {
     const point = anchor && anchor.locations && anchor.locations.koofyText;
@@ -98,7 +99,7 @@
     if (offset >= node.length || !visible(range(node, offset, charEnd(node.data, offset)))) continue;
     const css = selector(node.parentElement);
     const end = charEnd(node.data, offset);
-    return JSON.stringify({anchorVisible, resourceEnd: resourceEnd(), locations: {
+    return JSON.stringify({anchorVisible, resourceStart, resourceEnd: resourceEnd(), locations: {
       koofyCover: 0, cssSelector: css,
       koofyText: {cssSelector: css, textNodeIndex: Array.prototype.indexOf.call(node.parentNode.childNodes, node), charOffset: offset}
     }, text: {
@@ -108,8 +109,8 @@
     }});
   }
   if (document.body.hasAttribute('data-koofy-cover') && Math.abs(window.scrollX) < 2 && window.scrollY < 2) {
-    return JSON.stringify({anchorVisible, resourceEnd: false,
+    return JSON.stringify({anchorVisible, resourceStart, resourceEnd: false,
       locations: {progression: 0, cssSelector: 'body', koofyCover: 1}, text: {}});
   }
-  return JSON.stringify({anchorVisible, resourceEnd: resourceEnd()});
+  return JSON.stringify({anchorVisible, resourceStart, resourceEnd: resourceEnd()});
 })(__KOOFY_ANCHOR__)

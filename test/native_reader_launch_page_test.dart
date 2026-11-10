@@ -241,6 +241,8 @@ void main() {
       );
       await pumpUntil(tester, () => gateway.openCalls == 1);
       final active = gateway.request!;
+      expect(active.nextBookLabel, isNull);
+      expect(active.endOfBookMessage, '최신 회차까지 읽었어요');
       gateway.controller.add(
         ReaderEvent(
           protocolVersion: 1,
@@ -304,6 +306,8 @@ void main() {
       );
       await pumpUntil(tester, () => gateway.openCalls == 1);
       final request = gateway.request!;
+      expect(request.nextBookTitle, second.title);
+      expect(request.nextBookLabel, '다음 화 읽기');
       gateway.controller.add(
         ReaderEvent(
           protocolVersion: 1,
@@ -368,59 +372,6 @@ void main() {
   }
 
   testWidgets(
-    'personal font management returns to the latest location, not the initial bookmark',
-    (tester) async {
-      final support = (await tester.runAsync(
-        () => Directory.systemTemp.createTemp('font-route'),
-      ))!;
-      addTearDown(() => support.delete(recursive: true));
-      preparer.complete();
-      gateway.recovery.complete([]);
-      const initial =
-          '{"href":"chapter.xhtml","type":"application/xhtml+xml","locations":{"progression":0.1}}';
-      const current =
-          '{"href":"chapter.xhtml","type":"application/xhtml+xml","locations":{"progression":0.6}}';
-      await mount(tester, support: support, initialLocator: initial);
-      await pumpUntil(tester, () => gateway.openCalls == 1);
-      final request = gateway.request!;
-      void emit(String kind, int sequence, String locator, {String? message}) =>
-          gateway.controller.add(
-            ReaderEvent(
-              protocolVersion: 1,
-              sessionId: request.sessionId,
-              sessionGeneration: request.sessionGeneration,
-              publicationId: request.publicationId,
-              contentRevision: request.contentRevision,
-              sequence: sequence,
-              kind: kind,
-              locatorJson: locator,
-              preferences: request.preferences,
-              message: message,
-            ),
-          );
-      emit('ready', 1, initial);
-      await pumpUntil(
-        tester,
-        () => find.text('책을 읽고 있습니다.').evaluate().isNotEmpty,
-      );
-      emit('closed', 2, current, message: 'manageFonts');
-      await pumpUntil(
-        tester,
-        () => find.text('독서로 돌아가기').evaluate().isNotEmpty,
-      );
-      await pumpUntil(
-        tester,
-        () => find.text('아직 추가한 글꼴이 없습니다.').evaluate().isNotEmpty,
-      );
-      await tester.tap(find.text('독서로 돌아가기'));
-      await pumpUntil(tester, () => gateway.openCalls == 2);
-      expect(gateway.request!.initialLocatorJson, current);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-  );
-
-  testWidgets(
     'next volume preserves the old locator and opens the saved group order',
     (tester) async {
       final next = Book.asset(
@@ -465,6 +416,7 @@ void main() {
       await pumpUntil(tester, () => gateway.openCalls == 2);
       expect(gateway.request!.publicationId, 'next');
       expect(gateway.request!.nextBookTitle, isNull);
+      expect(gateway.request!.endOfBookMessage, '마지막 회차까지 읽었어요');
       expect(gateway.request!.preferences.theme, 'app');
       expect(
         (await tester.runAsync(
@@ -496,6 +448,7 @@ void main() {
     await mount(tester);
     await pumpUntil(tester, () => gateway.openCalls == 1);
     expect(gateway.request!.adHiddenUntilEpochMs, expiry);
+    expect(gateway.request!.endOfBookMessage, '다 읽었어요');
     expect(gateway.request!.bannerAdUnitId, '2dr1bupao7hqz66b');
     await tester.pumpWidget(const SizedBox.shrink());
   });

@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/home/presentation/main_tabs_page.dart';
+import 'package:koofy_reader/features/catalog/data/reader_catalog.dart';
 import 'package:koofy_reader/features/catalog/presentation/monthly_koofy_section.dart';
+import 'package:koofy_reader/features/catalog/presentation/promotion_carousel.dart';
 import 'package:koofy_reader/features/library/presentation/library_page.dart';
 import 'library_page_test.dart' show pumpLibrary, capture;
 
@@ -32,12 +34,28 @@ void main() {
               publishedAt: '2026-10-30T00:00:00Z',
             ),
             catalogFixture(3, title: 'Interview', category: '사람을 만나다'),
+            CatalogItem.fromJson({
+              ...catalogFixture(
+                4,
+                kind: 'series',
+                title: 'Older series with a new chapter',
+                publishedAt: '2026-09-01T00:00:00Z',
+              ).json,
+              'latestEpisodeReleasedAt': '2026-10-31T00:00:00Z',
+            }),
           ],
         );
         await tester.pumpAndSettle();
         expect(find.text('당신의 이야기를 들려주세요'), findsOneWidget);
         expect(find.text('사람을 만나다'), findsWidgets);
         expect(find.text('Newest story'), findsWidgets);
+        final carousel = tester.widget<PromotionCarousel>(
+          find.byType(PromotionCarousel),
+        );
+        expect(carousel.cards.take(2).map((card) => card.key), [
+          const ValueKey('monthly-promotion-placeholder'),
+          ValueKey('promotion-${catalogFixture(4).id}'),
+        ]);
         final newest = tester.getTopLeft(find.text('Newest story').last);
         final older = tester.getTopLeft(find.text('Older story').last);
         expect(
@@ -50,6 +68,50 @@ void main() {
       },
     );
   }
+  testWidgets(
+    'home features multiple genres and opens the unfiltered catalog',
+    (tester) async {
+      await pumpLibrary(
+        tester,
+        size: const Size(390, 1100),
+        rootPage: const MainTabsPage(),
+        catalog: [
+          catalogFixture(1, title: 'A fairy tale', category: '동화'),
+          catalogFixture(2, title: 'A novel', category: '소설'),
+        ],
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(MonthlyKoofySection), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNothing);
+      final carousel = tester.widget<PromotionCarousel>(
+        find.byType(PromotionCarousel),
+      );
+      expect(carousel.cards, hasLength(3));
+      expect(find.text('A fairy tale'), findsOneWidget);
+      expect(find.text('A novel'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, '전체 보기'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+      expect(find.text('A fairy tale'), findsOneWidget);
+      expect(find.text('A novel'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, '소설'));
+      await tester.pumpAndSettle();
+      expect(find.text('A novel'), findsOneWidget);
+
+      await tester.tap(find.text('홈').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '전체 보기'));
+      await tester.pumpAndSettle();
+      expect(find.text('A fairy tale'), findsOneWidget);
+      expect(find.text('A novel'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('home, books and library have distinct content', (tester) async {
     await pumpLibrary(tester, rootPage: const MainTabsPage());
     await tester.pumpAndSettle();
@@ -108,36 +170,51 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
-  testWidgets('wide settings selects individual items in the detail pane', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({MainTabsPage.selectionKey: 3});
-    await AppLanguage.instance.select('ko');
-    await pumpLibrary(
-      tester,
-      rootPage: const MainTabsPage(),
-      size: const Size(1000, 800),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(tr('설정')).last);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('settings-sidebar')), findsOneWidget);
-    expect(find.text('English'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('settings-category-1')));
-    await tester.pumpAndSettle();
-    expect(find.text('English'), findsNothing);
-    expect(find.text('종이색'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('settings-category-0')));
-    await tester.pumpAndSettle();
-    expect(find.text('English'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('settings-category-10')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('catalog-search-font')), findsOneWidget);
-    expect(find.byKey(const ValueKey('catalog-search-book')), findsNothing);
-    expect(find.byType(SegmentedButton<int>), findsNothing);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'wide settings expands reading controls in the shared detail pane',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({MainTabsPage.selectionKey: 3});
+      await AppLanguage.instance.select('ko');
+      await pumpLibrary(
+        tester,
+        rootPage: const MainTabsPage(),
+        size: const Size(1000, 800),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(tr('설정')).last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('settings-sidebar')), findsOneWidget);
+      expect(find.text('English'), findsNothing);
+      await tester.tap(find.text('언어'));
+      await tester.pumpAndSettle();
+      expect(find.text('English'), findsOneWidget);
+      await tester.tap(find.text('독서 배경'));
+      await tester.pumpAndSettle();
+      expect(find.text('English'), findsNothing);
+      expect(find.text('종이색'), findsOneWidget);
+      await tester.tap(find.text('글꼴추가'));
+      await tester.pumpAndSettle();
+      expect(find.text('종이색'), findsNothing);
+      expect(find.text('내 글꼴 추가·관리'), findsOneWidget);
+      expect(find.byKey(const ValueKey('catalog-search-font')), findsOneWidget);
+      expect(find.byKey(const ValueKey('catalog-search-book')), findsNothing);
+      expect(find.byType(SegmentedButton<int>), findsNothing);
+      await tester.tap(find.text('데이터 관리'));
+      await tester.pumpAndSettle();
+      expect(find.text('서재 백업·복원'), findsOneWidget);
+      expect(find.text('휴지통'), findsOneWidget);
+      await tester.tap(find.text('알림·개인정보'));
+      await tester.pumpAndSettle();
+      expect(find.text('새 글 알림'), findsOneWidget);
+      expect(find.text('개인정보 및 광고'), findsOneWidget);
+      await tester.tap(find.text('앱 정보'));
+      await tester.pumpAndSettle();
+      expect(find.text('앱 버전'), findsOneWidget);
+      expect(find.text('평가 남기기'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   for (final language in ['ko', 'en', 'ja']) {
     testWidgets('settings avoids notch and hinge with large text: $language', (
       tester,

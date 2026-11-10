@@ -22,6 +22,7 @@ import 'package:koofy_reader/features/library/presentation/library_page.dart';
 import 'package:koofy_reader/features/library/presentation/widgets/book_tile.dart';
 import 'package:koofy_reader/features/native_reader/data/native_reader_store.dart';
 import 'package:koofy_reader/features/native_reader/migration/legacy_reader_archive.dart';
+import 'package:koofy_reader/features/updates/data/update_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'helpers/catalog_fixture.dart';
 
@@ -93,6 +94,8 @@ Future<void> pumpLibrary(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (rootPage != null)
+          updateNoticeProvider.overrideWith((ref) async => null),
         if (rootPage != null)
           catalogItemsProvider('monthly').overrideWith((ref) async => []),
         catalogItemsProvider('book').overrideWith((ref) async => catalog),

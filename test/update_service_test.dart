@@ -21,30 +21,21 @@ class FakeUpdateSource implements UpdateSource {
 }
 
 void main() {
-  test(
-    'cold start check is shared, dismissal survives remount but not a new session',
-    () async {
-      final source = FakeUpdateSource(updateValues());
-      UpdateService create() => UpdateService(
-        source: source,
-        platform: UpdatePlatform.android,
-        installedVersion: () async => '1.0.0',
-      );
-      final service = create();
-      await Future.wait([
-        service.checkOnColdStart(),
-        service.checkOnColdStart(),
-      ]);
-      service.dismissForSession();
-      await service.checkOnColdStart();
-      expect(source.calls, 1);
-      expect(service.dismissed, true);
-      final restarted = create();
-      expect(await restarted.checkOnColdStart(), isNotNull);
-      expect(restarted.dismissed, false);
-      expect(source.calls, 2);
-    },
-  );
+  test('cold start check is shared and a new session checks again', () async {
+    final source = FakeUpdateSource(updateValues());
+    UpdateService create() => UpdateService(
+      source: source,
+      platform: UpdatePlatform.android,
+      installedVersion: () async => '1.0.0',
+    );
+    final service = create();
+    await Future.wait([service.checkOnColdStart(), service.checkOnColdStart()]);
+    await service.checkOnColdStart();
+    expect(source.calls, 1);
+    final restarted = create();
+    expect(await restarted.checkOnColdStart(), isNotNull);
+    expect(source.calls, 2);
+  });
   test('offline and version lookup failures allow reading', () async {
     final source = FakeUpdateSource(updateValues())..fail = true;
     final service = UpdateService(

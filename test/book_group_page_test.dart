@@ -136,6 +136,13 @@ void main() {
         find.descendant(of: member, matching: find.byType(BookCover)),
         findsOneWidget,
       );
+      expect(find.byType(SliverGrid), findsOneWidget);
+      await tester.tap(find.byTooltip('순서 변경'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ReorderableListView), findsOneWidget);
+      await tester.tap(find.byTooltip('완료'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SliverGrid), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

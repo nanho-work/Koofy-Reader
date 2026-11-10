@@ -40,12 +40,9 @@ class UpdateService {
   final String channel;
   final Duration timeout;
   Future<UpdateNotice?>? _startup;
-  bool _dismissed = false;
 
   // One check per process/provider lifetime, independent of routes or resumes.
   Future<UpdateNotice?> checkOnColdStart() => _startup ??= _check();
-  bool get dismissed => _dismissed;
-  void dismissForSession() => _dismissed = true;
 
   Future<UpdateNotice?> _check() async {
     if (platform == null || channel != 'store') return null;
@@ -81,4 +78,8 @@ final updateServiceProvider = Provider<UpdateService>(
       defaultValue: 'store',
     ),
   ),
+);
+
+final updateNoticeProvider = FutureProvider<UpdateNotice?>(
+  (ref) => ref.watch(updateServiceProvider).checkOnColdStart(),
 );

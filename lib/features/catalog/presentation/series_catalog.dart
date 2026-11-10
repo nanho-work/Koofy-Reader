@@ -65,9 +65,9 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
     super.dispose();
   }
 
-  void _changed() {
+  void _changed({required bool resetList}) {
     setState(() {});
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (resetList && _scroll.hasClients) _scroll.jumpTo(0);
   }
 
   Future<void> _refresh() async {
@@ -171,7 +171,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                           selected: !_newest,
                           onSelected: (_) {
                             _newest = false;
-                            _changed();
+                            _changed(resetList: wide);
                           },
                         ),
                         SelectionMenuChip(
@@ -179,7 +179,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                           selected: _newest,
                           onSelected: (_) {
                             _newest = true;
-                            _changed();
+                            _changed(resetList: wide);
                           },
                         ),
                       ],
@@ -190,7 +190,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                     child: TextField(
                       key: const ValueKey('series-episode-search'),
                       controller: _search,
-                      onChanged: (_) => _changed(),
+                      onChanged: (_) => _changed(resetList: wide),
                       style: Theme.of(context).textTheme.bodyMedium,
                       decoration: InputDecoration(
                         isDense: true,
@@ -229,6 +229,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                 child: CatalogShelfList(
                   key: ValueKey('series-episodes-${series.id}'),
                   controller: _scroll,
+                  episodeLayout: true,
                   padding: AdOverlayInsets.padding(
                     context,
                     const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -238,6 +239,14 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                     if (index == 0) {
                       return Column(
                         children: [
+                          if (!wide)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 8,
+                                bottom: 12,
+                              ),
+                              child: Column(children: [info, controls]),
+                            ),
                           if (catalog.isLoading || loading.refreshing) ...[
                             const LinearProgressIndicator(),
                             Text(tr("전체 목록 불러오는 중…")),
@@ -284,6 +293,7 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
                     return BookCatalogRow(
                       key: ValueKey(key),
                       item: episode,
+                      episodeLayout: true,
                       installed: received,
                       onOpen:
                           (received ||
@@ -371,19 +381,6 @@ class _ReaderSeriesPageState extends ConsumerState<ReaderSeriesPage> {
               return Column(
                 children: [
                   Padding(padding: const EdgeInsets.only(left: 8), child: back),
-                  Flexible(
-                    flex: 0,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: constraints.maxHeight * .55,
-                      ),
-                      child: SingleChildScrollView(
-                        primary: false,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: Column(children: [info, controls]),
-                      ),
-                    ),
-                  ),
                   Expanded(child: list),
                 ],
               );
@@ -406,15 +403,29 @@ class _SeriesInformation extends StatelessWidget {
   final bool expanded;
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final status = Text(
+      tr('{0} · {1}화 공개', [tr(series.seriesStatusLabel), count]),
+    );
     final summary = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(series.title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 6),
-        if (series.author.trim().isNotEmpty) Text(series.author),
-        const SizedBox(height: 6),
-        FavoriteButton(item: series, showLabel: true),
-        Text(tr('{0} · {1}화 공개', [tr(series.seriesStatusLabel), count])),
+        Text(series.title, style: textTheme.titleLarge),
+        if (series.author.trim().isNotEmpty) ...[
+          SizedBox(height: expanded ? 6 : 4),
+          Text(series.author, style: expanded ? null : textTheme.bodySmall),
+        ],
+        if (expanded) ...[
+          const SizedBox(height: 6),
+          FavoriteButton(item: series, showLabel: true),
+          status,
+        ] else
+          Row(
+            children: [
+              Flexible(child: status),
+              FavoriteButton(item: series),
+            ],
+          ),
       ],
     );
     return Column(

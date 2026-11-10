@@ -32,7 +32,6 @@ internal class ReaderSettingsDialog(
     private val canShowSpread: () -> Boolean = { true },
     private val speechStart: (() -> Unit)? = null,
     private val speechEnd: (() -> Unit)? = null,
-    private val manageFonts: (() -> Unit)? = null,
     private val speechVisibility: () -> Unit = {},
     private val autoRunning: () -> Boolean = { false },
     private val toggleAuto: () -> Unit = {},
@@ -194,7 +193,6 @@ internal class ReaderSettingsDialog(
                     update(current().copy(fontId = id))
                 }.apply { previewFont(id)?.let { typeface = it } }, LinearLayout.LayoutParams(-1, -2))
             }
-            column.addView(button(L("＋ 내 글꼴 추가·관리")) { dismiss { manageFonts?.invoke() } })
         }
         section("spacing", L("줄·문단 간격"), L("줄간격") + " · " + (p.lineHeight?.let { String.format(java.util.Locale.ROOT, "%.2f×", it) } ?: L("책 기본값"))) {
             column.addView(label(L("줄간격")))

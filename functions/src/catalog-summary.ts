@@ -1,14 +1,20 @@
 import {Content, isReleased, visibleInLanguage} from './content';
 
 /** Same release predicate as downloads; scheduled or deleted chapters never count. */
-export function releasedEpisodeCounts(items: Content[], language: 'ko'|'en'|'ja', now = new Date()) {
-  const counts = new Map<string, number>();
+export function releasedEpisodeSummaries(items: Content[], language: 'ko'|'en'|'ja', now = new Date()) {
+  const summaries = new Map<string, { count: number; latestAt: number }>();
   for (const item of items) {
-    if (item.seriesId && item.published && !item.deleting && isReleased(item, now) && visibleInLanguage(item, language)) {
-      counts.set(item.seriesId, (counts.get(item.seriesId) ?? 0) + 1);
-    }
+    const snapshot = item.publishedContent;
+    if (!item.seriesId || !item.published || item.deleting || !snapshot ||
+        !isReleased(item, now) || !visibleInLanguage(item, language)) continue;
+    const releasedAt = Date.parse(snapshot.releaseAt ||
+      (snapshot.releaseDate ? `${snapshot.releaseDate}T00:00:00+09:00` : snapshot.publishedAt || ''));
+    const summary = summaries.get(item.seriesId) ?? { count: 0, latestAt: 0 };
+    summary.count++;
+    if (Number.isFinite(releasedAt)) summary.latestAt = Math.max(summary.latestAt, releasedAt);
+    summaries.set(item.seriesId, summary);
   }
-  return counts;
+  return summaries;
 }
 export function nextCatalogChange(items: Content[], now = new Date()): string | null {
   const times = items.flatMap(item => {

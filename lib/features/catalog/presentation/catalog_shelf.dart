@@ -1,6 +1,6 @@
 import 'package:koofy_reader/features/notifications/notification_widgets.dart';
-import 'package:intl/intl.dart' show DateFormat;
 import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
+import 'package:koofy_reader/core/widgets/episode_shelf.dart';
 export 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
@@ -15,29 +15,43 @@ class CatalogShelfCard extends StatelessWidget {
     required this.onTap,
     this.progress,
     this.installed = false,
+    this.episodeLayout = false,
+    this.titleFontSize = _defaultTitleFontSize,
   });
   final CatalogItem item;
   final VoidCallback? onTap;
   final double? progress;
   final bool installed;
+  final bool episodeLayout;
+  final double titleFontSize;
 
-  static double titleHeight(BuildContext context) =>
-      MediaQuery.textScalerOf(context).scale(14) * 1.4 * 2;
+  static const double _defaultTitleFontSize = 13;
+  static const double titleTopSpacing = 6;
+
+  static double titleHeight(
+    BuildContext context, {
+    double fontSize = _defaultTitleFontSize,
+  }) => MediaQuery.textScalerOf(context).scale(fontSize) * 1.4 * 2;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final locked = item.upcoming && !installed;
-    final title = item.episodeNumber != null && item.episodeTitle != null
-        ? tr('{0}화 · {1}', [item.episodeNumber, item.episodeTitle])
-        : item.title;
+    final release = item.upcoming && (episodeLayout || locked)
+        ? _releaseLabel(item)
+        : null;
+    final title = episodeShelfTitle(
+      item.title,
+      item.episodeNumber,
+      item.episodeTitle,
+    );
     return Semantics(
       button: !locked,
       label: [
         title,
         if (item.kind == 'series') tr(item.seriesStatusLabel),
         if (installed) tr('다운로드 완료'),
-        if (locked) _releaseLabel(item),
+        if (release != null) release,
       ].join(', '),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
@@ -104,9 +118,20 @@ class CatalogShelfCard extends StatelessWidget {
                       right: 0,
                       child: FavoriteButton(item: item),
                     ),
+                  if (episodeLayout)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: EpisodeCoverCaption(
+                        title: title,
+                        subtitle: release,
+                      ),
+                    ),
                   if (installed && progress == null)
                     Positioned(
-                      bottom: 6,
+                      top: episodeLayout ? 6 : null,
+                      bottom: episodeLayout ? null : 6,
                       left: 6,
                       right: 6,
                       child: Container(
@@ -145,16 +170,18 @@ class CatalogShelfCard extends StatelessWidget {
                     ),
                   if (progress != null)
                     Positioned.fill(
-                      child: ColoredBox(
-                        color: colors.surface.withValues(alpha: .65),
-                        child: Center(
-                          child: SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: CircularProgressIndicator(
-                              value: progress,
-                              strokeWidth: 2,
-                              semanticsLabel: tr('{0} 다운로드 중', [title]),
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: colors.surface.withValues(alpha: .65),
+                          child: Center(
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(
+                                value: progress,
+                                strokeWidth: 2,
+                                semanticsLabel: tr('{0} 다운로드 중', [title]),
+                              ),
                             ),
                           ),
                         ),
@@ -163,34 +190,36 @@ class CatalogShelfCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: titleHeight(context),
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            if (locked)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
+            if (!episodeLayout) ...[
+              const SizedBox(height: titleTopSpacing),
+              SizedBox(
+                height: titleHeight(context, fontSize: titleFontSize),
                 child: Text(
-                  _releaseLabel(item),
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
+                  style: TextStyle(
+                    fontSize: titleFontSize,
                     height: 1.4,
-                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
+              if (release != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    release,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 11,
+                      height: 1.4,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -207,12 +236,16 @@ class CatalogShelfList extends StatelessWidget {
     required this.itemCount,
     required this.itemBuilder,
     this.grid = true,
+    this.episodeLayout = false,
+    this.reserveReleaseLabel = false,
   });
   final ScrollController controller;
   final EdgeInsets padding;
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final bool grid;
+  final bool episodeLayout;
+  final bool reserveReleaseLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -256,17 +289,25 @@ class CatalogShelfList extends StatelessWidget {
                 padding.bottom,
               ),
               sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  crossAxisSpacing: bookShelfSpacing,
-                  mainAxisSpacing: 22,
-                  mainAxisExtent:
-                      tileWidth * 1.5 +
-                      8 +
-                      CatalogShelfCard.titleHeight(context) +
-                      8 +
-                      MediaQuery.textScalerOf(context).scale(11) * 1.4 * 2,
-                ),
+                gridDelegate: episodeLayout
+                    ? episodeShelfGridDelegate(columns)
+                    : SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: bookShelfSpacing,
+                        mainAxisSpacing: 22,
+                        mainAxisExtent:
+                            tileWidth * 1.5 +
+                            CatalogShelfCard.titleTopSpacing +
+                            CatalogShelfCard.titleHeight(context) +
+                            (reserveReleaseLabel
+                                ? 8 +
+                                      MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(11) *
+                                          1.4 *
+                                          2
+                                : 0),
+                      ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => itemBuilder(context, index + 1),
                   childCount: itemCount - 1,
@@ -286,11 +327,5 @@ String _releaseLabel(CatalogItem item) {
         ? item.releaseAt
         : '${item.releaseDate}T00:00:00+09:00',
   );
-  return date == null
-      ? tr('공개 예정')
-      : tr('{0} 공개 예정', [
-          DateFormat.Md(
-            AppLanguage.instance.code,
-          ).add_Hm().format(date.toLocal()),
-        ]);
+  return episodeReleaseLabel(date);
 }

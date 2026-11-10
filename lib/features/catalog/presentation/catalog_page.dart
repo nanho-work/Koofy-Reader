@@ -46,10 +46,12 @@ class ReaderCatalogBrowser extends ConsumerStatefulWidget {
     this.booksOnly = false,
     this.fontsOnly = false,
     this.searchController,
+    this.filterReset = 0,
   });
   final bool booksOnly;
   final bool fontsOnly;
   final TextEditingController? searchController;
+  final int filterReset;
   final String initialBookQuery;
   @override
   ConsumerState<ReaderCatalogBrowser> createState() =>
@@ -80,6 +82,7 @@ class _ReaderCatalogBrowserState extends ConsumerState<ReaderCatalogBrowser> {
               kind: 'book',
               initialQuery: widget.initialBookQuery,
               externalSearch: widget.searchController,
+              filterReset: widget.filterReset,
             )
           : Column(
               children: [
@@ -143,8 +146,10 @@ class _CatalogList extends ConsumerStatefulWidget {
     required this.kind,
     this.initialQuery = '',
     this.externalSearch,
+    this.filterReset = 0,
   });
   final TextEditingController? externalSearch;
+  final int filterReset;
   final String initialQuery;
   final String kind;
   @override
@@ -161,7 +166,22 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
     _search.addListener(_changed);
   }
 
+  @override
+  void didUpdateWidget(covariant _CatalogList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filterReset == oldWidget.filterReset) return;
+    _category = null;
+    _favoritesOnly = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+      final chip = _allCategoriesChip.currentContext;
+      if (chip != null) Scrollable.ensureVisible(chip, alignment: .5);
+    });
+  }
+
   final _scroll = ScrollController();
+  final _allCategoriesChip = GlobalKey();
   String? _category;
   bool _favoritesOnly = false;
   bool _openedInitialSeries = false;
@@ -325,6 +345,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                 Padding(
                   padding: const EdgeInsets.only(right: 6, top: 8),
                   child: SelectionMenuChip(
+                    key: category == null ? _allCategoriesChip : null,
                     label: tr(category ?? '전체'),
                     selected: !_favoritesOnly && _category == category,
                     onSelected: (_) {
@@ -379,6 +400,7 @@ class _CatalogListState extends ConsumerState<_CatalogList> {
                 onRefresh: _refresh,
                 child: CatalogShelfList(
                   grid: _books,
+                  reserveReleaseLabel: items.any((item) => item.upcoming),
                   key: PageStorageKey('catalog-list-${widget.kind}'),
                   controller: _scroll,
                   padding: AdOverlayInsets.padding(
@@ -580,7 +602,9 @@ class CatalogSearchField extends StatelessWidget {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(28),
-              borderSide: BorderSide.none,
+              borderSide: kind == 'font'
+                  ? BorderSide(color: Theme.of(context).colorScheme.outline)
+                  : BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(28),

@@ -9,6 +9,7 @@ import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/catalog/presentation/catalog_page.dart';
 import 'discovery_feed.dart';
 import 'package:koofy_reader/features/library/presentation/library_page.dart';
+import 'package:koofy_reader/features/updates/presentation/update_inbox.dart';
 
 /// Root navigation only. Reader and detail routes cover it instead of inheriting tabs.
 class MainTabsPage extends StatefulWidget {
@@ -21,6 +22,24 @@ class MainTabsPage extends StatefulWidget {
 class _MainTabsPageState extends State<MainTabsPage> {
   int _selected = 0;
   final _visited = <int>{0};
+  final _bookSearch = TextEditingController();
+  int _bookReset = 0;
+
+  void _openBooks() {
+    _bookSearch.clear();
+    setState(() {
+      _bookReset++;
+      _selected = 1;
+      _visited.add(1);
+    });
+  }
+
+  @override
+  void dispose() {
+    _bookSearch.dispose();
+    super.dispose();
+  }
+
   void _select(int value) {
     if (_selected == value) return;
     setState(() {
@@ -73,12 +92,15 @@ class _MainTabsPageState extends State<MainTabsPage> {
                 children: [
                   TickerMode(
                     enabled: _selected == 0,
-                    child: const _DiscoveryPage(),
+                    child: _DiscoveryPage(onBrowse: _openBooks),
                   ),
                   TickerMode(
                     enabled: _selected == 1,
                     child: _visited.contains(1)
-                        ? const _BookstorePage()
+                        ? _BookstorePage(
+                            search: _bookSearch,
+                            filterReset: _bookReset,
+                          )
                         : const SizedBox.shrink(),
                   ),
                   TickerMode(
@@ -171,7 +193,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
 }
 
 class _DiscoveryPage extends StatelessWidget {
-  const _DiscoveryPage();
+  const _DiscoveryPage({required this.onBrowse});
+  final VoidCallback onBrowse;
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -181,9 +204,12 @@ class _DiscoveryPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const KoofyReaderWordmark(),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [KoofyReaderWordmark(), UpdateInboxButton()],
+            ),
             const SizedBox(height: 12),
-            const DiscoveryFeed(),
+            DiscoveryFeed(onBrowse: onBrowse),
           ],
         ),
       ),
@@ -191,19 +217,10 @@ class _DiscoveryPage extends StatelessWidget {
   );
 }
 
-class _BookstorePage extends StatefulWidget {
-  const _BookstorePage();
-  @override
-  State<_BookstorePage> createState() => _BookstorePageState();
-}
-
-class _BookstorePageState extends State<_BookstorePage> {
-  final _search = TextEditingController();
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
+class _BookstorePage extends StatelessWidget {
+  const _BookstorePage({required this.search, required this.filterReset});
+  final TextEditingController search;
+  final int filterReset;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -233,7 +250,7 @@ class _BookstorePageState extends State<_BookstorePage> {
                 const SizedBox(width: 12),
               ],
               Expanded(
-                child: CatalogSearchField(controller: _search, compact: true),
+                child: CatalogSearchField(controller: search, compact: true),
               ),
             ],
           ),
@@ -242,7 +259,8 @@ class _BookstorePageState extends State<_BookstorePage> {
           top: false,
           child: ReaderCatalogBrowser(
             booksOnly: true,
-            searchController: _search,
+            searchController: search,
+            filterReset: filterReset,
           ),
         ),
       );

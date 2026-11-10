@@ -80,6 +80,18 @@ const messages = {
     "en": "Show covers in the reader",
     "ja": "読書画面に表紙を表示"
   },
+  "표지 표시": {
+    "en": "Show cover",
+    "ja": "表紙を表示"
+  },
+  "표지 건너뛰기": {
+    "en": "Skip cover",
+    "ja": "表紙をスキップ"
+  },
+  "서재에 등록한 표지에 적용돼요.": {
+    "en": "Applies to covers added in your library.",
+    "ja": "本棚に登録した表紙に適用されます。"
+  },
   "각 책에 등록한 표지를 첫 장으로 표시합니다. 이어 읽기는 읽던 위치에서 시작하며, EPUB의 기존 표지는 유지합니다.": {
     "en": "Show the assigned cover as the first page. Resume starts at your saved position. Existing EPUB covers are preserved.",
     "ja": "登録した表紙を最初のページに表示します。続きから読む場合は保存した位置から始まり、EPUBの既存の表紙は保持されます。"
@@ -575,6 +587,10 @@ const messages = {
   "소설": {
     "en": "Fiction",
     "ja": "小説"
+  },
+  "동화": {
+    "en": "Fairy Tales",
+    "ja": "童話"
   },
   "에세이": {
     "en": "Essays",
@@ -1296,6 +1312,10 @@ const messages = {
     "en": "{1} of {0} books finished",
     "ja": "全{0}冊中{1}冊読了"
   },
+  "순서 변경": {
+    "en": "Change order",
+    "ja": "順番を変更"
+  },
   "순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.": {
     "en": "Drag the handles to change the reading order.",
     "ja": "ハンドルをドラッグして読む順番を変更できます。"
@@ -1427,6 +1447,18 @@ const messages = {
   "{0}권에 표지 적용": {
     "en": "Apply covers to {0} books",
     "ja": "{0}冊に表紙を適用"
+  },
+  "알림함": {
+    "en": "Notifications",
+    "ja": "通知"
+  },
+  "알림함 · 읽지 않은 알림": {
+    "en": "Notifications · Unread",
+    "ja": "通知 · 未読あり"
+  },
+  "알림이 없어요": {
+    "en": "No notifications",
+    "ja": "通知はありません"
   },
   "업데이트 확인 중…": {
     "en": "Checking for updates…",
@@ -1636,6 +1668,14 @@ const messages = {
     "en": "Import TTF or OTF files from your device. Added fonts are stored in the app and available for all books.",
     "ja": "端末のTTF・OTFファイルを追加できます。追加したフォントはアプリ内に保存され、すべての本で使えます。"
   },
+  "내 글꼴 추가·관리": {
+    "en": "Add or manage my fonts",
+    "ja": "フォントの追加・管理"
+  },
+  "기기에 있는 TTF·OTF 글꼴을 추가한 뒤 독서 화면에서 선택할 수 있습니다.": {
+    "en": "Add a TTF or OTF font from your device, then select it in the reader.",
+    "ja": "端末のTTF・OTFフォントを追加し、読書画面で選択できます。"
+  },
   "내 글꼴 추가": {
     "en": "Add a font",
     "ja": "フォントを追加"
@@ -1651,6 +1691,10 @@ const messages = {
   "언어": {
     "en": "Language",
     "ja": "言語"
+  },
+  "기기 설정": {
+    "en": "Device settings",
+    "ja": "端末設定"
   },
   "기기 설정 따르기": {
     "en": "Device language",
@@ -4024,9 +4068,13 @@ const messages = {
     "en": "Coming soon",
     "ja": "公開予定"
   },
-  "{0} 공개 예정": {
+  "공개": {
+    "en": "Release",
+    "ja": "公開"
+  },
+  "{0} 공개": {
     "en": "Available {0}",
-    "ja": "{0} 公開予定"
+    "ja": "{0} 公開"
   },
   "아직 공개되지 않은 회차입니다.": {
     "en": "This chapter is not available yet.",
@@ -4143,6 +4191,22 @@ const messages = {
   "즐겨찾기한 책이 없습니다. 책의 별표를 눌러 추가해 보세요.": {
     "en": "No favorites yet. Tap the star on a book to add it.",
     "ja": "お気に入りはまだありません。本の星をタップして追加してください。"
+  },
+  "다음 화 읽기": {
+    "en": "Read next episode",
+    "ja": "次の話を読む"
+  },
+  "최신 회차까지 읽었어요": {
+    "en": "You’re all caught up",
+    "ja": "最新話まで読みました"
+  },
+  "마지막 회차까지 읽었어요": {
+    "en": "You finished the final episode",
+    "ja": "最終話まで読みました"
+  },
+  "다 읽었어요": {
+    "en": "You finished reading",
+    "ja": "読み終わりました"
   },
   "다음 회차 확인": {
     "en": "Check next episode",

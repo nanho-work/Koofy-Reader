@@ -1,4 +1,6 @@
 import 'package:koofy_reader/core/widgets/reader_alert.dart';
+import 'package:koofy_reader/core/widgets/book_shelf_layout.dart';
+import 'package:koofy_reader/core/widgets/episode_shelf.dart';
 import 'package:koofy_reader/core/localization/app_language.dart';
 import 'package:koofy_reader/features/ads/presentation/ad_overlay_insets.dart';
 import 'package:koofy_reader/features/library/presentation/batch_cover_page.dart';
@@ -36,6 +38,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
   bool _opening = false;
   bool _coversBusy = false;
   bool _reordering = false;
+  bool _editingOrder = false;
   Future<void> _change(Future<Object?> Function() operation) async {
     if (_reordering) return;
     setState(() => _reordering = true);
@@ -115,6 +118,162 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
         !progressLoading &&
         !progressError &&
         !_opening;
+    final showGrid = group?.showMemberCovers == true && !_editingOrder;
+    final padding = AdOverlayInsets.padding(context, const EdgeInsets.all(20));
+    String readingLabel(Book book) => progressError
+        ? tr("읽기 기록 확인 필요")
+        : progressLoading
+        ? tr("기록 불러오는 중")
+        : switch (status(book)) {
+            LibraryBookStatus.finished => tr("완독"),
+            LibraryBookStatus.unread => tr("아직 읽지 않음"),
+            LibraryBookStatus.reading => tr("읽는 중 · {0}", [
+              states[book.id]?.progressLabel ?? tr('위치 저장됨'),
+            ]),
+          };
+    final header = group == null
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    height: 104,
+                    child: BookCover(book: group.displayBook, compact: true),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      progressLoading
+                          ? tr("읽기 기록 불러오는 중")
+                          : progressError
+                          ? tr("읽기 기록 확인 필요")
+                          : tr("총 {0}권 · 완독 {1}권\n{2}", [
+                              members.length,
+                              finishedCount,
+                              activeIndex != null
+                                  ? tr('{0}권을 읽는 중', [activeIndex])
+                                  : members.isNotEmpty &&
+                                        finishedCount == members.length
+                                  ? tr('모든 권을 완독했어요')
+                                  : finishedCount > 0 && unread.isNotEmpty
+                                  ? tr('{0}권부터 이어 읽어보세요', [
+                                      members.indexOf(unread.first) + 1,
+                                    ])
+                                  : tr('아직 읽기 전이에요'),
+                            ]),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (!progressLoading && !progressError && members.isNotEmpty)
+                Semantics(
+                  label: tr("총 {0}권 중 {1}권 완독", [
+                    members.length,
+                    finishedCount,
+                  ]),
+                  child: LinearProgressIndicator(
+                    value: finishedCount / members.length,
+                  ),
+                ),
+              if (!showGrid)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(tr("순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.")),
+                ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tr("묶음 안의 책 표지 표시")),
+                value: group.showMemberCovers,
+                onChanged: _reordering
+                    ? null
+                    : (value) => _change(
+                        () => ref
+                            .read(bookGroupRepositoryProvider)
+                            .setMemberCovers(group.id, value),
+                      ),
+              ),
+              TextButton.icon(
+                onPressed: _coversBusy || members.isEmpty
+                    ? null
+                    : () async {
+                        setState(() => _coversBusy = true);
+                        try {
+                          await showBatchCovers(
+                            context,
+                            ref,
+                            bookIds: members.map((b) => b.id).toSet(),
+                          );
+                        } finally {
+                          if (mounted) {
+                            setState(() => _coversBusy = false);
+                          }
+                        }
+                      },
+                icon: const Icon(Icons.collections_outlined),
+                label: Text(tr("묶음 안의 표지 일괄 등록")),
+              ),
+              TextButton.icon(
+                onPressed: _reordering || members.length < 2
+                    ? null
+                    : () => _change(() {
+                        final sorted = [...members]
+                          ..sort((a, b) => compareBookTitles(a.title, b.title));
+                        return ref
+                            .read(bookGroupRepositoryProvider)
+                            .reorder(
+                              group.id,
+                              sorted.map((b) => b.id).toList(),
+                              availableIds: byId.keys.toSet(),
+                            );
+                      }),
+                icon: const Icon(Icons.sort),
+                label: Text(tr("제목·회차 순으로 정렬")),
+              ),
+              if (recent.isNotEmpty)
+                FilledButton.icon(
+                  key: const ValueKey('group-continue'),
+                  onPressed: canOpen
+                      ? () => _open(recent.first, states[recent.first.id])
+                      : null,
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: Text(tr("{0} · 이어 읽기", [recent.first.title])),
+                ),
+              if (recent.isEmpty && unread.isNotEmpty)
+                FilledButton.icon(
+                  key: const ValueKey('group-start'),
+                  onPressed: canOpen
+                      ? () => _open(unread.first, states[unread.first.id])
+                      : null,
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: Text(tr("{0} · 읽기 시작", [unread.first.title])),
+                ),
+              OutlinedButton.icon(
+                onPressed: () => widget.onAdd(group),
+                icon: const Icon(Icons.add),
+                label: Text(tr("묶음에 책 추가")),
+              ),
+              if (progressLoading) const LinearProgressIndicator(),
+              if (progressError)
+                TextButton(
+                  onPressed: () {
+                    ref.invalidate(libraryReadingStateProvider);
+                    ref.invalidate(libraryCompletionProvider);
+                  },
+                  child: Text(tr("읽기 기록 다시 불러오기")),
+                ),
+              if (members.isEmpty)
+                Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(tr("비어 있는 묶음입니다. 책을 추가하거나 묶음을 해제할 수 있어요.")),
+                ),
+              const SizedBox(height: 12),
+            ],
+          );
     return Theme(
       data: Theme.of(context),
       child: DisplayFeatureSubScreen(
@@ -123,6 +282,14 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
           appBar: AppBar(
             title: Text(group?.title ?? tr("책 묶음")),
             actions: [
+              if (group?.showMemberCovers == true && members.length > 1)
+                IconButton(
+                  tooltip: tr(_editingOrder ? '완료' : '순서 변경'),
+                  icon: Icon(_editingOrder ? Icons.check : Icons.swap_vert),
+                  onPressed: _reordering
+                      ? null
+                      : () => setState(() => _editingOrder = !_editingOrder),
+                ),
               if (group != null)
                 IconButton(
                   tooltip: tr("묶음 관리"),
@@ -157,175 +324,101 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                             ],
                           ),
                   )
-                : ReorderableListView.builder(
-                    padding: AdOverlayInsets.padding(
-                      context,
-                      const EdgeInsets.all(20),
-                    ),
-                    buildDefaultDragHandles: false,
-                    header: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 72,
-                              height: 104,
-                              child: BookCover(
-                                book: group.displayBook,
-                                compact: true,
+                : showGrid
+                ? CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: padding.copyWith(bottom: 0),
+                        sliver: SliverToBoxAdapter(child: header),
+                      ),
+                      SliverPadding(
+                        padding: padding.copyWith(top: 0),
+                        sliver: SliverLayoutBuilder(
+                          builder: (context, constraints) => SliverGrid.builder(
+                            gridDelegate: episodeShelfGridDelegate(
+                              catalogShelfColumns(
+                                window: MediaQuery.sizeOf(context),
+                                shelfWidth: constraints.crossAxisExtent,
+                                textScale:
+                                    MediaQuery.textScalerOf(context).scale(14) /
+                                    14,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                progressLoading
-                                    ? tr("읽기 기록 불러오는 중")
-                                    : progressError
-                                    ? tr("읽기 기록 확인 필요")
-                                    : tr("총 {0}권 · 완독 {1}권\n{2}", [
-                                        members.length,
-                                        finishedCount,
-                                        activeIndex != null
-                                            ? tr('{0}권을 읽는 중', [activeIndex])
-                                            : members.isNotEmpty &&
-                                                  finishedCount ==
-                                                      members.length
-                                            ? tr('모든 권을 완독했어요')
-                                            : finishedCount > 0 &&
-                                                  unread.isNotEmpty
-                                            ? tr('{0}권부터 이어 읽어보세요', [
-                                                members.indexOf(unread.first) +
-                                                    1,
-                                              ])
-                                            : tr('아직 읽기 전이에요'),
-                                      ]),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (!progressLoading &&
-                            !progressError &&
-                            members.isNotEmpty)
-                          Semantics(
-                            label: tr("총 {0}권 중 {1}권 완독", [
-                              members.length,
-                              finishedCount,
-                            ]),
-                            child: LinearProgressIndicator(
-                              value: finishedCount / members.length,
-                            ),
-                          ),
-                        Padding(
-                          padding: EdgeInsets.only(top: 12),
-                          child: Text(tr("순서 손잡이를 끌어 읽을 순서를 바꿀 수 있어요.")),
-                        ),
-                        const SizedBox(height: 16),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(tr("묶음 안의 책 표지 표시")),
-                          value: group.showMemberCovers,
-                          onChanged: _reordering
-                              ? null
-                              : (value) => _change(
-                                  () => ref
-                                      .read(bookGroupRepositoryProvider)
-                                      .setMemberCovers(group.id, value),
-                                ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _coversBusy || members.isEmpty
-                              ? null
-                              : () async {
-                                  setState(() => _coversBusy = true);
-                                  try {
-                                    await showBatchCovers(
-                                      context,
-                                      ref,
-                                      bookIds: members.map((b) => b.id).toSet(),
-                                    );
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _coversBusy = false);
-                                    }
-                                  }
-                                },
-                          icon: const Icon(Icons.collections_outlined),
-                          label: Text(tr("묶음 안의 표지 일괄 등록")),
-                        ),
-                        TextButton.icon(
-                          onPressed: _reordering || members.length < 2
-                              ? null
-                              : () => _change(() {
-                                  final sorted = [...members]
-                                    ..sort(
-                                      (a, b) =>
-                                          compareBookTitles(a.title, b.title),
-                                    );
-                                  return ref
-                                      .read(bookGroupRepositoryProvider)
-                                      .reorder(
-                                        group.id,
-                                        sorted.map((b) => b.id).toList(),
-                                        availableIds: byId.keys.toSet(),
-                                      );
-                                }),
-                          icon: const Icon(Icons.sort),
-                          label: Text(tr("제목·회차 순으로 정렬")),
-                        ),
-                        if (recent.isNotEmpty)
-                          FilledButton.icon(
-                            key: const ValueKey('group-continue'),
-                            onPressed: canOpen
-                                ? () => _open(
-                                    recent.first,
-                                    states[recent.first.id],
-                                  )
-                                : null,
-                            icon: const Icon(Icons.menu_book_outlined),
-                            label: Text(
-                              tr("{0} · 이어 읽기", [recent.first.title]),
-                            ),
-                          ),
-                        if (recent.isEmpty && unread.isNotEmpty)
-                          FilledButton.icon(
-                            key: const ValueKey('group-start'),
-                            onPressed: canOpen
-                                ? () => _open(
-                                    unread.first,
-                                    states[unread.first.id],
-                                  )
-                                : null,
-                            icon: const Icon(Icons.menu_book_outlined),
-                            label: Text(
-                              tr("{0} · 읽기 시작", [unread.first.title]),
-                            ),
-                          ),
-                        OutlinedButton.icon(
-                          onPressed: () => widget.onAdd(group),
-                          icon: const Icon(Icons.add),
-                          label: Text(tr("묶음에 책 추가")),
-                        ),
-                        if (progressLoading) const LinearProgressIndicator(),
-                        if (progressError)
-                          TextButton(
-                            onPressed: () {
-                              ref.invalidate(libraryReadingStateProvider);
-                              ref.invalidate(libraryCompletionProvider);
+                            itemCount: members.length,
+                            itemBuilder: (context, index) {
+                              final book = members[index];
+                              final state = states[book.id];
+                              final metadata = book.catalogMetadata;
+                              final title = episodeShelfTitle(
+                                book.title,
+                                metadata?['episodeNumber'],
+                                metadata?['episodeTitle'],
+                              );
+                              final releaseAt = metadata?['releaseAt'];
+                              final release = releaseAt is String
+                                  ? DateTime.tryParse(releaseAt)
+                                  : null;
+                              final label =
+                                  release != null &&
+                                      release.isAfter(DateTime.now())
+                                  ? episodeReleaseLabel(release)
+                                  : readingLabel(book);
+                              return Stack(
+                                key: ValueKey('group-book-${book.id}'),
+                                fit: StackFit.expand,
+                                children: [
+                                  Semantics(
+                                    button: true,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: canOpen
+                                          ? () => _open(book, state)
+                                          : null,
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          BookCover(book: book, compact: true),
+                                          Positioned(
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: EpisodeCoverCaption(
+                                              title: title,
+                                              subtitle: label,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: IconButton.filledTonal(
+                                      tooltip: tr("{0} 더보기", [book.title]),
+                                      icon: const Icon(
+                                        Icons.more_horiz,
+                                        size: 18,
+                                      ),
+                                      onPressed: () => widget.onBookMenu(
+                                        book,
+                                        state,
+                                        status(book),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
                             },
-                            child: Text(tr("읽기 기록 다시 불러오기")),
                           ),
-                        if (members.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              tr("비어 있는 묶음입니다. 책을 추가하거나 묶음을 해제할 수 있어요."),
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-                      ],
-                    ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ReorderableListView.builder(
+                    padding: padding,
+                    buildDefaultDragHandles: false,
+                    header: header,
                     itemCount: members.length,
                     onReorder: (oldIndex, newIndex) async {
                       if (_reordering) return;
@@ -368,20 +461,7 @@ class _BookGroupPageState extends ConsumerState<BookGroupPage> {
                                 child: BookCover(book: book, compact: true),
                               ),
                         title: Text('${index + 1}. ${book.title}'),
-                        subtitle: Text(
-                          progressError
-                              ? tr("읽기 기록 확인 필요")
-                              : progressLoading
-                              ? tr("기록 불러오는 중")
-                              : switch (status(book)) {
-                                  LibraryBookStatus.finished => tr("완독"),
-                                  LibraryBookStatus.unread => tr("아직 읽지 않음"),
-                                  LibraryBookStatus.reading => tr(
-                                    "읽는 중 · {0}",
-                                    [state?.progressLabel ?? tr('위치 저장됨')],
-                                  ),
-                                },
-                        ),
+                        subtitle: Text(readingLabel(book)),
                         onTap: canOpen ? () => _open(book, state) : null,
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,

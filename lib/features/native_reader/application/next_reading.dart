@@ -12,12 +12,14 @@ class NextReading {
     this.book,
     this.item,
     this.groupEnd = false,
+    this.seriesEnd = false,
     this.afterEpisode,
   });
   final NextReadingKind kind;
   final Book? book;
   final CatalogItem? item;
   final bool groupEnd;
+  final bool seriesEnd;
   final int? afterEpisode;
 }
 
@@ -170,6 +172,7 @@ class NextReadingResolver {
       parent.seriesStatus == 'completed'
           ? NextReadingKind.completed
           : NextReadingKind.waiting,
+      seriesEnd: true,
     );
   }
 }
