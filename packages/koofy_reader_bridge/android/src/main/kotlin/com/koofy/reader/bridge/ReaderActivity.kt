@@ -202,7 +202,9 @@ class ReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener,
         turnHost.addView(curlView, FrameLayout.LayoutParams(-1, -1))
         val readingArea = FrameLayout(this)
         page.addView(readingArea, LinearLayout.LayoutParams(-1, 0, 1f))
-        readingArea.addView(turnHost, FrameLayout.LayoutParams(-1, -1))
+        readingArea.addView(turnHost, FrameLayout.LayoutParams(-1, -1).apply {
+            topMargin = dp(20)
+        })
         readingArea.addView(toolbar, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
         navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         returnButton = button("↶") { returnToReading() }.apply {

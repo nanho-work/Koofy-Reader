@@ -164,11 +164,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     spacing: gap,
                     runSpacing: gap,
                     children: [
-                      for (final (mode, palette) in [
-                        ('system', ReaderPalette.light),
-                        ('light', ReaderPalette.light),
-                        ('sepia', ReaderPalette.sepia),
-                        ('dark', ReaderPalette.dark),
+                      for (final (mode, color) in [
+                        ('system', Colors.white),
+                        ('light', Colors.white),
+                        ('sepia', ReaderPalette.sepia.background),
+                        ('dark', Colors.black),
                       ])
                         SizedBox(
                           width: width,
@@ -179,7 +179,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 ? null
                                 : () => _saveTheme(mode),
                             preview: _BackgroundSwatch(
-                              palette: palette,
+                              color: color,
                               system: mode == 'system',
                             ),
                           ),
@@ -681,27 +681,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 
 class _BackgroundSwatch extends StatelessWidget {
-  const _BackgroundSwatch({required this.palette, required this.system});
+  const _BackgroundSwatch({required this.color, required this.system});
 
-  final ReaderPalette palette;
+  final Color color;
   final bool system;
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 52,
-    height: 46,
+    width: 36,
+    height: 36,
     clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(6),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.black),
     ),
     child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      textDirection: TextDirection.ltr,
       children: [
-        Expanded(child: ColoredBox(color: palette.background)),
-        if (system) ...[
-          Expanded(child: ColoredBox(color: ReaderPalette.sepia.background)),
-          Expanded(child: ColoredBox(color: ReaderPalette.dark.background)),
-        ],
+        Expanded(child: ColoredBox(color: color)),
+        if (system) const Expanded(child: ColoredBox(color: Colors.black)),
       ],
     ),
   );

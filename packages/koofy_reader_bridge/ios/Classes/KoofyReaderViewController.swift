@@ -461,8 +461,9 @@ final class KoofyReaderViewController: UIViewController, EPUBNavigatorDelegate, 
         } else {
             top = view.safeAreaInsets.top
         }
-        if let bodyTop, bodyTop.constant != top {
-            bodyTop.constant = top
+        let readingTop = top + 20
+        if let bodyTop, bodyTop.constant != readingTop {
+            bodyTop.constant = readingTop
         }
         updateSpreadDivider()
     }

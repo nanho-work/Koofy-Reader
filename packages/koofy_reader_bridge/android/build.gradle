@@ -36,7 +36,7 @@ tasks.named('preBuild').configure { dependsOn(sharedReaderAssets) }
 
 dependencies {
     implementation 'com.google.mlkit:translate:17.0.3'
-    implementation 'com.unity3d.ads-mediation:mediation-sdk:9.4.0'
+    implementation 'com.unity3d.ads-mediation:mediation-sdk:9.4.3'
     implementation 'com.unity3d.ads-mediation:unityads-adapter:5.5.0'
     implementation 'com.unity3d.ads-mediation:admob-adapter:5.4.0'
     implementation 'com.google.android.gms:play-services-ads:24.9.0'
