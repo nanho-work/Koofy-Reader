@@ -1,0 +1,11 @@
+첫 프레임은 assets/04_마지막대사_가로.png
+가로 16대9, 8초, 제공되면 1080p, 음성 생성 켜기.
+8초 선택이 없으면 10초 생성 후 필요한 구간을 편집한다.
+배경음악 옵션은 끈다. 마지막 프레임은 비워둔다.
+
+The man looks toward the camera with a relaxed, quietly pleased expression while holding his open foldable phone steadily in both hands. He gives a tiny natural nod and says in Korean, “무료 소설도 있고, 내 파일도 넣어서 읽을 수 있네.” His lip movements synchronize accurately with the Korean dialogue. He speaks casually and warmly, like sharing a small discovery, with understated acting. After speaking, he gives a subtle smile and briefly looks back down at his phone. Keep the same face, clothing and phone shape. The camera remains nearly still. One continuous realistic lifestyle commercial shot.
+
+Audio consists only of the man's natural Korean speaking voice. No background music, no ambient noise, no sound effects, no off-screen narration. No subtitles or on-screen text.
+
+이 영상 뒤에 무료다운로드_음성포함.mp4를 붙인다.
+엔딩 음성은 임시 한국어 여성 합성 내레이션이다.
