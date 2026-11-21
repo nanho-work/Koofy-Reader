@@ -1,3 +1,4 @@
+import { interviews } from './interviews';
 import {readerStatistics} from './reader-statistics';
 import { prepareStoryBody } from './story-body';
 import { storyCatalog } from './story-catalog';
@@ -40,6 +41,7 @@ const options = { region: 'asia-northeast3', maxInstances: 3, minInstances: 0, c
 const previewKeys = defineSecret('READER_EPISODE_PREVIEW_KEYS');
 const previewEnabled = defineBoolean('READER_EPISODE_PREVIEW_ENABLED', { default: false });
 const preview = episodePreview(db, bucket);
+const readerInterviews = interviews(db, bucket);
 
 function sendError(error: unknown, response: { status: (code: number) => { json: (value: unknown) => unknown } }) {
   if (error instanceof ApiError) response.status(error.status).json({ error: error.message });
@@ -285,6 +287,7 @@ export const readerAdmin = onRequest(options, async (request, response) => {
     try { claims = await getAuth(adminIdentity).verifyIdToken(token); }
     catch { throw new ApiError(401, '관리자 인증이 만료되었거나 올바르지 않습니다. 다시 로그인해 주세요.'); }
     requireSuperAdmin({ superAdmin: claims.superAdmin });
+    if (request.query.action === 'interviews') { await readerInterviews.admin(request, response); return; }
     if (request.method === 'GET') {
       if (request.query.action === 'statistics') { response.json(await readerStatistics(request.query.source, request.query.days, request.query.platform)); return; }
       if (request.query.action === 'works') { response.json(await adminWorks(request.query.kind, request.query.after, request.query.scope)); return; }
@@ -561,7 +564,12 @@ export const readerAdmin = onRequest(options, async (request, response) => {
 
 const serveStory = storyCatalog(db, bucket);
 export const readerStory = onRequest({ ...options, concurrency: 8 }, async (request, response) => {
-  try { await serveStory(request, response); }
+  try {
+    if (['interviews', 'interview', 'interviewPhoto'].some(action => action === request.query.action)) {
+      await readerInterviews.public(request, response); return;
+    }
+    await serveStory(request, response);
+  }
   catch (error) { sendError(error, response); }
 });
 

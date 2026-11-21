@@ -1,3 +1,4 @@
+import 'package:koofy_reader/features/interviews/interview_page.dart';
 import 'package:koofy_reader/features/catalog/presentation/download_status_bar.dart';
 import 'package:koofy_reader/features/notifications/notification_widgets.dart';
 import 'package:flutter/material.dart';
@@ -209,6 +210,18 @@ class _DiscoveryPage extends StatelessWidget {
               children: [KoofyReaderWordmark(), UpdateInboxButton()],
             ),
             const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const InterviewPage(),
+                  ),
+                ),
+                icon: const Icon(Icons.people_outline, size: 20),
+                label: Text(interviewsTitle(context)),
+              ),
+            ),
             DiscoveryFeed(onBrowse: onBrowse),
           ],
         ),
